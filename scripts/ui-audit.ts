@@ -97,6 +97,17 @@ const expectedLightTokens = {
   "--nw-radius": "8px"
 };
 
+const expectedDarkTokens = {
+  "--bg": "#16181a",
+  "--surface": "#212528",
+  "--surface-muted": "#2b3033",
+  "--surface-sunken": "#121416",
+  "--text": "#e9edef",
+  "--primary": "#6fa2d0",
+  "--border": "#333a3e",
+  "--nw-radius": "8px"
+};
+
 const publicRoutes = [
   "/",
   "/search?q=E2E",
@@ -155,7 +166,9 @@ async function main() {
         storageState
       });
       const page = await context.newPage();
-      await auditLightDesignTokens(page, browserName, viewport.name);
+      await auditDesignTokens(page, "light", expectedLightTokens, browserName, viewport.name);
+      await auditDesignTokens(page, "dark", expectedDarkTokens, browserName, viewport.name);
+      await setAppearanceCookie(page, "light");
       for (const route of buildRoutes({
         articleSlug,
         categorySlug,
@@ -335,15 +348,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-async function auditLightDesignTokens(page: Page, browserName: string, sizeName: string) {
+async function setAppearanceCookie(page: Page, theme: "light" | "dark") {
   await page.context().addCookies([
     {
       name: "noviqwiki-appearance",
-      value: "light",
+      value: theme,
       url: baseUrl,
       sameSite: "Lax"
     }
   ]);
+}
+
+async function auditDesignTokens(
+  page: Page,
+  theme: "light" | "dark",
+  expectedTokens: Record<string, string>,
+  browserName: string,
+  sizeName: string
+) {
+  await setAppearanceCookie(page, theme);
   const response = await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   if (!response || response.status() >= 500) {
     addFailure({
@@ -359,7 +382,7 @@ async function auditLightDesignTokens(page: Page, browserName: string, sizeName:
   const metrics = (await page.evaluate(`(() => {
     const style = getComputedStyle(document.documentElement);
     const tokens = {};
-    for (const name of ${JSON.stringify(Object.keys(expectedLightTokens))}) {
+    for (const name of ${JSON.stringify(Object.keys(expectedTokens))}) {
       tokens[name] = style.getPropertyValue(name).trim();
     }
     return {
@@ -371,7 +394,7 @@ async function auditLightDesignTokens(page: Page, browserName: string, sizeName:
     };
   })()`)) as DesignTokenMetrics;
 
-  const tokenMismatches = Object.entries(expectedLightTokens)
+  const tokenMismatches = Object.entries(expectedTokens)
     .map(([name, expected]) => ({
       name,
       expected,
@@ -390,13 +413,14 @@ async function auditLightDesignTokens(page: Page, browserName: string, sizeName:
     expectedFonts.some((font) => !value.includes(font))
   );
 
-  if (metrics.theme !== "light" || tokenMismatches.length > 0 || fontMismatches.length > 0) {
+  if (metrics.theme !== theme || tokenMismatches.length > 0 || fontMismatches.length > 0) {
     addFailure({
       kind: "design_token_mismatch",
       browserName,
       sizeName,
       route: "/",
       detail: {
+        expectedTheme: theme,
         theme: metrics.theme,
         tokenMismatches,
         fontMismatches
