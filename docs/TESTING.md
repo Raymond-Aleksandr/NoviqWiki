@@ -78,6 +78,7 @@ It checks:
 - Chromium and WebKit at desktop and mobile widths.
 - Public homepage, search, recent changes, category index/detail, media, auth, recovery, reset, verification, registration, article, backlinks, history, and the first discoverable diff route.
 - Authenticated editor and admin routes when credentials are provided.
+- Light theme design tokens for background, surface, muted surface, sunken surface, text, primary, border, radius, and font stacks.
 - Horizontal overflow.
 - Sub-32px command targets.
 - Safari/WebKit checkbox, radio, and file-input sizing.

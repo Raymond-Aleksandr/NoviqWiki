@@ -57,6 +57,14 @@ type ModalMetrics = {
   overflow: boolean;
 };
 
+type DesignTokenMetrics = {
+  theme: string | undefined;
+  tokens: Record<string, string>;
+  bodyFont: string;
+  serifFont: string;
+  monoFont: string;
+};
+
 type Credentials = {
   username: string;
   password: string;
@@ -77,6 +85,17 @@ const viewports: ViewportCase[] = [
   { name: "desktop", width: 1280, height: 820 },
   { name: "mobile", width: 439, height: 734 }
 ];
+
+const expectedLightTokens = {
+  "--bg": "#f6f7f9",
+  "--surface": "#ffffff",
+  "--surface-muted": "#eaedf0",
+  "--surface-sunken": "#e5e8ec",
+  "--text": "#1e2328",
+  "--primary": "#2c5f8f",
+  "--border": "#d4d9df",
+  "--nw-radius": "8px"
+};
 
 const publicRoutes = [
   "/",
@@ -136,6 +155,7 @@ async function main() {
         storageState
       });
       const page = await context.newPage();
+      await auditLightDesignTokens(page, browserName, viewport.name);
       for (const route of buildRoutes({
         articleSlug,
         categorySlug,
@@ -177,7 +197,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no overflow, duplicate admin controls, stray dialogs, tiny controls, iconless command buttons, modal mismatches, mobile shell drift, or active-state transform drift."
+    "UI audit passed: no design token drift, overflow, duplicate admin controls, stray dialogs, tiny controls, iconless command buttons, modal mismatches, mobile shell drift, or active-state transform drift."
   );
 }
 
@@ -313,6 +333,93 @@ function extractFirstCategorySlug(body: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+async function auditLightDesignTokens(page: Page, browserName: string, sizeName: string) {
+  await page.context().addCookies([
+    {
+      name: "noviqwiki-appearance",
+      value: "light",
+      url: baseUrl,
+      sameSite: "Lax"
+    }
+  ]);
+  const response = await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  if (!response || response.status() >= 500) {
+    addFailure({
+      kind: "design_token_navigation_error",
+      browserName,
+      sizeName,
+      route: "/",
+      detail: response?.status() ?? null
+    });
+    return;
+  }
+
+  const metrics = (await page.evaluate(`(() => {
+    const style = getComputedStyle(document.documentElement);
+    const tokens = {};
+    for (const name of ${JSON.stringify(Object.keys(expectedLightTokens))}) {
+      tokens[name] = style.getPropertyValue(name).trim();
+    }
+    return {
+      theme: document.documentElement.dataset.theme,
+      tokens,
+      bodyFont: style.getPropertyValue("--nw-font-body").trim(),
+      serifFont: style.getPropertyValue("--nw-font-serif").trim(),
+      monoFont: style.getPropertyValue("--nw-font-mono").trim()
+    };
+  })()`)) as DesignTokenMetrics;
+
+  const tokenMismatches = Object.entries(expectedLightTokens)
+    .map(([name, expected]) => ({
+      name,
+      expected,
+      actual: metrics.tokens[name]
+    }))
+    .filter(
+      ({ expected, actual }) => normalizeTokenValue(actual) !== normalizeTokenValue(expected)
+    );
+
+  const fontExpectations: Array<[string, string, string[]]> = [
+    ["--nw-font-body", metrics.bodyFont, ["Hanken Grotesk", "Noto Sans SC"]],
+    ["--nw-font-serif", metrics.serifFont, ["Source Serif 4", "Noto Serif SC"]],
+    ["--nw-font-mono", metrics.monoFont, ["JetBrains Mono"]]
+  ];
+  const fontMismatches = fontExpectations.filter(([, value, expectedFonts]) =>
+    expectedFonts.some((font) => !value.includes(font))
+  );
+
+  if (metrics.theme !== "light" || tokenMismatches.length > 0 || fontMismatches.length > 0) {
+    addFailure({
+      kind: "design_token_mismatch",
+      browserName,
+      sizeName,
+      route: "/",
+      detail: {
+        theme: metrics.theme,
+        tokenMismatches,
+        fontMismatches
+      }
+    });
+  }
+}
+
+function normalizeTokenValue(value: string | undefined) {
+  const trimmed = (value ?? "").trim().toLowerCase();
+  const shortHex = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(trimmed);
+  if (shortHex) {
+    return `#${shortHex[1]}${shortHex[1]}${shortHex[2]}${shortHex[2]}${shortHex[3]}${shortHex[3]}`;
+  }
+  const rgb = /^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/.exec(trimmed);
+  if (rgb) {
+    return `#${toHex(Number(rgb[1]))}${toHex(Number(rgb[2]))}${toHex(Number(rgb[3]))}`;
+  }
+  return trimmed.replace(/\s+/g, " ");
+}
+
+function toHex(value: number) {
+  return Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0");
 }
 
 async function auditRoute(page: Page, route: string, browserName: string, sizeName: string) {

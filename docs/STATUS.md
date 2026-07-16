@@ -77,6 +77,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Added `pnpm test:ui`, a repeatable non-reset Chromium/WebKit desktop/mobile release audit for live review databases and the `NoviqWiki.html` design-package requirements. It covers public routes, authenticated admin/editor routes, media picker/page delete modals, active button states, history controls, and the first discoverable diff route, and the local authenticated run passed with zero icon, overflow, dialog, duplicate-control, tiny-control, Safari form-control, modal consistency, or pressed-state failures.
 - 2026-07-16: Expanded `pnpm test:ui` to lock down the remaining live-review regressions: mobile sidebar height/width, media deletion confirmation, and admin user reset-session confirmation now use the same non-reset Chromium/WebKit desktop/mobile audit. The authenticated local run passed without opening destructive confirmation submissions.
 - 2026-07-16: Expanded the non-reset UI release audit to cover registration, article backlinks, and the first discoverable category detail page in addition to the existing public, editor, admin, modal, and diff routes. The authenticated local Chromium/WebKit desktop/mobile run passed without database reset.
+- 2026-07-16: Added light-theme design token checks to `pnpm test:ui` so the design package colors, radius token, and font stacks are now release-gated alongside layout, modal, icon, and Safari form-control checks.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes
