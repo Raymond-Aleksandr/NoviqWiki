@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { BookOpen } from "lucide-react";
 import { ActionForm } from "@/components/ui/action-form";
 import { getCurrentSession } from "@/modules/auth/session";
 import { loginAction } from "@/app/actions";
@@ -19,50 +20,61 @@ export default async function LoginPage({ searchParams }: Props) {
   }
   const params = await searchParams;
   return (
-    <section className="panel">
-      <h1>Log in</h1>
-      {params.registered ? (
-        <p role="status" className="meta">
-          Account created. If email verification is enabled, open the verification link before
-          logging in.
-        </p>
-      ) : null}
-      {params.reset ? (
-        <p role="status" className="meta">
-          Password reset complete. You can log in with the new password.
-        </p>
-      ) : null}
-      {params.verified ? (
-        <p role="status" className="meta">
-          Email verified. You can log in now.
-        </p>
-      ) : null}
-      <ActionForm action={loginAction}>
-        <label>
-          Username or email
-          <input className="field" name="identifier" autoComplete="username" required />
-        </label>
-        <label>
-          Password
-          <input
-            className="field"
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-          />
-        </label>
-        <button className="primary">Log in</button>
-      </ActionForm>
-      {site.settings?.registrationMode === "open" ||
-      site.settings?.registrationMode === "email_verification" ? (
-        <p>
-          Need an account? <Link href="/register">Register</Link>
-        </p>
-      ) : null}
-      <p>
-        <Link href="/forgot-password">Forgot password?</Link>
-      </p>
+    <section className="auth-page">
+      <div className="auth-card">
+        <div className="auth-form-panel">
+          <div className="auth-brand">
+            <span>
+              <BookOpen size={19} aria-hidden="true" />
+            </span>
+            <strong>{site.site.name}</strong>
+          </div>
+          <h1>Log in</h1>
+          {params.registered ? (
+            <p role="status" className="notice">
+              Account created. If email verification is enabled, open the verification link before
+              logging in.
+            </p>
+          ) : null}
+          {params.reset ? (
+            <p role="status" className="notice">
+              Password reset complete. You can log in with the new password.
+            </p>
+          ) : null}
+          {params.verified ? (
+            <p role="status" className="notice">
+              Email verified. You can log in now.
+            </p>
+          ) : null}
+          <ActionForm action={loginAction}>
+            <label>
+              Username or email
+              <input className="field" name="identifier" autoComplete="username" required />
+            </label>
+            <label>
+              Password
+              <input
+                className="field"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
+            <button className="primary">Log in</button>
+          </ActionForm>
+          <div className="auth-links">
+            <Link href="/forgot-password">Forgot password?</Link>
+            {site.settings?.registrationMode === "open" ||
+            site.settings?.registrationMode === "email_verification" ? (
+              <Link href="/register">Create account</Link>
+            ) : null}
+          </div>
+        </div>
+        <div className="auth-art" aria-hidden="true">
+          <span>brand image · optional</span>
+        </div>
+      </div>
     </section>
   );
 }

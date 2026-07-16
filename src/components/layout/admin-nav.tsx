@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function AdminNav() {
   return (
-    <nav className="article-tabs" aria-label="Admin navigation">
+    <nav className="admin-tabs" aria-label="Admin navigation">
       <Link className="button" href="/admin">
         Dashboard
       </Link>
