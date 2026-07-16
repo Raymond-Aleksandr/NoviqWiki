@@ -3,11 +3,13 @@
 import { useMemo, useState, useActionState } from "react";
 import { Check, ChevronRight } from "lucide-react";
 import type { ActionState } from "@/app/actions";
+import type { Messages } from "@/i18n";
 
 type SetupValues = {
   siteName: string;
   tagline: string;
   baseUrl: string;
+  defaultLocale: "en" | "zh-CN";
   registrationMode: "closed" | "open" | "email_verification" | "invite";
   mediaDriver: "local" | "s3";
   ownerUsername: string;
@@ -20,51 +22,63 @@ type Props = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   defaultBaseUrl: string;
   defaultMediaDriver: "local" | "s3";
+  initialLocale: "en" | "zh-CN";
+  messages: Messages;
 };
 
 const initialActionState: ActionState = { ok: true };
 
-const steps = [
-  {
-    id: "site",
-    title: "Site",
-    eyebrow: "Identity",
-    description: "Name the wiki and set the canonical address."
-  },
-  {
-    id: "access",
-    title: "Access",
-    eyebrow: "Policy",
-    description: "Choose how new users can enter the wiki."
-  },
-  {
-    id: "storage",
-    title: "Storage",
-    eyebrow: "Media",
-    description: "Select where uploaded files should live."
-  },
-  {
-    id: "owner",
-    title: "Owner",
-    eyebrow: "Account",
-    description: "Create the first administrator account."
-  },
-  {
-    id: "review",
-    title: "Review",
-    eyebrow: "Launch",
-    description: "Confirm the setup details and create the site."
-  }
-] as const;
-
-export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Props) {
+export function SetupWizard({
+  action,
+  defaultBaseUrl,
+  defaultMediaDriver,
+  initialLocale,
+  messages
+}: Props) {
   const [activeStep, setActiveStep] = useState(0);
   const [localError, setLocalError] = useState("");
   const [actionState, formAction, pending] = useActionState(action, initialActionState);
+  const steps = useMemo(
+    () =>
+      [
+        {
+          id: "site",
+          title: messages.setupSite,
+          eyebrow: messages.setupIdentity,
+          description: messages.setupSiteDescription
+        },
+        {
+          id: "access",
+          title: messages.setupAccess,
+          eyebrow: messages.setupPolicy,
+          description: messages.setupAccessDescription
+        },
+        {
+          id: "storage",
+          title: messages.setupStorage,
+          eyebrow: messages.setupMedia,
+          description: messages.setupStorageDescription
+        },
+        {
+          id: "owner",
+          title: messages.setupOwner,
+          eyebrow: messages.setupAccount,
+          description: messages.setupOwnerDescription
+        },
+        {
+          id: "review",
+          title: messages.setupReview,
+          eyebrow: messages.setupLaunch,
+          description: messages.setupReviewDescription
+        }
+      ] as const,
+    [messages]
+  );
   const [values, setValues] = useState<SetupValues>({
     siteName: "NoviqWiki",
-    tagline: "A modern self-hosted wiki",
+    tagline: messages.modernSelfHostedWiki,
     baseUrl: defaultBaseUrl,
+    defaultLocale: initialLocale,
     registrationMode: "closed",
     mediaDriver: defaultMediaDriver,
     ownerUsername: "",
@@ -81,7 +95,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
   }
 
   function goNext() {
-    const error = validateStep(activeStep, values);
+    const error = validateStep(activeStep, values, messages);
     if (error) {
       setLocalError(error);
       return;
@@ -99,12 +113,9 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
   return (
     <section className="setup-shell" aria-labelledby="setup-title">
       <div className="setup-hero">
-        <p className="setup-kicker">First-run setup</p>
-        <h1 id="setup-title">Set up NoviqWiki</h1>
-        <p>
-          Create the first site, choose the access policy, configure media storage, and create the
-          Owner account. This route closes permanently after setup succeeds.
-        </p>
+        <p className="setup-kicker">{messages.firstRunSetup}</p>
+        <h1 id="setup-title">{messages.setupTitle}</h1>
+        <p>{messages.setupIntro}</p>
       </div>
 
       <form action={formAction} className="setup-wizard">
@@ -112,7 +123,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
           <input key={key} type="hidden" name={key} value={value} />
         ))}
 
-        <aside className="setup-stepper" aria-label="Setup steps">
+        <aside className="setup-stepper" aria-label={messages.setupStepsLabel}>
           <div className="setup-progress" aria-hidden="true">
             <span style={{ inlineSize: `${progress}%` }} />
           </div>
@@ -154,7 +165,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
           {activeStep === 0 ? (
             <div className="setup-fields">
               <label>
-                Site name
+                {messages.siteName}
                 <input
                   className="field"
                   value={values.siteName}
@@ -163,7 +174,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                 />
               </label>
               <label>
-                Tagline
+                {messages.tagline}
                 <input
                   className="field"
                   value={values.tagline}
@@ -171,13 +182,25 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                 />
               </label>
               <label>
-                Base URL
+                {messages.baseUrl}
                 <input
                   className="field"
                   value={values.baseUrl}
                   onChange={(event) => update("baseUrl", event.target.value)}
                   inputMode="url"
                 />
+              </label>
+              <label>
+                {messages.defaultLocale}
+                <select
+                  value={values.defaultLocale}
+                  onChange={(event) =>
+                    update("defaultLocale", event.target.value as "en" | "zh-CN")
+                  }
+                >
+                  <option value="zh-CN">{messages.simplifiedChinese}</option>
+                  <option value="en">{messages.english}</option>
+                </select>
               </label>
             </div>
           ) : null}
@@ -191,8 +214,8 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                   onChange={() => update("registrationMode", "closed")}
                 />
                 <span>
-                  <strong>Closed</strong>
-                  <small>Only administrators can create accounts.</small>
+                  <strong>{messages.registrationClosed}</strong>
+                  <small>{messages.registrationClosedDescription}</small>
                 </span>
               </label>
               <label className="setup-choice">
@@ -202,8 +225,8 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                   onChange={() => update("registrationMode", "invite")}
                 />
                 <span>
-                  <strong>Invite or administrator-created</strong>
-                  <small>Keep public signup disabled while allowing controlled growth.</small>
+                  <strong>{messages.registrationInvite}</strong>
+                  <small>{messages.registrationInviteDescription}</small>
                 </span>
               </label>
               <label className="setup-choice">
@@ -213,8 +236,8 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                   onChange={() => update("registrationMode", "open")}
                 />
                 <span>
-                  <strong>Open</strong>
-                  <small>Anyone can register and receive default permissions.</small>
+                  <strong>{messages.registrationOpen}</strong>
+                  <small>{messages.registrationOpenDescription}</small>
                 </span>
               </label>
               <label className="setup-choice">
@@ -224,8 +247,8 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                   onChange={() => update("registrationMode", "email_verification")}
                 />
                 <span>
-                  <strong>Email verification required</strong>
-                  <small>New accounts must verify email when SMTP is configured.</small>
+                  <strong>{messages.registrationEmailVerification}</strong>
+                  <small>{messages.registrationEmailVerificationDescription}</small>
                 </span>
               </label>
             </div>
@@ -240,8 +263,8 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                   onChange={() => update("mediaDriver", "local")}
                 />
                 <span>
-                  <strong>Local persistent filesystem</strong>
-                  <small>Best default for Docker Compose. Uses the mounted media volume.</small>
+                  <strong>{messages.localFilesystem}</strong>
+                  <small>{messages.localFilesystemDescription}</small>
                 </span>
               </label>
               <label className="setup-choice">
@@ -251,8 +274,8 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                   onChange={() => update("mediaDriver", "s3")}
                 />
                 <span>
-                  <strong>S3-compatible object storage</strong>
-                  <small>Use when production media should live outside the app container.</small>
+                  <strong>{messages.s3Storage}</strong>
+                  <small>{messages.s3StorageDescription}</small>
                 </span>
               </label>
             </div>
@@ -261,7 +284,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
           {activeStep === 3 ? (
             <div className="setup-fields">
               <label>
-                Username
+                {messages.username}
                 <input
                   className="field"
                   value={values.ownerUsername}
@@ -270,7 +293,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                 />
               </label>
               <label>
-                Email
+                {messages.email}
                 <input
                   className="field"
                   type="email"
@@ -280,7 +303,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                 />
               </label>
               <label>
-                Display name
+                {messages.displayName}
                 <input
                   className="field"
                   value={values.ownerDisplayName}
@@ -288,7 +311,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                 />
               </label>
               <label>
-                Password
+                {messages.password}
                 <input
                   className="field"
                   type="password"
@@ -304,32 +327,39 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
             <div className="setup-review">
               <dl>
                 <div>
-                  <dt>Site</dt>
+                  <dt>{messages.setupSite}</dt>
                   <dd>{values.siteName}</dd>
                 </div>
                 <div>
-                  <dt>Base URL</dt>
+                  <dt>{messages.baseUrl}</dt>
                   <dd>{values.baseUrl}</dd>
                 </div>
                 <div>
-                  <dt>Registration</dt>
-                  <dd>{registrationLabel(values.registrationMode)}</dd>
+                  <dt>{messages.defaultLocale}</dt>
+                  <dd>
+                    {values.defaultLocale === "zh-CN"
+                      ? messages.simplifiedChinese
+                      : messages.english}
+                  </dd>
                 </div>
                 <div>
-                  <dt>Media storage</dt>
-                  <dd>{values.mediaDriver === "local" ? "Local filesystem" : "S3-compatible"}</dd>
+                  <dt>{messages.registration}</dt>
+                  <dd>{registrationLabel(values.registrationMode, messages)}</dd>
                 </div>
                 <div>
-                  <dt>Owner</dt>
+                  <dt>{messages.mediaStorage}</dt>
+                  <dd>
+                    {values.mediaDriver === "local" ? messages.localFilesystem : messages.s3Storage}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{messages.owner}</dt>
                   <dd>
                     {values.ownerUsername} · {values.ownerEmail}
                   </dd>
                 </div>
               </dl>
-              <p className="muted">
-                Setup is a one-time operation. After creation, future changes happen in the admin
-                settings area.
-              </p>
+              <p className="muted">{messages.setupOneTimeNote}</p>
             </div>
           ) : null}
 
@@ -346,7 +376,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
 
           <div className="setup-actions">
             <button type="button" onClick={goBack} disabled={activeStep === 0 || pending}>
-              Back
+              {messages.back}
             </button>
             {activeStep < steps.length - 1 ? (
               <button
@@ -356,12 +386,12 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                 onClick={goNext}
                 disabled={pending}
               >
-                Continue
+                {messages.continue}
                 <ChevronRight size={15} aria-hidden="true" />
               </button>
             ) : (
               <button key="submit" type="submit" className="primary" disabled={pending}>
-                {pending ? "Creating site..." : "Complete setup"}
+                {pending ? messages.creatingSite : messages.completeSetup}
               </button>
             )}
           </div>
@@ -371,36 +401,36 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
   );
 }
 
-function validateStep(step: number, values: SetupValues) {
+function validateStep(step: number, values: SetupValues, messages: Messages) {
   if (step === 0) {
-    if (!values.siteName.trim()) return "Enter a site name.";
+    if (!values.siteName.trim()) return messages.enterSiteName;
     try {
       new URL(values.baseUrl);
     } catch {
-      return "Enter a valid base URL.";
+      return messages.enterValidBaseUrl;
     }
   }
   if (step === 3) {
-    if (!values.ownerUsername.trim()) return "Enter an Owner username.";
+    if (!values.ownerUsername.trim()) return messages.enterOwnerUsername;
     if (!/^[A-Za-z0-9_.-]+$/.test(values.ownerUsername)) {
-      return "Username can use letters, numbers, underscore, dot, and hyphen.";
+      return messages.usernameCharacters;
     }
-    if (!values.ownerEmail.includes("@")) return "Enter a valid Owner email.";
-    if (values.ownerPassword.length < 12) return "Password must be at least 12 characters.";
+    if (!values.ownerEmail.includes("@")) return messages.enterOwnerEmail;
+    if (values.ownerPassword.length < 12) return messages.passwordLength;
     if (
       !/[a-z]/.test(values.ownerPassword) ||
       !/[A-Z]/.test(values.ownerPassword) ||
       !/[0-9]/.test(values.ownerPassword)
     ) {
-      return "Password must include lowercase, uppercase, and a number.";
+      return messages.passwordComplexity;
     }
   }
   return "";
 }
 
-function registrationLabel(mode: SetupValues["registrationMode"]) {
-  if (mode === "open") return "Open";
-  if (mode === "email_verification") return "Email verification required";
-  if (mode === "invite") return "Invite or administrator-created";
-  return "Closed";
+function registrationLabel(mode: SetupValues["registrationMode"], messages: Messages) {
+  if (mode === "open") return messages.registrationOpen;
+  if (mode === "email_verification") return messages.registrationEmailVerification;
+  if (mode === "invite") return messages.registrationInvite;
+  return messages.registrationClosed;
 }

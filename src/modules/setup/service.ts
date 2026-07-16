@@ -16,6 +16,7 @@ export async function completeSetup(
     siteName: string;
     tagline: string;
     baseUrl: string;
+    defaultLocale?: "en" | "zh-CN";
     registrationMode: "open" | "email_verification" | "invite" | "closed";
     mediaDriver: "local" | "s3";
     ownerUsername: string;
@@ -43,6 +44,7 @@ export async function completeSetup(
       siteId: site.id,
       tagline: input.tagline,
       baseUrl: input.baseUrl,
+      defaultLocale: input.defaultLocale ?? "en",
       registrationMode: input.registrationMode,
       mediaDriver: input.mediaDriver,
       homepageTitle: input.siteName,
@@ -55,7 +57,8 @@ export async function completeSetup(
         email: input.ownerEmail,
         displayName: input.ownerDisplayName,
         password: input.ownerPassword,
-        status: "active"
+        status: "active",
+        locale: input.defaultLocale ?? "en"
       },
       tx
     );

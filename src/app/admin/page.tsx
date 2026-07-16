@@ -4,6 +4,7 @@ import { Activity, FileText, ImageIcon, Layers3, Users } from "lucide-react";
 import { db } from "@/db/client";
 import { mediaAssets, pageDrafts, pages, users } from "@/db/schema";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 import { listRecentChanges } from "@/modules/activity/service";
 
 export default async function AdminDashboard() {
@@ -18,55 +19,64 @@ export default async function AdminDashboard() {
       mediaCount: sql<number>`(select count(*)::int from ${mediaAssets} where site_id = ${siteId} and deleted_at is null)`
     })
     .from(sql`(select 1) as stats`);
-  const changes = await listRecentChanges({ siteId, limit: 8 });
+  const [changes, i18n] = await Promise.all([
+    listRecentChanges({ siteId, limit: 8 }),
+    getRequestI18n(site!.settings?.defaultLocale)
+  ]);
+  const { locale, messages } = i18n;
   return (
     <section className="admin-page">
-      <h1>Admin dashboard</h1>
+      <h1>{messages.dashboard}</h1>
       <div className="admin-stat-grid">
-        <Stat icon={<FileText size={18} />} value={stats.pageCount} label="Pages" />
-        <Stat icon={<Layers3 size={18} />} value={stats.publishedPageCount} label="Published" />
-        <Stat icon={<Activity size={18} />} value={stats.draftCount} label="Drafts" />
-        <Stat icon={<Users size={18} />} value={stats.userCount} label="Users" />
-        <Stat icon={<ImageIcon size={18} />} value={stats.mediaCount} label="Media" />
+        <Stat icon={<FileText size={18} />} value={stats.pageCount} label={messages.pages} />
+        <Stat
+          icon={<Layers3 size={18} />}
+          value={stats.publishedPageCount}
+          label={messages.published}
+        />
+        <Stat icon={<Activity size={18} />} value={stats.draftCount} label={messages.drafts} />
+        <Stat icon={<Users size={18} />} value={stats.userCount} label={messages.users} />
+        <Stat icon={<ImageIcon size={18} />} value={stats.mediaCount} label={messages.media} />
       </div>
       <div className="admin-panels">
         <section className="data-panel activity-card">
-          <div className="admin-panel-heading">Recent activity</div>
+          <div className="admin-panel-heading">{messages.recentActivity}</div>
           {changes.length === 0 ? (
-            <div className="admin-panel-row muted">No recent activity.</div>
+            <div className="admin-panel-row muted">{messages.noRecentActivity}</div>
           ) : (
             changes.map((change) => (
               <div className="admin-panel-row" key={change.id}>
                 <span className="mono admin-event-name">{change.action}</span>
                 <span className="mono muted" style={{ marginLeft: "auto", fontSize: "11px" }}>
-                  {change.actorDisplayName ?? "System"} · {change.createdAt.toLocaleString()}
+                  {change.actorDisplayName ?? messages.system} ·{" "}
+                  {change.createdAt.toLocaleString(locale)}
                 </span>
               </div>
             ))
           )}
         </section>
         <section className="data-panel admin-status-panel">
-          <div className="admin-panel-heading">Operational status</div>
+          <div className="admin-panel-heading">{messages.operationalStatus}</div>
           <div className="admin-panel-row admin-status-row">
-            <span className="admin-status-label">Database</span>
+            <span className="admin-status-label">{messages.database}</span>
             <span className="status-ok">
-              <span className="admin-dot" /> Ready
+              <span className="admin-dot" /> {messages.ready}
             </span>
           </div>
           <div className="admin-panel-row admin-status-row">
-            <span className="admin-status-label">Storage</span>
+            <span className="admin-status-label">{messages.storage}</span>
             <span className="status-ok">
-              <span className="admin-dot" /> Configured
+              <span className="admin-dot" /> {messages.configured}
             </span>
           </div>
           <div className="admin-panel-row admin-status-row">
-            <span className="admin-status-label">Migrations</span>
+            <span className="admin-status-label">{messages.migrations}</span>
             <span className="status-ok">
               <span className="admin-dot" /> Drizzle
             </span>
           </div>
           <div className="admin-panel-row admin-status-row">
-            <span className="admin-status-label">Application</span>
+            <span className="admin-status-label">{messages.application}</span>
             <span className="status-ok">
               <span className="admin-dot" /> v0.1.0
             </span>

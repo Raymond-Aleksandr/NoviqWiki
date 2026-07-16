@@ -4,6 +4,7 @@ import { BookOpen } from "lucide-react";
 import { ActionForm } from "@/components/ui/action-form";
 import { registerAction } from "@/app/actions";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 
 export default async function RegisterPage() {
   const site = await getPrimarySiteWithSettings();
@@ -16,6 +17,7 @@ export default async function RegisterPage() {
   ) {
     redirect("/login");
   }
+  const { messages } = await getRequestI18n(site.settings?.defaultLocale);
   return (
     <section className="auth-compact auth-shell">
       <div className="auth-compact-card">
@@ -25,15 +27,15 @@ export default async function RegisterPage() {
           </span>
           <strong>{site.site.name}</strong>
         </div>
-        <h1>Create account</h1>
-        <p>Register a local NoviqWiki account using the site access policy.</p>
-        <ActionForm action={registerAction}>
+        <h1>{messages.createAccount}</h1>
+        <p>{messages.registerDescription}</p>
+        <ActionForm action={registerAction} pendingLabel={messages.working}>
           <label>
-            Username
+            {messages.username}
             <input className="field input" name="username" autoComplete="username" required />
           </label>
           <label>
-            Email
+            {messages.email}
             <input
               className="field input"
               name="email"
@@ -43,11 +45,11 @@ export default async function RegisterPage() {
             />
           </label>
           <label>
-            Display name
+            {messages.displayName}
             <input className="field input" name="displayName" />
           </label>
           <label>
-            Password
+            {messages.password}
             <input
               className="field input"
               name="password"
@@ -56,10 +58,10 @@ export default async function RegisterPage() {
               required
             />
           </label>
-          <button className="primary button-primary">Create account</button>
+          <button className="primary button-primary">{messages.createAccount}</button>
         </ActionForm>
         <p className="muted" style={{ marginTop: "14px", marginBottom: 0 }}>
-          Already have an account? <Link href="/login">Log in</Link>
+          {messages.alreadyHaveAccount} <Link href="/login">{messages.login}</Link>
         </p>
       </div>
     </section>

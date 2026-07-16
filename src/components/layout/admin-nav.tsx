@@ -2,23 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard } from "lucide-react";
+import type { Messages } from "@/i18n";
 
-export function AdminNav() {
+export function AdminNav({ messages }: { messages: Messages }) {
   const pathname = usePathname();
   const links = [
-    { href: "/admin", label: "Dashboard" },
-    { href: "/admin/pages", label: "Pages" },
-    { href: "/admin/users", label: "Users" },
-    { href: "/admin/groups", label: "Groups" },
-    { href: "/admin/roles", label: "Roles" },
-    { href: "/admin/media", label: "Media" },
-    { href: "/admin/settings", label: "Settings" },
-    { href: "/admin/audit", label: "Audit" },
-    { href: "/admin/status", label: "Status" }
+    { href: "/admin", label: messages.dashboard },
+    { href: "/admin/pages", label: messages.pages },
+    { href: "/admin/users", label: messages.users },
+    { href: "/admin/groups", label: messages.groups },
+    { href: "/admin/roles", label: messages.roles },
+    { href: "/admin/media", label: messages.media },
+    { href: "/admin/settings", label: messages.settings },
+    { href: "/admin/audit", label: messages.audit },
+    { href: "/admin/status", label: messages.status }
   ] as const;
   return (
-    <nav className="admin-tabs" aria-label="Admin navigation">
+    <nav className="admin-tabs" aria-label={messages.adminNavigation}>
       {links.map(({ href, label }) => {
         const active = href === "/admin" ? pathname === href : pathname.startsWith(href);
         return (
@@ -28,7 +28,6 @@ export function AdminNav() {
             href={href}
             aria-current={active ? "page" : undefined}
           >
-            {active && href === "/admin" ? <LayoutDashboard size={15} aria-hidden="true" /> : null}
             {label}
           </Link>
         );

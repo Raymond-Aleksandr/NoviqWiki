@@ -57,6 +57,20 @@ test("fresh setup and core wiki workflow", async ({ page }) => {
 
   await page.goto("/search?q=Initial");
   await expect(page.getByRole("link", { name: "E2E Article" })).toBeVisible();
+
+  await page.goto("/edit/new");
+  await page.getByLabel("Page title").fill("Linked Source");
+  await page.locator(".cm-content").click();
+  await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await page.keyboard.type("# Linked Source\n\nThis page links to [[E2E Article]].");
+  await page.getByLabel("Edit summary").fill("Create backlink source");
+  await page.getByRole("button", { name: "Publish" }).click();
+  await expect(page).toHaveURL(/\/page\/linked-source/);
+
+  await page.goto("/page/e2e-article");
+  await page.getByRole("link", { name: "What links here" }).click();
+  await expect(page.getByRole("heading", { name: "What links here" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Linked Source/ })).toBeVisible();
 });
 
 test("media upload, user administration, and mobile article layout", async ({

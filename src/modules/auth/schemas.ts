@@ -42,6 +42,7 @@ export const setupSchema = z.object({
   siteName: z.string().trim().min(1).max(160),
   tagline: z.string().trim().max(240).default("A modern self-hosted wiki"),
   baseUrl: z.string().trim().url(),
+  defaultLocale: z.enum(["en", "zh-CN"]).default("en"),
   registrationMode: z.enum(["open", "email_verification", "invite", "closed"]).default("closed"),
   mediaDriver: z.enum(["local", "s3"]).default("local"),
   ownerUsername: z

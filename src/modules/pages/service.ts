@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, isNull, max, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
 import { db, type Database, type RootDatabase } from "@/db/client";
 import {
   categories,
@@ -330,6 +330,103 @@ export async function listRevisions(pageId: string, database: Database = db) {
     .orderBy(desc(pageRevisions.revisionNumber));
 }
 
+export type PageBacklink = {
+  pageId: string;
+  title: string;
+  slug: string;
+  updatedAt: Date;
+};
+
+export async function listPageBacklinks(
+  input: { siteId: string; pageId: string; limit?: number; offset?: number },
+  database: Database = db
+): Promise<PageBacklink[]> {
+  const page = await getPageById(input.pageId, database);
+  if (page.siteId !== input.siteId) {
+    throw new NotFoundError("Page not found.");
+  }
+  const rows = await database
+    .select({
+      pageId: pages.id,
+      title: pages.title,
+      slug: pages.slug,
+      updatedAt: pages.updatedAt
+    })
+    .from(pageLinks)
+    .innerJoin(pages, eq(pages.id, pageLinks.sourcePageId))
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt),
+        sql`${pages.id} <> ${page.id}`,
+        or(
+          eq(pageLinks.targetPageId, page.id),
+          eq(pageLinks.targetNormalizedTitle, page.normalizedTitle)
+        )
+      )
+    )
+    .orderBy(desc(pages.updatedAt))
+    .limit(input.limit ?? 50)
+    .offset(input.offset ?? 0);
+
+  return uniqueRows(rows, (row) => row.pageId);
+}
+
+export type PageOutboundLink = {
+  targetTitle: string;
+  label: string | null;
+  targetPageId: string | null;
+  targetSlug: string | null;
+  exists: boolean;
+};
+
+export async function listPageOutboundLinks(
+  input: { siteId: string; pageId: string },
+  database: Database = db
+): Promise<PageOutboundLink[]> {
+  const rows = await database
+    .select()
+    .from(pageLinks)
+    .where(eq(pageLinks.sourcePageId, input.pageId))
+    .orderBy(asc(pageLinks.targetTitle));
+  if (rows.length === 0) {
+    return [];
+  }
+
+  const targetPages = await database
+    .select({
+      id: pages.id,
+      slug: pages.slug,
+      normalizedTitle: pages.normalizedTitle,
+      status: pages.status,
+      deletedAt: pages.deletedAt
+    })
+    .from(pages)
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        inArray(
+          pages.normalizedTitle,
+          rows.map((row) => row.targetNormalizedTitle)
+        )
+      )
+    );
+  const targets = new Map(targetPages.map((page) => [page.normalizedTitle, page]));
+
+  return rows.map((row) => {
+    const target = targets.get(row.targetNormalizedTitle);
+    const exists = Boolean(target && target.status === "published" && !target.deletedAt);
+    return {
+      targetTitle: row.targetTitle,
+      label: row.label,
+      targetPageId: exists ? (target?.id ?? null) : null,
+      targetSlug: exists ? (target?.slug ?? null) : null,
+      exists
+    };
+  });
+}
+
 export async function compareRevisions(
   input: { fromRevisionId: string; toRevisionId: string },
   database: RootDatabase = db
@@ -655,4 +752,18 @@ async function updateRelationships(
         set: { targetPageId: targetPage?.id ?? null, label: target }
       });
   }
+}
+
+function uniqueRows<T>(rows: T[], keyFn: (row: T) => string) {
+  const seen = new Set<string>();
+  const unique: T[] = [];
+  for (const row of rows) {
+    const key = keyFn(row);
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    unique.push(row);
+  }
+  return unique;
 }

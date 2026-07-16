@@ -1,69 +1,84 @@
 import { updateSettingsAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 
 export default async function AdminSettingsPage() {
   const site = await getPrimarySiteWithSettings();
   const settings = site!.settings!;
+  const { messages } = await getRequestI18n(settings.defaultLocale);
   return (
     <section className="admin-page compact">
-      <h1>Site settings</h1>
-      <ActionForm action={updateSettingsAction} className="settings-grid">
+      <h1>{messages.siteSettings}</h1>
+      <ActionForm
+        action={updateSettingsAction}
+        className="settings-grid"
+        pendingLabel={messages.working}
+      >
         <section className="settings-card">
-          <div className="settings-kicker">Identity</div>
+          <div className="settings-kicker">{messages.identity}</div>
           <label>
-            Site name
+            {messages.siteName}
             <input className="field" value={site!.site.name} readOnly />
           </label>
           <label>
-            Tagline
+            {messages.tagline}
             <input className="field" name="tagline" defaultValue={settings.tagline} />
           </label>
           <label>
-            Base URL
+            {messages.baseUrl}
             <input className="field mono" name="baseUrl" defaultValue={settings.baseUrl} />
           </label>
           <label>
-            Homepage title
+            {messages.defaultLocale}
+            <select name="defaultLocale" defaultValue={settings.defaultLocale}>
+              <option value="zh-CN">{messages.simplifiedChinese}</option>
+              <option value="en">{messages.english}</option>
+            </select>
+          </label>
+          <label>
+            {messages.homepageTitle}
             <input className="field" name="homepageTitle" defaultValue={settings.homepageTitle} />
           </label>
           <label>
-            Homepage intro
+            {messages.homepageIntro}
             <textarea name="homepageIntro" defaultValue={settings.homepageIntro} />
           </label>
         </section>
         <section className="settings-card">
-          <div className="settings-kicker">Access &amp; appearance</div>
+          <div className="settings-kicker">{messages.accessAndAppearance}</div>
           <div className="switch-row">
             <div>
-              <div style={{ fontSize: "14px", fontWeight: 500 }}>Allow anonymous reading</div>
+              <div style={{ fontSize: "14px", fontWeight: 500 }}>
+                {messages.allowAnonymousReading}
+              </div>
               <div className="muted" style={{ fontSize: "12px" }}>
-                Visitors can read without an account.
+                {messages.anonymousReadingHelp}
               </div>
             </div>
             <label>
               <input type="checkbox" name="publicMode" defaultChecked={settings.publicMode} />
-              Public wiki
+              {messages.publicWiki}
             </label>
           </div>
           <label>
-            Registration mode
+            {messages.registrationMode}
             <select name="registrationMode" defaultValue={settings.registrationMode}>
-              <option value="open">Open</option>
-              <option value="email_verification">Email verification required</option>
-              <option value="invite">Invite or administrator-created</option>
-              <option value="closed">Closed</option>
+              <option value="open">{messages.registrationOpen}</option>
+              <option value="email_verification">{messages.registrationEmailVerification}</option>
+              <option value="invite">{messages.registrationInvite}</option>
+              <option value="closed">{messages.registrationClosed}</option>
             </select>
           </label>
           <label>
-            Footer
+            {messages.footer}
             <textarea name="footerContent" defaultValue={settings.footerContent} />
           </label>
         </section>
         <section className="settings-card">
-          <div className="settings-kicker">Upload policy</div>
+          <div className="settings-kicker">{messages.uploadPolicy}</div>
           <label>
-            Upload max bytes
+            {messages.uploadMaxBytes}
             <input
               className="field"
               name="uploadMaxBytes"
@@ -73,7 +88,7 @@ export default async function AdminSettingsPage() {
           </label>
         </section>
         <div className="settings-actions">
-          <button className="primary">Save changes</button>
+          <button className="primary">{messages.saveChanges}</button>
         </div>
       </ActionForm>
     </section>

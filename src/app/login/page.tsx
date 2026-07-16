@@ -5,6 +5,7 @@ import { ActionForm } from "@/components/ui/action-form";
 import { getCurrentSession } from "@/modules/auth/session";
 import { loginAction } from "@/app/actions";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 
 type Props = {
   searchParams: Promise<{ registered?: string; reset?: string; verified?: string }>;
@@ -18,6 +19,7 @@ export default async function LoginPage({ searchParams }: Props) {
   if (!site) {
     redirect("/setup");
   }
+  const { messages } = await getRequestI18n(site.settings?.defaultLocale);
   const params = await searchParams;
   return (
     <section className="auth-page auth-shell">
@@ -29,30 +31,29 @@ export default async function LoginPage({ searchParams }: Props) {
             </span>
             <strong>{site.site.name}</strong>
           </div>
-          <h1>Log in</h1>
+          <h1>{messages.loginTitle}</h1>
           {params.registered ? (
             <p role="status" className="notice">
-              Account created. If email verification is enabled, open the verification link before
-              logging in.
+              {messages.accountCreatedNotice}
             </p>
           ) : null}
           {params.reset ? (
             <p role="status" className="notice">
-              Password reset complete. You can log in with the new password.
+              {messages.passwordResetComplete}
             </p>
           ) : null}
           {params.verified ? (
             <p role="status" className="notice">
-              Email verified. You can log in now.
+              {messages.emailVerifiedNotice}
             </p>
           ) : null}
-          <ActionForm action={loginAction}>
+          <ActionForm action={loginAction} pendingLabel={messages.working}>
             <label>
-              Username or email
+              {messages.usernameOrEmail}
               <input className="field input" name="identifier" autoComplete="username" required />
             </label>
             <label>
-              Password
+              {messages.password}
               <input
                 className="field input"
                 name="password"
@@ -61,18 +62,18 @@ export default async function LoginPage({ searchParams }: Props) {
                 required
               />
             </label>
-            <button className="primary button-primary">Log in</button>
+            <button className="primary button-primary">{messages.login}</button>
           </ActionForm>
           <div className="auth-links">
-            <Link href="/forgot-password">Forgot password?</Link>
+            <Link href="/forgot-password">{messages.forgotPassword}</Link>
             {site.settings?.registrationMode === "open" ||
             site.settings?.registrationMode === "email_verification" ? (
-              <Link href="/register">Create account</Link>
+              <Link href="/register">{messages.createAccount}</Link>
             ) : null}
           </div>
         </div>
         <div className="auth-art" aria-hidden="true">
-          <span>brand image · optional</span>
+          <span>{messages.authBrandImage}</span>
         </div>
       </div>
     </section>

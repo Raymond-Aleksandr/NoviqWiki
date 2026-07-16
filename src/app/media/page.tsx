@@ -3,6 +3,7 @@ import { Upload } from "lucide-react";
 import { deleteMediaAction, uploadMediaAction } from "@/app/actions";
 import { MediaLibrary, type MediaLibraryItem } from "@/components/media-library";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { listMedia } from "@/modules/media/service";
@@ -13,24 +14,24 @@ export default async function MediaPage() {
     redirect("/setup");
   }
   const session = await getCurrentSession();
-  const [canUpload, canDelete, assets] = await Promise.all([
+  const [canUpload, canDelete, assets, i18n] = await Promise.all([
     hasPermission(session?.user.id, site.site.id, "media.upload"),
     hasPermission(session?.user.id, site.site.id, "media.delete"),
-    listMedia({ siteId: site.site.id, limit: 100 })
+    listMedia({ siteId: site.site.id, limit: 100 }),
+    getRequestI18n(site.settings?.defaultLocale)
   ]);
+  const { messages } = i18n;
   return (
     <section className="page-frame wide">
       <header className="page-header">
         <div>
-          <h1 className="page-title">Media library</h1>
-          <p className="page-description">
-            Upload, browse, copy URLs, and insert media into articles.
-          </p>
+          <h1 className="page-title">{messages.mediaLibrary}</h1>
+          <p className="page-description">{messages.mediaLibraryDescription}</p>
         </div>
         {canUpload ? (
           <a className="button primary" href="#media-upload">
             <Upload size={16} aria-hidden="true" />
-            Upload
+            {messages.upload}
           </a>
         ) : null}
       </header>
@@ -40,6 +41,7 @@ export default async function MediaPage() {
         canDelete={canDelete}
         uploadAction={uploadMediaAction}
         deleteAction={deleteMediaAction}
+        messages={messages}
       />
     </section>
   );

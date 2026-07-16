@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, FileText } from "lucide-react";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 import { getCategoryWithPages } from "@/modules/categories/service";
 
 type Props = {
@@ -14,13 +15,19 @@ export default async function CategoryPage({ params }: Props) {
     redirect("/setup");
   }
   const { slug } = await params;
-  const result = await getCategoryWithPages({ siteId: site.site.id, slug });
+  const [result, i18n] = await Promise.all([
+    getCategoryWithPages({ siteId: site.site.id, slug }),
+    getRequestI18n(site.settings?.defaultLocale)
+  ]);
+  const { messages } = i18n;
   return (
     <section className="page-frame">
       <header className="page-header stack">
-        <h1 className="page-title">Category: {result.category.name}</h1>
+        <h1 className="page-title">
+          {messages.categoryPrefix}: {result.category.name}
+        </h1>
         <p className="page-description">
-          {result.category.description || "Published pages grouped under this category."}
+          {result.category.description || messages.categoryDefaultDescription}
         </p>
       </header>
       <div className="category-card-grid">
@@ -29,7 +36,9 @@ export default async function CategoryPage({ params }: Props) {
           <span className="category-card-body">
             <span>
               <strong>{result.category.name}</strong>
-              <span className="muted">{result.pages.length} pages</span>
+              <span className="muted">
+                {result.pages.length} {messages.pagesLower}
+              </span>
             </span>
             <ChevronRight size={16} aria-hidden="true" />
           </span>
@@ -38,11 +47,11 @@ export default async function CategoryPage({ params }: Props) {
       <section className="data-panel page-list-panel">
         <header className="panel-header">
           <span className="badge info">{result.category.name}</span>
-          <h2>Pages in this category</h2>
+          <h2>{messages.pagesInThisCategory}</h2>
         </header>
         {result.pages.length === 0 ? (
           <div className="empty-state">
-            <strong>No published pages in this category.</strong>
+            <strong>{messages.noPublishedPagesInCategory}</strong>
           </div>
         ) : (
           result.pages.map((page) => (

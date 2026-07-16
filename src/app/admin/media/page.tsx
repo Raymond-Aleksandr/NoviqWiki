@@ -1,6 +1,7 @@
 import { deleteMediaAction, uploadMediaAction } from "@/app/actions";
 import { MediaLibrary, type MediaLibraryItem } from "@/components/media-library";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { listMedia } from "@/modules/media/service";
@@ -8,19 +9,19 @@ import { listMedia } from "@/modules/media/service";
 export default async function AdminMediaPage() {
   const site = await getPrimarySiteWithSettings();
   const session = await getCurrentSession();
-  const [canUpload, canDelete, rows] = await Promise.all([
+  const [canUpload, canDelete, rows, i18n] = await Promise.all([
     hasPermission(session?.user.id, site!.site.id, "media.upload"),
     hasPermission(session?.user.id, site!.site.id, "media.delete"),
-    listMedia({ siteId: site!.site.id, limit: 200 })
+    listMedia({ siteId: site!.site.id, limit: 200 }),
+    getRequestI18n(site!.settings?.defaultLocale)
   ]);
+  const { messages } = i18n;
   return (
     <section className="admin-page">
       <header className="page-header">
         <div>
-          <h1 className="page-title admin-title">Media</h1>
-          <p className="page-description">
-            Browse uploads, inspect metadata, and copy insertion syntax.
-          </p>
+          <h1 className="page-title admin-title">{messages.media}</h1>
+          <p className="page-description">{messages.mediaAdminDescription}</p>
         </div>
       </header>
       <MediaLibrary
@@ -29,7 +30,8 @@ export default async function AdminMediaPage() {
         canDelete={canDelete}
         uploadAction={uploadMediaAction}
         deleteAction={deleteMediaAction}
-        emptyMessage="Uploaded files will appear in the administrative media library."
+        messages={messages}
+        emptyMessage={messages.mediaEmptyAdminLibrary}
       />
     </section>
   );

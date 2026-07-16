@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { completeSetup } from "@/modules/setup/service";
-import { createPage, listRevisions, publishPage, rollbackPage } from "@/modules/pages/service";
+import {
+  createPage,
+  listPageBacklinks,
+  listPageOutboundLinks,
+  listRevisions,
+  publishPage,
+  rollbackPage
+} from "@/modules/pages/service";
 import { searchPages } from "@/modules/search/service";
 import { createTestDatabase } from "../helpers/test-db";
 
@@ -43,6 +50,32 @@ describe("page lifecycle integration", () => {
     expect(firstRevision.revisionNumber).toBe(1);
 
     const page = first.page;
+    const source = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Link Source",
+        markdown: "# Link Source\n\nSee [[Lifecycle]].",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Link to lifecycle"
+      },
+      test.db
+    );
+    const sourcePage = source.page;
+    const backlinks = await listPageBacklinks(
+      { siteId: setup.site.id, pageId: page.id },
+      test.executor
+    );
+    expect(backlinks.map((backlink) => backlink.title)).toContain("Link Source");
+    const outboundLinks = await listPageOutboundLinks(
+      { siteId: setup.site.id, pageId: sourcePage.id },
+      test.executor
+    );
+    expect(outboundLinks).toContainEqual(
+      expect.objectContaining({ targetTitle: "Lifecycle", exists: true })
+    );
+
     const second = await publishPage(
       {
         pageId: page.id,

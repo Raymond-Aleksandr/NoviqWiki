@@ -5,17 +5,19 @@ import type { ReactNode } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { Bold, Heading2, Image, Italic, Link, List, Quote } from "lucide-react";
+import type { Messages } from "@/i18n";
 
 type Props = {
   name?: string;
   initialValue?: string;
   footer?: ReactNode;
+  messages: Messages;
 };
 
-export function MarkdownEditor({ name = "markdown", initialValue = "", footer }: Props) {
+export function MarkdownEditor({ name = "markdown", initialValue = "", footer, messages }: Props) {
   const [value, setValue] = useState(initialValue);
   const extensions = useMemo(() => [markdown()], []);
-  const preview = useMemo(() => renderPreview(value), [value]);
+  const preview = useMemo(() => renderPreview(value, messages), [messages, value]);
 
   function insert(before: string, after = "", sample = "") {
     setValue(
@@ -26,69 +28,69 @@ export function MarkdownEditor({ name = "markdown", initialValue = "", footer }:
 
   return (
     <div className="editor-shell">
-      <div className="editor-toolbar" role="toolbar" aria-label="Markdown formatting">
+      <div className="editor-toolbar" role="toolbar" aria-label={messages.markdownFormatting}>
         <button
           className="editor-tool-button"
           type="button"
-          title="Bold"
+          title={messages.bold}
           onClick={() => insert("**", "**", "bold")}
         >
           <Bold size={16} aria-hidden="true" />
-          <span className="sr-only">Bold</span>
+          <span className="sr-only">{messages.bold}</span>
         </button>
         <button
           className="editor-tool-button"
           type="button"
-          title="Italic"
+          title={messages.italic}
           onClick={() => insert("*", "*", "italic")}
         >
           <Italic size={16} aria-hidden="true" />
-          <span className="sr-only">Italic</span>
+          <span className="sr-only">{messages.italic}</span>
         </button>
         <button
           className="editor-tool-button"
           type="button"
-          title="Heading"
-          onClick={() => insert("## ", "", "Heading")}
+          title={messages.heading}
+          onClick={() => insert("## ", "", messages.heading)}
         >
           <Heading2 size={16} aria-hidden="true" />
-          <span className="sr-only">Heading</span>
+          <span className="sr-only">{messages.heading}</span>
         </button>
         <button
           className="editor-tool-button"
           type="button"
-          title="List"
-          onClick={() => insert("- ", "", "List item")}
+          title={messages.list}
+          onClick={() => insert("- ", "", messages.list)}
         >
           <List size={16} aria-hidden="true" />
-          <span className="sr-only">List</span>
+          <span className="sr-only">{messages.list}</span>
         </button>
         <button
           className="editor-tool-button"
           type="button"
-          title="Quote"
-          onClick={() => insert("> ", "", "Quote")}
+          title={messages.quote}
+          onClick={() => insert("> ", "", messages.quote)}
         >
           <Quote size={16} aria-hidden="true" />
-          <span className="sr-only">Quote</span>
+          <span className="sr-only">{messages.quote}</span>
         </button>
         <button
           className="editor-tool-button"
           type="button"
-          title="Link"
+          title={messages.link}
           onClick={() => insert("[", "](https://example.com)", "link")}
         >
           <Link size={16} aria-hidden="true" />
-          <span className="sr-only">Link</span>
+          <span className="sr-only">{messages.link}</span>
         </button>
         <button
           className="editor-tool-button"
           type="button"
-          title="Image"
-          onClick={() => insert("![", "](/media/example.png)", "alt text")}
+          title={messages.image}
+          onClick={() => insert("![", "](/media/example.png)", messages.altText)}
         >
           <Image size={16} aria-hidden="true" />
-          <span className="sr-only">Image</span>
+          <span className="sr-only">{messages.image}</span>
         </button>
       </div>
       <div className="editor-columns">
@@ -99,11 +101,11 @@ export function MarkdownEditor({ name = "markdown", initialValue = "", footer }:
             extensions={extensions}
             basicSetup={{ lineNumbers: true, foldGutter: true }}
             onChange={setValue}
-            aria-label="Markdown editor"
+            aria-label={messages.markdownEditor}
           />
         </div>
-        <div className="editor-preview" aria-label="Markdown preview">
-          <div className="editor-preview-kicker">Live preview</div>
+        <div className="editor-preview" aria-label={messages.markdownPreview}>
+          <div className="editor-preview-kicker">{messages.livePreview}</div>
           {preview}
         </div>
       </div>
@@ -113,7 +115,7 @@ export function MarkdownEditor({ name = "markdown", initialValue = "", footer }:
   );
 }
 
-function renderPreview(value: string): ReactNode[] | ReactNode {
+function renderPreview(value: string, messages: Messages): ReactNode[] | ReactNode {
   const nodes: ReactNode[] = [];
   let listItems: ReactNode[] = [];
 
@@ -165,7 +167,7 @@ function renderPreview(value: string): ReactNode[] | ReactNode {
   });
 
   flushList();
-  return nodes.length > 0 ? nodes : <p className="muted">Preview appears here as you write.</p>;
+  return nodes.length > 0 ? nodes : <p className="muted">{messages.previewEmpty}</p>;
 }
 
 function renderInline(text: string): ReactNode[] {

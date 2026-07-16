@@ -20,6 +20,12 @@ const spec = {
     "/pages/{id}/revisions": {
       get: { summary: "List revisions", responses: { "200": { description: "Revisions" } } }
     },
+    "/pages/{id}/backlinks": {
+      get: {
+        summary: "List published pages that link to this page",
+        responses: { "200": { description: "Backlinks" } }
+      }
+    },
     "/revisions/{id}": {
       get: { summary: "Get revision", responses: { "200": { description: "Revision" } } }
     },

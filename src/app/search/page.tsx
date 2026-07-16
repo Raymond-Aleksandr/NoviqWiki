@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Search } from "lucide-react";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 import { listCategories } from "@/modules/categories/service";
 import { searchPages } from "@/modules/search/service";
 
@@ -18,32 +19,36 @@ export default async function SearchPage({ searchParams }: Props) {
   const results = q
     ? await searchPages({ siteId: site.site.id, query: q, category })
     : { rows: [], count: 0 };
-  const categories = await listCategories(site.site.id);
+  const [categories, i18n] = await Promise.all([
+    listCategories(site.site.id),
+    getRequestI18n(site.settings?.defaultLocale)
+  ]);
+  const { messages } = i18n;
   return (
     <section className="page-frame">
-      <h1 className="page-title">Search</h1>
+      <h1 className="page-title">{messages.search}</h1>
       <form className="search-form-main" role="search">
         <label className="search-input-main">
           <Search size={18} aria-hidden="true" />
           <input
             name="q"
             defaultValue={q}
-            aria-label="Search query"
-            placeholder="Search this wiki..."
+            aria-label={messages.searchQuery}
+            placeholder={messages.searchThisWikiPlaceholder}
           />
         </label>
         <input type="hidden" name="category" value={category ?? ""} />
-        <button className="primary">Search</button>
+        <button className="primary">{messages.search}</button>
       </form>
       <div className="search-layout">
         <aside>
-          <div className="search-filter-title">Filter · Categories</div>
+          <div className="search-filter-title">{messages.filterCategories}</div>
           <div className="search-filter-list">
             <Link
               className={`search-filter-link ${!category ? "active" : ""}`}
               href={`/search?q=${encodeURIComponent(q)}`}
             >
-              <span>All</span>
+              <span>{messages.all}</span>
               <span>{results.count}</span>
             </Link>
             {categories.slice(0, 8).map((item) => (
@@ -61,8 +66,8 @@ export default async function SearchPage({ searchParams }: Props) {
         <div>
           <p className="meta">
             {q
-              ? `${results.count} result${results.count === 1 ? "" : "s"}`
-              : "Enter a query to search pages."}
+              ? `${results.count} ${results.count === 1 ? messages.result : messages.results}`
+              : messages.enterQueryToSearch}
           </p>
           <div className="search-results">
             {results.rows.map((row) => (
@@ -75,8 +80,8 @@ export default async function SearchPage({ searchParams }: Props) {
           </div>
           {q && results.rows.length === 0 ? (
             <section className="empty-state">
-              <strong>No results.</strong>
-              <p className="muted">Try a different title, alias, body term, or category.</p>
+              <strong>{messages.noResultsWithPeriod}</strong>
+              <p className="muted">{messages.searchNoResultsHint}</p>
             </section>
           ) : null}
         </div>

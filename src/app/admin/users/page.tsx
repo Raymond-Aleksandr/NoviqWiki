@@ -5,6 +5,7 @@ import { ActionForm } from "@/components/ui/action-form";
 import { db } from "@/db/client";
 import { groupRoles, groups, roles, userGroups } from "@/db/schema";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 import { listUsers } from "@/modules/users/service";
 
 export default async function AdminUsersPage() {
@@ -36,32 +37,37 @@ export default async function AdminUsersPage() {
   for (const row of roleRows) {
     roleMap.set(row.userId, [...(roleMap.get(row.userId) ?? []), row.roleName]);
   }
+  const { locale, messages } = await getRequestI18n(site!.settings?.defaultLocale);
   return (
     <section className="admin-page">
-      <h1>Users</h1>
+      <h1>{messages.users}</h1>
       <section className="panel admin-create-panel">
-        <h2>Create account</h2>
-        <ActionForm action={createUserAction} className="admin-form-grid">
+        <h2>{messages.createAccount}</h2>
+        <ActionForm
+          action={createUserAction}
+          className="admin-form-grid"
+          pendingLabel={messages.working}
+        >
           <label>
-            Username
+            {messages.username}
             <input className="field" name="username" required />
           </label>
           <label>
-            Email
+            {messages.email}
             <input className="field" name="email" type="email" required />
           </label>
           <label>
-            Display name
+            {messages.displayName}
             <input className="field" name="displayName" />
           </label>
           <label>
-            Password
+            {messages.password}
             <input className="field" name="password" type="password" required />
           </label>
           <label>
-            Initial group
+            {messages.initialGroup}
             <select name="groupId" defaultValue="">
-              <option value="">No group</option>
+              <option value="">{messages.noGroup}</option>
               {groupRows.map((group) => (
                 <option key={group.id} value={group.id}>
                   {group.name}
@@ -71,41 +77,45 @@ export default async function AdminUsersPage() {
           </label>
           <button className="primary">
             <Plus size={15} aria-hidden="true" />
-            Create user
+            {messages.createUser}
           </button>
         </ActionForm>
       </section>
       <div className="data-panel admin-table admin-grid-users">
         <div className="admin-grid-header admin-users-grid admin-grid-users">
-          <div>User</div>
-          <div>Email</div>
-          <div>Role</div>
-          <div>Status</div>
-          <div>Last login</div>
-          <div style={{ textAlign: "right" }}>Actions</div>
+          <div>{messages.user}</div>
+          <div>{messages.email}</div>
+          <div>{messages.role}</div>
+          <div>{messages.status}</div>
+          <div>{messages.lastLogin}</div>
+          <div style={{ textAlign: "right" }}>{messages.actions}</div>
         </div>
         {rows.map((user) => (
           <article className="admin-grid-row admin-users-grid admin-grid-users" key={user.id}>
-            <div className="user-cell" data-label="User">
+            <div className="user-cell" data-label={messages.user}>
               <span className="avatar" aria-hidden="true">
                 {user.displayName.slice(0, 2).toUpperCase()}
               </span>
               <strong>{user.username}</strong>
             </div>
-            <div className="mono muted" data-label="Email">
+            <div className="mono muted" data-label={messages.email}>
               {user.email}
             </div>
-            <div data-label="Role">
+            <div data-label={messages.role}>
               <span className="role-badge">{roleMap.get(user.id)?.join(", ") ?? "-"}</span>
             </div>
-            <div data-label="Status">
+            <div data-label={messages.status}>
               <span className={`status-badge ${user.status}`}>{user.status}</span>
             </div>
-            <div className="mono muted" data-label="Last login">
-              {user.lastLoginAt?.toLocaleString() ?? "Never"}
+            <div className="mono muted" data-label={messages.lastLogin}>
+              {user.lastLoginAt?.toLocaleString(locale) ?? messages.never}
             </div>
-            <div className="admin-action-list" data-label="Actions">
-              <ActionForm action={updateUserStatusAction} className="inline-form">
+            <div className="admin-action-list" data-label={messages.actions}>
+              <ActionForm
+                action={updateUserStatusAction}
+                className="inline-form"
+                pendingLabel={messages.working}
+              >
                 <input type="hidden" name="userId" value={user.id} />
                 <input
                   type="hidden"
@@ -114,7 +124,7 @@ export default async function AdminUsersPage() {
                 />
                 <button
                   className="icon-button"
-                  title={user.status === "active" ? "Suspend" : "Activate"}
+                  title={user.status === "active" ? messages.suspend : messages.activate}
                 >
                   {user.status === "active" ? (
                     <Pause size={15} aria-hidden="true" />
@@ -122,15 +132,19 @@ export default async function AdminUsersPage() {
                     <Play size={15} aria-hidden="true" />
                   )}
                   <span className="sr-only">
-                    {user.status === "active" ? "Suspend" : "Activate"}
+                    {user.status === "active" ? messages.suspend : messages.activate}
                   </span>
                 </button>
               </ActionForm>
-              <ActionForm action={resetUserSessionsAction} className="inline-form">
+              <ActionForm
+                action={resetUserSessionsAction}
+                className="inline-form"
+                pendingLabel={messages.working}
+              >
                 <input type="hidden" name="userId" value={user.id} />
-                <button className="icon-button" title="Reset sessions">
+                <button className="icon-button" title={messages.resetSessions}>
                   <RotateCcw size={15} aria-hidden="true" />
-                  <span className="sr-only">Reset sessions</span>
+                  <span className="sr-only">{messages.resetSessions}</span>
                 </button>
               </ActionForm>
             </div>

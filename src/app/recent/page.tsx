@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 import { listRecentChanges } from "@/modules/activity/service";
 
 export default async function RecentChangesPage() {
@@ -7,28 +8,30 @@ export default async function RecentChangesPage() {
   if (!site) {
     redirect("/setup");
   }
-  const changes = await listRecentChanges({ siteId: site.site.id, limit: 100 });
+  const [changes, i18n] = await Promise.all([
+    listRecentChanges({ siteId: site.site.id, limit: 100 }),
+    getRequestI18n(site.settings?.defaultLocale)
+  ]);
+  const { locale, messages } = i18n;
   return (
     <section className="page-frame">
       <header className="page-header stack">
-        <h1 className="page-title">Recent changes</h1>
-        <p className="page-description">
-          Created pages, edits, publications, rollbacks, deletions, restores, and media activity.
-        </p>
+        <h1 className="page-title">{messages.recentChanges}</h1>
+        <p className="page-description">{messages.recentChangesDescription}</p>
       </header>
-      <div className="filter-pills" aria-label="Recent changes filters">
-        <span className="filter-pill active">All</span>
-        <span className="filter-pill">created</span>
-        <span className="filter-pill">edited</span>
-        <span className="filter-pill">published</span>
-        <span className="filter-pill">rollback</span>
-        <span className="filter-pill">media</span>
+      <div className="filter-pills" aria-label={messages.recentChangesFilters}>
+        <span className="filter-pill active">{messages.all}</span>
+        <span className="filter-pill">{messages.created}</span>
+        <span className="filter-pill">{messages.edited}</span>
+        <span className="filter-pill">{messages.publishedLower}</span>
+        <span className="filter-pill">{messages.rollbackLower}</span>
+        <span className="filter-pill">{messages.mediaLower}</span>
       </div>
       <div className="timeline-panel">
         {changes.length === 0 ? (
           <div className="empty-state">
-            <strong>No changes yet.</strong>
-            <p className="muted">Activity appears here after pages or media are changed.</p>
+            <strong>{messages.noChangesYet}</strong>
+            <p className="muted">{messages.activityAppears}</p>
           </div>
         ) : (
           changes.map((change) => (
@@ -44,14 +47,16 @@ export default async function RecentChangesPage() {
                 <span className="mono muted">{change.action}</span>
               </span>
               <span className="timeline-meta">
-                <span>{change.actorDisplayName ?? "System"}</span>
-                <span className="mono">{change.createdAt.toLocaleString()}</span>
+                <span>{change.actorDisplayName ?? messages.system}</span>
+                <span className="mono">{change.createdAt.toLocaleString(locale)}</span>
               </span>
             </article>
           ))
         )}
         <footer className="timeline-row">
-          <span className="muted">{changes.length} changes</span>
+          <span className="muted">
+            {changes.length} {messages.changes}
+          </span>
           <span className="timeline-meta">
             <span className="filter-pill active">1</span>
           </span>

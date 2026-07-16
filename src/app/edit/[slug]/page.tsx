@@ -5,6 +5,7 @@ import { editPageAction } from "@/app/actions";
 import { MarkdownEditor } from "@/components/editor/markdown-editor";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 import { getCurrentSession } from "@/modules/auth/session";
 import { requirePermission } from "@/modules/authorization/permissions";
 import { getRevisionById } from "@/modules/pages/service";
@@ -32,41 +33,49 @@ export default async function EditPage({ params }: Props) {
   const revision = resolved.page.currentRevisionId
     ? await getRevisionById(resolved.page.currentRevisionId)
     : null;
+  const { messages } = await getRequestI18n(site.settings?.defaultLocale);
   return (
     <section className="page-frame editor-page">
       <header className="editor-header">
         <div>
-          <h1>Edit · {resolved.page.title}</h1>
+          <h1>
+            {messages.editPageTitlePrefix} · {resolved.page.title}
+          </h1>
           <p className="meta">
-            Base revision {revision?.revisionNumber ?? "none"}. Publishing from an outdated base
-            revision is rejected.
+            {messages.baseRevision} {revision?.revisionNumber ?? messages.none}.{" "}
+            {messages.outdatedBaseRejected}
           </p>
         </div>
-        <div className="unsaved-badge">Unsaved changes</div>
+        <div className="unsaved-badge">{messages.unsavedChanges}</div>
       </header>
-      <ActionForm action={editPageAction} className="editor-form">
+      <ActionForm action={editPageAction} className="editor-form" pendingLabel={messages.working}>
         <input type="hidden" name="pageId" value={resolved.page.id} />
         <input type="hidden" name="slug" value={resolved.page.slug} />
         <input type="hidden" name="baseRevisionId" value={resolved.page.currentRevisionId ?? ""} />
         <MarkdownEditor
           initialValue={revision?.markdown ?? ""}
+          messages={messages}
           footer={
             <>
               <label>
-                <span>Edit summary</span>
-                <input className="field" name="editSummary" placeholder="Describe this change" />
+                <span>{messages.editSummary}</span>
+                <input
+                  className="field"
+                  name="editSummary"
+                  placeholder={messages.editSummaryPlaceholder}
+                />
               </label>
               <Link className="button" href={`/page/${resolved.page.slug}`}>
                 <X size={15} aria-hidden="true" />
-                Cancel
+                {messages.cancel}
               </Link>
               <button name="intent" value="save-draft">
                 <Save size={15} aria-hidden="true" />
-                Save draft
+                {messages.saveDraft}
               </button>
               <button className="primary" name="intent" value="publish">
                 <Check size={15} aria-hidden="true" />
-                Publish
+                {messages.publish}
               </button>
             </>
           }

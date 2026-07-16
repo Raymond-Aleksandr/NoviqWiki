@@ -65,9 +65,12 @@ PATCH /api/v1/pages/{id}
 DELETE /api/v1/pages/{id}
 POST /api/v1/pages/{id}/rollback
 GET /api/v1/pages/{id}/revisions
+GET /api/v1/pages/{id}/backlinks
 ```
 
 The API delegates to the same page services as the server-rendered UI. `POST` and `PATCH` require page permissions and validate title, Markdown, summary, publish intent, and optimistic concurrency fields.
+
+Backlinks return published, non-deleted source pages that link to the requested page through stored wiki-link relationships.
 
 ### Revisions
 

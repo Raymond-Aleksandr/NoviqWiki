@@ -11,7 +11,7 @@ import { getMessages } from "@/i18n";
 
 export const metadata: Metadata = {
   title: "NoviqWiki",
-  description: "A modern self-hosted wiki platform"
+  description: "NoviqWiki"
 };
 
 export const dynamic = "force-dynamic";
@@ -43,14 +43,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         <div className="nw-app">
           <div className="design-utility">
-            <span>NOVIQWIKI · CLASSIC THEME</span>
+            <span>NOVIQWIKI · {messages.classicTheme}</span>
             <PreferenceControls
               initialAppearance={appearance}
               initialLocale={locale === "zh-CN" ? "zh-CN" : "en"}
+              messages={messages}
             />
           </div>
           <div className="shell site-shell">
-            <aside className="sidebar" aria-label="Site navigation">
+            <aside className="sidebar" aria-label={messages.siteNavigation}>
               <Link href="/" className="brand">
                 <span className="brand-mark" aria-hidden="true">
                   <BookOpen size={25} aria-hidden="true" />
@@ -62,10 +63,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {!site ? (
                   <Link className="button sidebar-setup-link" href="/setup">
                     <Rocket size={16} aria-hidden="true" />
-                    First-run setup
+                    {messages.firstRunSetup}
                   </Link>
                 ) : null}
-                <p className="muted">{site?.settings?.tagline ?? "A modern self-hosted wiki"}</p>
+                <p className="muted">{site?.settings?.tagline ?? messages.modernSelfHostedWiki}</p>
               </div>
             </aside>
             <div className="main">
@@ -74,7 +75,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   <label className="sr-only" htmlFor="q">
                     {messages.search}
                   </label>
-                  <input id="q" name="q" placeholder={`${messages.search} this wiki...`} />
+                  <input id="q" name="q" placeholder={messages.searchThisWikiPlaceholder} />
                   <button aria-label={messages.search}>
                     <Search size={18} aria-hidden="true" />
                   </button>

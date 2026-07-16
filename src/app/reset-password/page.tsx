@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { resetPasswordAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
+import { getRequestI18n } from "@/i18n/server";
 
 type Props = {
   searchParams: Promise<{ token?: string }>;
@@ -9,16 +10,17 @@ type Props = {
 
 export default async function ResetPasswordPage({ searchParams }: Props) {
   const { token = "" } = await searchParams;
+  const { messages } = await getRequestI18n();
   return (
     <section className="auth-compact auth-shell">
       <div className="auth-compact-card">
-        <h1>Choose a new password</h1>
-        <p>Enter a replacement password for this account recovery token.</p>
+        <h1>{messages.chooseNewPassword}</h1>
+        <p>{messages.resetPasswordDescription}</p>
         {token ? (
-          <ActionForm action={resetPasswordAction}>
+          <ActionForm action={resetPasswordAction} pendingLabel={messages.working}>
             <input type="hidden" name="token" value={token} />
             <label>
-              New password
+              {messages.newPassword}
               <input
                 className="field input"
                 name="password"
@@ -27,17 +29,17 @@ export default async function ResetPasswordPage({ searchParams }: Props) {
                 required
               />
             </label>
-            <button className="primary button-primary">Reset password</button>
+            <button className="primary button-primary">{messages.resetPassword}</button>
           </ActionForm>
         ) : (
           <p role="alert" className="error">
-            Reset token is missing.
+            {messages.resetTokenMissing}
           </p>
         )}
         <p style={{ marginTop: "14px", marginBottom: 0 }}>
           <Link href="/login">
             <ArrowLeft size={14} aria-hidden="true" />
-            Return to login
+            {messages.returnToLogin}
           </Link>
         </p>
       </div>

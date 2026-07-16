@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Messages } from "@/i18n";
 
 type Appearance = "light" | "dark";
 type Locale = "zh-CN" | "en";
@@ -14,10 +15,12 @@ function setCookie(name: string, value: string) {
 
 export function PreferenceControls({
   initialAppearance,
-  initialLocale
+  initialLocale,
+  messages
 }: {
   initialAppearance: Appearance;
   initialLocale: Locale;
+  messages: Messages;
 }) {
   const [appearance, setAppearance] = useState<Appearance>(initialAppearance);
   const [locale, setLocale] = useState<Locale>(initialLocale);
@@ -39,7 +42,7 @@ export function PreferenceControls({
 
   return (
     <div className="preference-controls">
-      <div className="segmented-control" aria-label="Language">
+      <div className="segmented-control" aria-label={messages.language}>
         <button
           type="button"
           className={locale === "zh-CN" ? "active" : ""}
@@ -57,14 +60,14 @@ export function PreferenceControls({
           EN
         </button>
       </div>
-      <div className="segmented-control" aria-label="Appearance">
+      <div className="segmented-control" aria-label={messages.appearance}>
         <button
           type="button"
           className={appearance === "light" ? "active" : ""}
           aria-pressed={appearance === "light"}
           onClick={() => chooseAppearance("light")}
         >
-          Light
+          {messages.light}
         </button>
         <button
           type="button"
@@ -72,7 +75,7 @@ export function PreferenceControls({
           aria-pressed={appearance === "dark"}
           onClick={() => chooseAppearance("dark")}
         >
-          Dark
+          {messages.dark}
         </button>
       </div>
     </div>

@@ -3,32 +3,30 @@ import { ArrowLeft } from "lucide-react";
 import { requestPasswordResetAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 
 export default async function ForgotPasswordPage() {
   const site = await getPrimarySiteWithSettings();
+  const { messages } = await getRequestI18n(site?.settings?.defaultLocale);
   return (
     <section className="auth-compact auth-shell">
       <div className="auth-compact-card">
-        <h1>Reset password</h1>
-        <p>
-          Enter your username or email address. If SMTP is configured, NoviqWiki sends a reset link.
-        </p>
-        <ActionForm action={requestPasswordResetAction}>
+        <h1>{messages.resetPassword}</h1>
+        <p>{messages.forgotPasswordDescription}</p>
+        <ActionForm action={requestPasswordResetAction} pendingLabel={messages.working}>
           <label>
-            Username or email
+            {messages.usernameOrEmail}
             <input className="field input" name="identifier" autoComplete="username" required />
           </label>
-          <button className="primary button-primary">Request reset link</button>
+          <button className="primary button-primary">{messages.requestResetLink}</button>
         </ActionForm>
         <p style={{ marginTop: "14px", marginBottom: 0 }}>
           <Link href="/login">
             <ArrowLeft size={14} aria-hidden="true" />
-            Return to login
+            {messages.returnToLogin}
           </Link>
         </p>
-        {!site ? (
-          <p className="meta">Setup is required before account recovery is available.</p>
-        ) : null}
+        {!site ? <p className="meta">{messages.setupRequiredRecovery}</p> : null}
       </div>
     </section>
   );

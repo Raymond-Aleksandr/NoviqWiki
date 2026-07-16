@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db/client";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestI18n } from "@/i18n/server";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { requirePermission } from "@/modules/authorization/permissions";
 import {
@@ -97,10 +98,10 @@ export async function requestPasswordResetAction(
   try {
     const parsed = passwordResetRequestSchema.parse(Object.fromEntries(formData.entries()));
     await requestPasswordReset(parsed.identifier);
+    const { messages } = await getRequestI18n();
     return {
       ok: true,
-      message:
-        "If an account matches that identifier and email is configured, a reset link has been sent."
+      message: messages.passwordResetSentGeneric
     };
   } catch (error) {
     return actionError(error);
@@ -162,7 +163,8 @@ export async function createPageAction(
     return actionError(error);
   }
   if (!target) {
-    return { ok: false, message: "Page was not created." };
+    const { messages } = await getRequestI18n();
+    return { ok: false, message: messages.pageNotCreated };
   }
   redirect(target);
 }
@@ -184,7 +186,8 @@ export async function saveDraftAction(
       actorDisplayName: session.user.displayName
     });
     revalidatePath(`/edit/${stringValue(formData, "slug")}`);
-    return { ok: true, message: "Draft saved." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.draftSaved };
   } catch (error) {
     return actionError(error);
   }
@@ -208,7 +211,11 @@ export async function publishPageAction(
     });
     revalidatePath("/");
     revalidatePath(`/page/${stringValue(formData, "slug")}`);
-    return { ok: true, message: `Published revision ${revision.revisionNumber}.` };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return {
+      ok: true,
+      message: `${messages.publishedRevisionPrefix} ${revision.revisionNumber}.`
+    };
   } catch (error) {
     return actionError(error);
   }
@@ -246,7 +253,8 @@ export async function rollbackAction(
     return actionError(error);
   }
   if (!target) {
-    return { ok: false, message: "Rollback was not completed." };
+    const { messages } = await getRequestI18n();
+    return { ok: false, message: messages.rollbackNotCompleted };
   }
   redirect(target);
 }
@@ -265,7 +273,8 @@ export async function deletePageAction(
       actorDisplayName: session.user.displayName
     });
     revalidatePath("/admin/pages");
-    return { ok: true, message: "Page deleted." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.pageDeleted };
   } catch (error) {
     return actionError(error);
   }
@@ -285,7 +294,8 @@ export async function restorePageAction(
       actorDisplayName: session.user.displayName
     });
     revalidatePath("/admin/pages");
-    return { ok: true, message: "Page restored." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.pageRestored };
   } catch (error) {
     return actionError(error);
   }
@@ -308,7 +318,8 @@ export async function renamePageAction(
       actorDisplayName: session.user.displayName
     });
     revalidatePath("/admin/pages");
-    return { ok: true, message: "Page renamed." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.pageRenamed };
   } catch (error) {
     return actionError(error);
   }
@@ -322,6 +333,7 @@ export async function updateSettingsAction(
     const session = await requireSession();
     const site = await requireSite();
     await requirePermission(session.user.id, site.site.id, "site.configure");
+    const defaultLocale = localeValue(formData, "defaultLocale");
     await updateSiteSettings({
       siteId: site.site.id,
       actorId: session.user.id,
@@ -329,6 +341,7 @@ export async function updateSettingsAction(
       values: {
         tagline: stringValue(formData, "tagline"),
         baseUrl: stringValue(formData, "baseUrl"),
+        defaultLocale,
         registrationMode: formData.get("registrationMode") as
           "open" | "email_verification" | "invite" | "closed",
         publicMode: formData.get("publicMode") === "on",
@@ -340,7 +353,8 @@ export async function updateSettingsAction(
     });
     revalidatePath("/");
     revalidatePath("/admin/settings");
-    return { ok: true, message: "Settings updated." };
+    const { messages } = await getRequestI18n(defaultLocale);
+    return { ok: true, message: messages.settingsUpdated };
   } catch (error) {
     return actionError(error);
   }
@@ -356,7 +370,8 @@ export async function uploadMediaAction(
     await requirePermission(session.user.id, site.site.id, "media.upload");
     const file = formData.get("file");
     if (!(file instanceof File)) {
-      throw new AppError("Select a file to upload.", "missing_file", 422);
+      const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+      throw new AppError(messages.selectFileToUpload, "missing_file", 422);
     }
     const bytes = Buffer.from(await file.arrayBuffer());
     await uploadMedia({
@@ -370,7 +385,8 @@ export async function uploadMediaAction(
     });
     revalidatePath("/media");
     revalidatePath("/admin/media");
-    return { ok: true, message: "Media uploaded." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.mediaUploaded };
   } catch (error) {
     return actionError(error);
   }
@@ -394,7 +410,8 @@ export async function deleteMediaAction(
     revalidatePath("/admin/media");
     revalidatePath("/admin");
     revalidatePath("/recent");
-    return { ok: true, message: "Media deleted." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.mediaDeleted };
   } catch (error) {
     return actionError(error);
   }
@@ -413,14 +430,16 @@ export async function createUserAction(
       email: stringValue(formData, "email"),
       displayName: optionalString(formData, "displayName"),
       password: stringValue(formData, "password"),
-      status: "active"
+      status: "active",
+      locale: site.settings?.defaultLocale ?? "en"
     });
     const groupId = optionalString(formData, "groupId");
     if (groupId) {
       await assignUserToGroup(user.id, groupId);
     }
     revalidatePath("/admin/users");
-    return { ok: true, message: "User created." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.userCreated };
   } catch (error) {
     return actionError(error);
   }
@@ -440,7 +459,8 @@ export async function updateUserStatusAction(
       status: stringValue(formData, "status") as "active" | "suspended" | "pending"
     });
     revalidatePath("/admin/users");
-    return { ok: true, message: "User status updated." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.userStatusUpdated };
   } catch (error) {
     return actionError(error);
   }
@@ -456,7 +476,8 @@ export async function resetUserSessionsAction(
     await requirePermission(session.user.id, site.site.id, "user.manage");
     await invalidateUserSessions(stringValue(formData, "userId"));
     revalidatePath("/admin/users");
-    return { ok: true, message: "Sessions reset." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.sessionsResetMessage };
   } catch (error) {
     return actionError(error);
   }
@@ -480,7 +501,8 @@ export async function createGroupAction(
       await assignRoleToGroup(group.id, roleId);
     }
     revalidatePath("/admin/groups");
-    return { ok: true, message: "Group created." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.groupCreated };
   } catch (error) {
     return actionError(error);
   }
@@ -507,7 +529,8 @@ export async function createRoleAction(
       permissionKeys: selected
     });
     revalidatePath("/admin/roles");
-    return { ok: true, message: "Role created." };
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.roleCreated };
   } catch (error) {
     return actionError(error);
   }
@@ -521,7 +544,8 @@ export type ActionState = {
 async function requireSession() {
   const session = await getCurrentSession();
   if (!session) {
-    throw new ForbiddenError("Log in to continue.");
+    const { messages } = await getRequestI18n();
+    throw new ForbiddenError(messages.loginToContinue);
   }
   return session;
 }
@@ -529,7 +553,8 @@ async function requireSession() {
 async function requireSite() {
   const site = await getPrimarySiteWithSettings(db);
   if (!site) {
-    throw new AppError("Setup is required.", "setup_required", 503);
+    const { messages } = await getRequestI18n();
+    throw new AppError(messages.setupRequired, "setup_required", 503);
   }
   return site;
 }
@@ -550,12 +575,21 @@ function optionalString(formData: FormData, key: string) {
   return value;
 }
 
-function actionError(error: unknown): ActionState {
+function localeValue(formData: FormData, key: string): "en" | "zh-CN" {
+  const value = stringValue(formData, key);
+  if (value !== "en" && value !== "zh-CN") {
+    throw new AppError(`Invalid locale: ${value}`, "validation_error", 422);
+  }
+  return value;
+}
+
+async function actionError(error: unknown): Promise<ActionState> {
   if (error instanceof AppError) {
     return { ok: false, message: error.message };
   }
   if (error instanceof Error) {
     return { ok: false, message: error.message };
   }
-  return { ok: false, message: "An unexpected error occurred." };
+  const { messages } = await getRequestI18n();
+  return { ok: false, message: messages.unexpectedError };
 }

@@ -4,6 +4,7 @@ import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Code2, Copy, ImageIcon, Search, Trash2, Upload } from "lucide-react";
 import type { ActionState } from "@/app/actions";
+import type { Messages } from "@/i18n";
 
 export type MediaLibraryItem = {
   id: string;
@@ -33,13 +34,15 @@ export function MediaLibrary({
   canDelete,
   uploadAction,
   deleteAction,
-  emptyMessage = "Uploaded files will appear in this library."
+  messages,
+  emptyMessage
 }: {
   assets: MediaLibraryItem[];
   canUpload: boolean;
   canDelete: boolean;
   uploadAction: ServerAction;
   deleteAction: ServerAction;
+  messages: Messages;
   emptyMessage?: string;
 }) {
   const router = useRouter();
@@ -119,9 +122,9 @@ export function MediaLibrary({
     if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
-      setCopyStatus(`${label} copied.`);
+      setCopyStatus(`${label} ${messages.copiedSuffix}`);
     } catch {
-      setCopyStatus("Clipboard access failed. Select and copy the text manually.");
+      setCopyStatus(messages.clipboardFailed);
     }
   }
 
@@ -131,18 +134,18 @@ export function MediaLibrary({
         <section className="panel upload-panel" id="media-upload">
           <form ref={uploadFormRef} action={uploadFormAction} className="form">
             <label>
-              File
+              {messages.file}
               <input className="field" name="file" type="file" required />
             </label>
             <label>
-              Alt text
+              {messages.altText}
               <input className="field" name="altText" />
             </label>
             <button className="primary" disabled={uploadPending}>
               <Upload size={16} aria-hidden="true" />
-              Upload
+              {messages.upload}
             </button>
-            {uploadPending ? <p className="muted">Working...</p> : null}
+            {uploadPending ? <p className="muted">{messages.working}</p> : null}
             {uploadState.message ? (
               <p role="status" className={uploadState.ok ? "meta" : "error"}>
                 {uploadState.message}
@@ -156,21 +159,23 @@ export function MediaLibrary({
         <div>
           <label className="media-search">
             <Search size={16} aria-hidden="true" />
-            <span className="sr-only">Search uploads by name</span>
+            <span className="sr-only">{messages.searchUploadsByName}</span>
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search by filename..."
+              placeholder={messages.searchByFilenamePlaceholder}
             />
           </label>
           <div className="media-grid">
             {filteredAssets.length === 0 ? (
               <div className="empty-state">
                 <strong>
-                  {assets.length === 0 ? "No media assets yet." : "No media matched."}
+                  {assets.length === 0 ? messages.noMediaAssetsYet : messages.noMediaMatched}
                 </strong>
                 <p className="muted">
-                  {assets.length === 0 ? emptyMessage : "Try another filename."}
+                  {assets.length === 0
+                    ? (emptyMessage ?? messages.mediaEmptyLibrary)
+                    : messages.tryAnotherFilename}
                 </p>
               </div>
             ) : (
@@ -198,7 +203,7 @@ export function MediaLibrary({
             )}
           </div>
         </div>
-        <aside className="media-detail" aria-label="Selected media details">
+        <aside className="media-detail" aria-label={messages.selectedMediaDetails}>
           <div className="media-detail-preview">
             {selected?.mimeType.startsWith("image/") ? (
               <img src={selected.publicUrl} alt={selected.altText || selected.safeFilename} />
@@ -215,18 +220,21 @@ export function MediaLibrary({
                   {selected.width && selected.height
                     ? ` · ${selected.width}x${selected.height}`
                     : ""}{" "}
-                  · {selected.byteSize} bytes
+                  · {selected.byteSize} {messages.bytes}
                 </div>
                 <code className="media-code">{selected.publicUrl}</code>
                 <code className="media-code">{markdown}</code>
                 <div className="media-actions">
-                  <button type="button" onClick={() => copyText("Public URL", selected.publicUrl)}>
+                  <button
+                    type="button"
+                    onClick={() => copyText(messages.publicUrl, selected.publicUrl)}
+                  >
                     <Copy size={15} aria-hidden="true" />
-                    Copy public URL
+                    {messages.copyPublicUrl}
                   </button>
-                  <button type="button" onClick={() => copyText("Markdown", markdown)}>
+                  <button type="button" onClick={() => copyText(messages.markdownSyntax, markdown)}>
                     <Code2 size={15} aria-hidden="true" />
-                    Copy Markdown
+                    {messages.copyMarkdown}
                   </button>
                 </div>
                 {copyStatus ? (
@@ -235,16 +243,16 @@ export function MediaLibrary({
                   </p>
                 ) : null}
                 {canDelete ? (
-                  <section className="media-reference-panel" aria-label="Media references">
-                    <div className="settings-kicker">References</div>
+                  <section className="media-reference-panel" aria-label={messages.mediaReferences}>
+                    <div className="settings-kicker">{messages.references}</div>
                     {referenceStatus === "loading" ? (
-                      <p className="muted">Checking references...</p>
+                      <p className="muted">{messages.checkingReferences}</p>
                     ) : null}
                     {referenceStatus === "error" ? (
-                      <p className="error">References could not be loaded.</p>
+                      <p className="error">{messages.referencesFailed}</p>
                     ) : null}
                     {referenceStatus === "idle" && references.length === 0 ? (
-                      <p className="muted">No published pages currently reference this file.</p>
+                      <p className="muted">{messages.noMediaReferences}</p>
                     ) : null}
                     {references.length > 0 ? (
                       <ul className="media-reference-list">
@@ -260,20 +268,20 @@ export function MediaLibrary({
                       {references.length > 0 ? (
                         <label className="media-force-delete">
                           <input type="checkbox" name="force" />
-                          Delete even though this file is referenced
+                          {messages.deleteReferencedMedia}
                         </label>
                       ) : null}
                       {references.length > 0 ? (
                         <div className="auth-note">
                           <AlertTriangle size={16} aria-hidden="true" />
-                          Deleting this file may leave broken image links.
+                          {messages.deleteMayBreakLinks}
                         </div>
                       ) : null}
                       <button className="danger" disabled={deletePending}>
                         <Trash2 size={15} aria-hidden="true" />
-                        Delete
+                        {messages.delete}
                       </button>
-                      {deletePending ? <p className="muted">Working...</p> : null}
+                      {deletePending ? <p className="muted">{messages.working}</p> : null}
                       {deleteState.message ? (
                         <p role="status" className={deleteState.ok ? "meta" : "error"}>
                           {deleteState.message}
@@ -284,7 +292,7 @@ export function MediaLibrary({
                 ) : null}
               </>
             ) : (
-              <p className="muted">Select an upload to inspect metadata and insertion syntax.</p>
+              <p className="muted">{messages.selectMediaHint}</p>
             )}
           </div>
         </aside>

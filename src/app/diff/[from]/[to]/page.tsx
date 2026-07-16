@@ -2,6 +2,7 @@ import Link from "next/link";
 import { RotateCcw } from "lucide-react";
 import { rollbackAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
+import { getRequestI18n } from "@/i18n/server";
 import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { compareRevisions, getPageById } from "@/modules/pages/service";
@@ -15,7 +16,11 @@ export default async function DiffPage({ params }: Props) {
   const diff = await compareRevisions({ fromRevisionId: from, toRevisionId: to });
   const page = await getPageById(diff.to.pageId);
   const session = await getCurrentSession();
-  const canRollback = await hasPermission(session?.user.id, page.siteId, "page.rollback");
+  const [canRollback, i18n] = await Promise.all([
+    hasPermission(session?.user.id, page.siteId, "page.rollback"),
+    getRequestI18n()
+  ]);
+  const { messages } = i18n;
   const added = diff.lines.filter((line) => line.type === "add").length;
   const removed = diff.lines.filter((line) => line.type === "remove").length;
   return (
@@ -23,14 +28,19 @@ export default async function DiffPage({ params }: Props) {
       <header className="diff-page-header">
         <div>
           <h1 className="page-title small">
-            Compare revision {diff.from.revisionNumber} to {diff.to.revisionNumber}
+            {messages.compareRevision} {diff.from.revisionNumber} {messages.to}{" "}
+            {diff.to.revisionNumber}
           </h1>
           <p className="page-description">
             {diff.from.editorDisplayName} → {diff.to.editorDisplayName}
           </p>
         </div>
         {canRollback && page.currentRevisionId !== diff.from.id ? (
-          <ActionForm action={rollbackAction} className="inline-form">
+          <ActionForm
+            action={rollbackAction}
+            className="inline-form"
+            pendingLabel={messages.working}
+          >
             <input type="hidden" name="pageId" value={page.id} />
             <input type="hidden" name="slug" value={page.slug} />
             <input type="hidden" name="targetRevisionId" value={diff.from.id} />
@@ -41,12 +51,12 @@ export default async function DiffPage({ params }: Props) {
             />
             <button className="danger">
               <RotateCcw size={15} aria-hidden="true" />
-              Roll back to r{diff.from.revisionNumber}
+              {messages.rollBackToRevision} r{diff.from.revisionNumber}
             </button>
           </ActionForm>
         ) : null}
       </header>
-      <div className="diff diff-panel" aria-label="Unified diff">
+      <div className="diff diff-panel" aria-label={messages.unifiedDiff}>
         {diff.lines.map((line, index) => (
           <div
             key={`${index}-${line.text}`}
@@ -65,10 +75,14 @@ export default async function DiffPage({ params }: Props) {
         ))}
       </div>
       <div className="diff-summary">
-        <span className="diff-count add">+{added} added</span>
-        <span className="diff-count remove">-{removed} removed</span>
+        <span className="diff-count add">
+          +{added} {messages.added}
+        </span>
+        <span className="diff-count remove">
+          -{removed} {messages.removed}
+        </span>
         <Link className="button compact" href={`/page/${page.slug}`} style={{ marginLeft: "auto" }}>
-          ← Return to page
+          ← {messages.returnToPage}
         </Link>
       </div>
     </section>
