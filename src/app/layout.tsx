@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { BookOpen, LogIn, LogOut, Rocket, Settings, UserRound } from "lucide-react";
+import { BookOpen, LogIn, LogOut, Rocket, UserRound } from "lucide-react";
 import "@/styles/globals.css";
 import { SiteNav } from "@/components/layout/site-nav";
+import { TopbarSettingsLink } from "@/components/layout/topbar-settings-link";
 import { TopbarSearch } from "@/components/layout/topbar-search";
 import { PreferenceControls } from "@/components/layout/theme-controls";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -102,15 +103,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     {messages.login}
                   </Link>
                 )}
-                {session ? (
-                  <Link
-                    className="button"
-                    href="/admin/settings"
-                    aria-label={messages.siteSettings}
-                  >
-                    <Settings size={18} aria-hidden="true" />
-                  </Link>
-                ) : null}
+                {session ? <TopbarSettingsLink label={messages.siteSettings} /> : null}
               </header>
               <main id="content" className="content">
                 {children}

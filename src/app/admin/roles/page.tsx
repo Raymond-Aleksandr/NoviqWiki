@@ -18,10 +18,6 @@ export default async function AdminRolesPage() {
           <h1 className="page-title admin-title">{messages.rolesAndPermissions}</h1>
           <p className="page-description">{messages.rolesDescription}</p>
         </div>
-        <a className="button primary" href="#create-role">
-          <Plus size={15} aria-hidden="true" />
-          {messages.newRole}
-        </a>
       </div>
       <section className="panel admin-create-panel" id="create-role">
         <h2>{messages.createRole}</h2>

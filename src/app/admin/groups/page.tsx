@@ -24,10 +24,6 @@ export default async function AdminGroupsPage() {
     <section className="admin-page">
       <div className="page-header">
         <h1 className="page-title admin-title">{messages.groups}</h1>
-        <a className="button primary" href="#create-group">
-          <Plus size={15} aria-hidden="true" />
-          {messages.newGroup}
-        </a>
       </div>
       <section className="panel admin-create-panel" id="create-group">
         <h2>{messages.createGroup}</h2>
