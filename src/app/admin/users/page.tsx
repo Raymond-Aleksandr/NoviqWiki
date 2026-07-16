@@ -1,4 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
+import { Pause, Play, RotateCcw } from "lucide-react";
 import { createUserAction, resetUserSessionsAction, updateUserStatusAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { db } from "@/db/client";
@@ -71,58 +72,67 @@ export default async function AdminUsersPage() {
           <button className="primary">Create user</button>
         </ActionForm>
       </section>
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>User</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Status</th>
-              <th>Display name</th>
-              <th>Last login</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((user) => (
-              <tr key={user.id}>
-                <td>
-                  <span className="user-cell">
-                    <span className="avatar" aria-hidden="true">
-                      {user.displayName.slice(0, 2).toUpperCase()}
-                    </span>
-                    <strong>{user.username}</strong>
+      <div className="data-panel admin-table admin-grid-users">
+        <div className="admin-grid-header admin-users-grid admin-grid-users">
+          <div>User</div>
+          <div>Email</div>
+          <div>Role</div>
+          <div>Status</div>
+          <div>Last login</div>
+          <div style={{ textAlign: "right" }}>Actions</div>
+        </div>
+        {rows.map((user) => (
+          <article className="admin-grid-row admin-users-grid admin-grid-users" key={user.id}>
+            <div className="user-cell" data-label="User">
+              <span className="avatar" aria-hidden="true">
+                {user.displayName.slice(0, 2).toUpperCase()}
+              </span>
+              <strong>{user.username}</strong>
+            </div>
+            <div className="mono muted" data-label="Email">
+              {user.email}
+            </div>
+            <div data-label="Role">
+              <span className="role-badge">{roleMap.get(user.id)?.join(", ") ?? "-"}</span>
+            </div>
+            <div data-label="Status">
+              <span className={`status-badge ${user.status}`}>{user.status}</span>
+            </div>
+            <div className="mono muted" data-label="Last login">
+              {user.lastLoginAt?.toLocaleString() ?? "Never"}
+            </div>
+            <div className="admin-action-list" data-label="Actions">
+              <ActionForm action={updateUserStatusAction} className="inline-form">
+                <input type="hidden" name="userId" value={user.id} />
+                <input
+                  type="hidden"
+                  name="status"
+                  value={user.status === "active" ? "suspended" : "active"}
+                />
+                <button
+                  className="icon-button"
+                  title={user.status === "active" ? "Suspend" : "Activate"}
+                >
+                  {user.status === "active" ? (
+                    <Pause size={15} aria-hidden="true" />
+                  ) : (
+                    <Play size={15} aria-hidden="true" />
+                  )}
+                  <span className="sr-only">
+                    {user.status === "active" ? "Suspend" : "Activate"}
                   </span>
-                </td>
-                <td>{user.email}</td>
-                <td>
-                  <span className="role-badge">{roleMap.get(user.id)?.join(", ") ?? "-"}</span>
-                </td>
-                <td>
-                  <span className={`status-badge ${user.status}`}>{user.status}</span>
-                </td>
-                <td>{user.displayName}</td>
-                <td>{user.lastLoginAt?.toLocaleString() ?? "Never"}</td>
-                <td>
-                  <ActionForm action={updateUserStatusAction} className="inline-form">
-                    <input type="hidden" name="userId" value={user.id} />
-                    <input
-                      type="hidden"
-                      name="status"
-                      value={user.status === "active" ? "suspended" : "active"}
-                    />
-                    <button>{user.status === "active" ? "Suspend" : "Activate"}</button>
-                  </ActionForm>
-                  <ActionForm action={resetUserSessionsAction} className="inline-form">
-                    <input type="hidden" name="userId" value={user.id} />
-                    <button>Reset sessions</button>
-                  </ActionForm>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                </button>
+              </ActionForm>
+              <ActionForm action={resetUserSessionsAction} className="inline-form">
+                <input type="hidden" name="userId" value={user.id} />
+                <button className="icon-button" title="Reset sessions">
+                  <RotateCcw size={15} aria-hidden="true" />
+                  <span className="sr-only">Reset sessions</span>
+                </button>
+              </ActionForm>
+            </div>
+          </article>
+        ))}
       </div>
     </section>
   );

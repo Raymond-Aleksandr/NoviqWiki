@@ -45,6 +45,16 @@ Last updated: 2026-07-16
 | `GET /api/ready`               | Passed, database/storage true                       |
 | `GET /setup`                   | Passed, first-run setup page loads                  |
 
+## UI Reset Verification
+
+- 2026-07-16: Applied the imported `NoviqWiki UI reset design.zip` package across the running application instead of treating it as loose inspiration.
+- Public surfaces aligned with the package: shell/navigation, homepage, article, search, recent changes, categories, media library, login, registration, recovery, reset, and verification screens.
+- Workspace surfaces aligned with the package: Markdown editor, live preview, new-page flow, edit flow, history, unified diff, and rollback controls.
+- Admin surfaces aligned with the package: dashboard, pages, users, groups, roles/permissions, settings, audit log, operational status, and admin media.
+- Theme colors use the design package tokens (`--bg`, `--surface`, `--surface-muted`, `--surface-sunken`, `--text`, `--primary`, `--border`) with compatibility aliases for automated verification.
+- Browser review checked representative desktop and mobile routes on `http://127.0.0.1:3100`; no horizontal overflow remained on the sampled public, editor, and admin user pages after the responsive table fix.
+- The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
+
 ## Notes
 
 - The Docker Compose app is currently running locally on port `3000` after the final clean deployment validation.

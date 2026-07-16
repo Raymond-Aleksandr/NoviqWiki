@@ -20,7 +20,7 @@ export default async function LoginPage({ searchParams }: Props) {
   }
   const params = await searchParams;
   return (
-    <section className="auth-page">
+    <section className="auth-page auth-shell">
       <div className="auth-card">
         <div className="auth-form-panel">
           <div className="auth-brand">
@@ -49,19 +49,19 @@ export default async function LoginPage({ searchParams }: Props) {
           <ActionForm action={loginAction}>
             <label>
               Username or email
-              <input className="field" name="identifier" autoComplete="username" required />
+              <input className="field input" name="identifier" autoComplete="username" required />
             </label>
             <label>
               Password
               <input
-                className="field"
+                className="field input"
                 name="password"
                 type="password"
                 autoComplete="current-password"
                 required
               />
             </label>
-            <button className="primary">Log in</button>
+            <button className="primary button-primary">Log in</button>
           </ActionForm>
           <div className="auth-links">
             <Link href="/forgot-password">Forgot password?</Link>

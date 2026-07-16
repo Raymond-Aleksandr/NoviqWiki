@@ -1,19 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import {
-  BookOpen,
-  Clock3,
-  ImageIcon,
-  LogIn,
-  LogOut,
-  Search,
-  Settings,
-  ShieldCheck,
-  Tags,
-  UserRound
-} from "lucide-react";
+import { BookOpen, LogIn, LogOut, Search, Settings, UserRound } from "lucide-react";
 import "@/styles/globals.css";
+import { SiteNav } from "@/components/layout/site-nav";
 import { PreferenceControls } from "@/components/layout/theme-controls";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getCurrentSession } from "@/modules/auth/session";
@@ -59,7 +49,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               initialLocale={locale === "zh-CN" ? "zh-CN" : "en"}
             />
           </div>
-          <div className="shell">
+          <div className="shell site-shell">
             <aside className="sidebar" aria-label="Site navigation">
               <Link href="/" className="brand">
                 <span className="brand-mark" aria-hidden="true">
@@ -67,30 +57,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 </span>
                 <span>{siteName}</span>
               </Link>
-              <nav className="nav-list">
-                <Link href="/">
-                  <BookOpen size={18} aria-hidden="true" />
-                  {messages.read}
-                </Link>
-                <Link href="/recent">
-                  <Clock3 size={18} aria-hidden="true" />
-                  {messages.recentChanges}
-                </Link>
-                <Link href="/categories">
-                  <Tags size={18} aria-hidden="true" />
-                  {messages.categories}
-                </Link>
-                <Link href="/media">
-                  <ImageIcon size={18} aria-hidden="true" />
-                  {messages.media}
-                </Link>
-                {session ? (
-                  <Link href="/admin">
-                    <ShieldCheck size={18} aria-hidden="true" />
-                    {messages.admin}
-                  </Link>
-                ) : null}
-              </nav>
+              <SiteNav messages={messages} showAdmin={Boolean(session)} />
               <div className="sidebar-footer">
                 {!site ? (
                   <Link className="button sidebar-setup-link" href="/setup">

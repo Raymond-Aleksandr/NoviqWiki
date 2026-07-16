@@ -15,7 +15,7 @@ export default async function HomePage() {
   const categories = await listCategories(site.site.id);
   const changes = await listRecentChanges({ siteId: site.site.id, limit: 8 });
   return (
-    <section className="home-page">
+    <section className="home-page wiki-home">
       <div className="home-hero">
         <div className="home-hero-media" aria-hidden="true">
           <span>cover image</span>

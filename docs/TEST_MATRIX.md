@@ -12,7 +12,9 @@
 | Search    | PostgreSQL ranking, filters, permission checks            | Playwright search; integration lifecycle search indexing; `pnpm search:reindex`                                        |
 | Media     | Upload, validate, browse, insert syntax, references       | Playwright upload; media service validation and reference lookup                                                       |
 | Admin     | Dashboard, settings, users, groups, roles                 | Playwright user creation; server-rendered admin sections                                                               |
+| UI reset  | Imported design package applied consistently              | Browser review of homepage, article, search, recent, categories, media, auth, editor, history, diff, admin pages       |
+| Theme     | Design package colors and responsive layout               | CSS token inspection for `--bg`, `--surface`, `--text`, `--primary`, `--border`; desktop and mobile overflow checks    |
 | Audit     | Append-only audit log and filtering                       | Audit service; auth/page/media/settings actions write audit events                                                     |
 | Ops       | Health, readiness, migrations, backup, restore, Docker    | `/api/health`, `/api/ready`, `pnpm db:migrate`, `pnpm backup`, `pnpm restore`, Docker clean deployment                 |
 | Security  | XSS, CSRF, uploads, access control, secrets               | Sanitized Markdown, CSP proxy headers, HttpOnly cookies, Zod validation, upload validation, no fixed production secret |
-| A11y      | Keyboard, labels, focus, responsive/mobile                | Semantic forms, skip link, visible focus styles, Playwright mobile article viewport                                    |
+| A11y      | Keyboard, labels, focus, responsive/mobile                | Semantic forms, skip link, visible focus styles, Playwright mobile article viewport, browser mobile admin/user review  |

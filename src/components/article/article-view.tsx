@@ -12,7 +12,7 @@ export function ArticleView({
   canEdit?: boolean;
 }) {
   return (
-    <div className="article-page">
+    <div className="article-page article-shell">
       <nav className="breadcrumbs" aria-label="Breadcrumb">
         <Link href="/">Read</Link>
         <span aria-hidden="true">/</span>
@@ -48,7 +48,7 @@ export function ArticleView({
         </article>
         <aside className="article-aside">
           {revision.headings.length > 1 ? (
-            <nav className="toc" aria-label="Table of contents">
+            <nav className="toc toc-card" aria-label="Table of contents">
               <strong>Contents</strong>
               {revision.headings.map((heading) => (
                 <a
