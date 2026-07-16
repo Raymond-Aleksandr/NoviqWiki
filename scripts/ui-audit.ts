@@ -85,6 +85,7 @@ const publicRoutes = [
   "/categories",
   "/media",
   "/login",
+  "/register",
   "/forgot-password",
   "/reset-password?token=ui-audit",
   "/verify-email?token=ui-audit"
@@ -112,6 +113,8 @@ async function main() {
   const storageState = credentials ? await createAuthState(credentials) : undefined;
   const articleSlug =
     process.env.UI_AUDIT_ARTICLE_SLUG ?? (await discoverArticleSlug(storageState));
+  const categorySlug =
+    process.env.UI_AUDIT_CATEGORY_SLUG ?? (await discoverCategorySlug(storageState));
 
   if (!credentials) {
     console.log("UI audit: no UI_AUDIT_USERNAME/UI_AUDIT_PASSWORD set; skipping auth routes.");
@@ -133,7 +136,11 @@ async function main() {
         storageState
       });
       const page = await context.newPage();
-      for (const route of buildRoutes(articleSlug, Boolean(storageState))) {
+      for (const route of buildRoutes({
+        articleSlug,
+        categorySlug,
+        includeAuthenticated: Boolean(storageState)
+      })) {
         await auditRoute(page, route, browserName, viewport.name);
       }
       if (articleSlug) {
@@ -174,10 +181,25 @@ async function main() {
   );
 }
 
-function buildRoutes(articleSlug: string | undefined, includeAuthenticated: boolean) {
+function buildRoutes({
+  articleSlug,
+  categorySlug,
+  includeAuthenticated
+}: {
+  articleSlug: string | undefined;
+  categorySlug: string | undefined;
+  includeAuthenticated: boolean;
+}) {
   const routes = [...publicRoutes];
   if (articleSlug) {
-    routes.push(`/page/${articleSlug}`, `/history/${articleSlug}`);
+    routes.push(
+      `/page/${articleSlug}`,
+      `/page/${articleSlug}/backlinks`,
+      `/history/${articleSlug}`
+    );
+  }
+  if (categorySlug) {
+    routes.push(`/categories/${categorySlug}`);
   }
   if (includeAuthenticated) {
     routes.push(...authenticatedRoutes);
@@ -233,6 +255,21 @@ async function discoverArticleSlug(storageState: AuditStorageState | undefined) 
   }
 }
 
+async function discoverCategorySlug(storageState: AuditStorageState | undefined) {
+  try {
+    const response = await fetch(`${baseUrl}/api/v1/categories`, {
+      headers: cookieHeader(storageState)
+    });
+    if (!response.ok) {
+      return undefined;
+    }
+    const body: unknown = await response.json();
+    return extractFirstCategorySlug(body);
+  } catch {
+    return undefined;
+  }
+}
+
 function cookieHeader(storageState: AuditStorageState | undefined): Record<string, string> {
   if (!storageState) {
     return {};
@@ -260,6 +297,18 @@ function extractFirstSlug(body: unknown) {
   }
   const firstPage = data.pages.find(isRecord);
   return typeof firstPage?.slug === "string" ? firstPage.slug : undefined;
+}
+
+function extractFirstCategorySlug(body: unknown) {
+  if (!isRecord(body)) {
+    return undefined;
+  }
+  const data = body.data;
+  if (!isRecord(data) || !Array.isArray(data.categories)) {
+    return undefined;
+  }
+  const firstCategory = data.categories.find(isRecord);
+  return typeof firstCategory?.slug === "string" ? firstCategory.slug : undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

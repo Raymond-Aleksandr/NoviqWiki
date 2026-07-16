@@ -76,6 +76,8 @@ The UI release audit is a non-reset browser audit for live review builds. It doe
 It checks:
 
 - Chromium and WebKit at desktop and mobile widths.
+- Public homepage, search, recent changes, category index/detail, media, auth, recovery, reset, verification, registration, article, backlinks, history, and the first discoverable diff route.
+- Authenticated editor and admin routes when credentials are provided.
 - Horizontal overflow.
 - Sub-32px command targets.
 - Safari/WebKit checkbox, radio, and file-input sizing.
@@ -84,7 +86,7 @@ It checks:
 - Mobile shell/sidebar height and width drift.
 - Duplicate admin settings entries.
 - Missing icons on visible command buttons.
-- History controls and the first discoverable diff route.
+- History controls, backlinks, category cards, and the first discoverable diff route.
 - Button active-state transform drift.
 
 Run public-route checks against a running local app:
