@@ -115,7 +115,14 @@ export const siteSettings = pgTable(
       .notNull()
       .default(sql`ARRAY[]::text[]`),
     homepageSections: jsonb("homepage_sections")
-      .$type<{ search: boolean; featured: boolean; recent: boolean; categories: boolean }>()
+      .$type<{
+        search: boolean;
+        featured: boolean;
+        recent: boolean;
+        categories: boolean;
+        layout?: "classic" | "portal" | "compact";
+        showLogo?: boolean;
+      }>()
       .notNull()
       .default({ search: true, featured: true, recent: true, categories: true }),
     seoTitle: varchar("seo_title", { length: 220 }),

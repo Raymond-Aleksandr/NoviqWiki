@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Code2, Copy, ImageIcon, Search, Trash2, Upload } from "lucide-react";
+import { AlertTriangle, Code2, Copy, ImageIcon, Search, Trash2, Upload, X } from "lucide-react";
 import type { ActionState } from "@/app/actions";
 import type { Messages } from "@/i18n";
 
@@ -60,6 +60,7 @@ export function MediaLibrary({
   const [copyStatus, setCopyStatus] = useState("");
   const [references, setReferences] = useState<MediaReference[]>([]);
   const [referenceStatus, setReferenceStatus] = useState<"idle" | "loading" | "error">("idle");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const filteredAssets = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -81,6 +82,7 @@ export function MediaLibrary({
 
   useEffect(() => {
     if (!deleteState.message || !deleteState.ok) return;
+    setDeleteDialogOpen(false);
     setSelectedId("");
     router.refresh();
   }, [deleteState.message, deleteState.ok, router]);
@@ -132,6 +134,15 @@ export function MediaLibrary({
     <>
       {canUpload ? (
         <section className="panel upload-panel" id="media-upload">
+          <div className="upload-panel-heading">
+            <span className="icon-chip">
+              <Upload size={16} aria-hidden="true" />
+            </span>
+            <div>
+              <h2>{messages.upload}</h2>
+              <p>{messages.mediaLibraryDescription}</p>
+            </div>
+          </div>
           <form ref={uploadFormRef} action={uploadFormAction} className="form">
             <label>
               {messages.file}
@@ -169,6 +180,9 @@ export function MediaLibrary({
           <div className="media-grid">
             {filteredAssets.length === 0 ? (
               <div className="empty-state">
+                <span className="empty-state-icon">
+                  <ImageIcon size={22} aria-hidden="true" />
+                </span>
                 <strong>
                   {assets.length === 0 ? messages.noMediaAssetsYet : messages.noMediaMatched}
                 </strong>
@@ -264,20 +278,18 @@ export function MediaLibrary({
                       </ul>
                     ) : null}
                     <form action={deleteFormAction} className="media-delete-form">
-                      <input type="hidden" name="assetId" value={selected.id} />
-                      {references.length > 0 ? (
-                        <label className="media-force-delete">
-                          <input type="checkbox" name="force" />
-                          {messages.deleteReferencedMedia}
-                        </label>
-                      ) : null}
                       {references.length > 0 ? (
                         <div className="auth-note">
                           <AlertTriangle size={16} aria-hidden="true" />
                           {messages.deleteMayBreakLinks}
                         </div>
                       ) : null}
-                      <button className="danger" disabled={deletePending}>
+                      <button
+                        className="danger"
+                        disabled={deletePending}
+                        type="button"
+                        onClick={() => setDeleteDialogOpen(true)}
+                      >
                         <Trash2 size={15} aria-hidden="true" />
                         {messages.delete}
                       </button>
@@ -297,6 +309,57 @@ export function MediaLibrary({
           </div>
         </aside>
       </div>
+      {selected && deleteDialogOpen ? (
+        <div className="modal-backdrop" role="presentation">
+          <div
+            className="confirm-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="media-delete-title"
+          >
+            <div className="confirm-dialog-heading">
+              <span className="confirm-dialog-icon danger">
+                <AlertTriangle size={19} aria-hidden="true" />
+              </span>
+              <div>
+                <h2 id="media-delete-title">
+                  {messages.delete} · {selected.safeFilename}
+                </h2>
+                <p>{messages.deleteMediaConfirmBody}</p>
+              </div>
+            </div>
+            {references.length > 0 ? (
+              <div className="confirm-warning">{messages.deleteMayBreakLinks}</div>
+            ) : (
+              <div className="confirm-warning">{messages.destructiveActionWarning}</div>
+            )}
+            <form action={deleteFormAction} className="confirm-action-form">
+              <input type="hidden" name="assetId" value={selected.id} />
+              {references.length > 0 ? (
+                <label className="media-force-delete checkbox-row">
+                  <input type="checkbox" name="force" />
+                  <span>{messages.deleteReferencedMedia}</span>
+                </label>
+              ) : null}
+              {deleteState.message && !deleteState.ok ? (
+                <p role="status" className="error">
+                  {deleteState.message}
+                </p>
+              ) : null}
+              <div className="confirm-actions">
+                <button type="button" onClick={() => setDeleteDialogOpen(false)}>
+                  <X size={15} aria-hidden="true" />
+                  {messages.cancel}
+                </button>
+                <button className="danger" disabled={deletePending}>
+                  <Trash2 size={15} aria-hidden="true" />
+                  {deletePending ? messages.working : messages.delete}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

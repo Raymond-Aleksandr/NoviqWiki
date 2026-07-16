@@ -20,6 +20,14 @@ export type SiteSettingsUpdate = Partial<{
   homepageIntro: string;
   homepageFeaturedPages: string[];
   homepageFeaturedCategories: string[];
+  homepageSections: {
+    search: boolean;
+    featured: boolean;
+    recent: boolean;
+    categories: boolean;
+    layout?: "classic" | "portal" | "compact";
+    showLogo?: boolean;
+  };
   seoTitle: string | null;
   seoDescription: string | null;
 }>;

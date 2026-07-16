@@ -8,17 +8,41 @@ type Props = {
   children: React.ReactNode;
   className?: string;
   pendingLabel?: string;
+  statusMode?: "inline" | "compact";
 };
 
 const initialState: ActionState = { ok: true };
 
-export function ActionForm({ action, children, className = "form", pendingLabel = "..." }: Props) {
+export function ActionForm({
+  action,
+  children,
+  className = "form",
+  pendingLabel = "...",
+  statusMode = "inline"
+}: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
   return (
     <form action={formAction} className={className}>
       {children}
-      {pending ? <p className="muted">{pendingLabel}</p> : null}
-      {state.message ? (
+      {pending ? (
+        statusMode === "compact" ? (
+          <span className="form-status-dot pending" role="status" title={pendingLabel}>
+            <span className="sr-only">{pendingLabel}</span>
+          </span>
+        ) : (
+          <p className="muted">{pendingLabel}</p>
+        )
+      ) : null}
+      {state.message && statusMode === "compact" ? (
+        <span
+          role="status"
+          className={`form-status-dot ${state.ok ? "ok" : "error"}`}
+          title={state.message}
+        >
+          <span className="sr-only">{state.message}</span>
+        </span>
+      ) : null}
+      {state.message && statusMode === "inline" ? (
         <p role="status" className={state.ok ? "meta" : "error"}>
           {state.message}
         </p>

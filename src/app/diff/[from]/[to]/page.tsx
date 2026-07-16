@@ -1,7 +1,6 @@
 import Link from "next/link";
-import { RotateCcw } from "lucide-react";
 import { rollbackAction } from "@/app/actions";
-import { ActionForm } from "@/components/ui/action-form";
+import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getRequestI18n } from "@/i18n/server";
 import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
@@ -36,24 +35,28 @@ export default async function DiffPage({ params }: Props) {
           </p>
         </div>
         {canRollback && page.currentRevisionId !== diff.from.id ? (
-          <ActionForm
+          <ConfirmActionForm
             action={rollbackAction}
-            className="inline-form"
+            hiddenFields={[
+              { name: "pageId", value: page.id },
+              { name: "slug", value: page.slug },
+              { name: "targetRevisionId", value: diff.from.id },
+              {
+                name: "reason",
+                value: `Rollback from diff to revision ${diff.from.revisionNumber}`
+              }
+            ]}
+            triggerLabel={`${messages.rollBackToRevision} r${diff.from.revisionNumber}`}
+            triggerClassName="button danger"
+            icon="rollback"
+            title={`${messages.rollback} · r${diff.from.revisionNumber}`}
+            body={messages.rollbackConfirmBody}
+            warning={messages.destructiveActionWarning}
+            confirmLabel={messages.rollback}
+            cancelLabel={messages.cancel}
             pendingLabel={messages.working}
-          >
-            <input type="hidden" name="pageId" value={page.id} />
-            <input type="hidden" name="slug" value={page.slug} />
-            <input type="hidden" name="targetRevisionId" value={diff.from.id} />
-            <input
-              type="hidden"
-              name="reason"
-              value={`Rollback from diff to revision ${diff.from.revisionNumber}`}
-            />
-            <button className="danger">
-              <RotateCcw size={15} aria-hidden="true" />
-              {messages.rollBackToRevision} r{diff.from.revisionNumber}
-            </button>
-          </ActionForm>
+            danger
+          />
         ) : null}
       </header>
       <div className="diff diff-panel" aria-label={messages.unifiedDiff}>

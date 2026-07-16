@@ -1,20 +1,28 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { BookOpen, LogIn, LogOut, Rocket, Search, Settings, UserRound } from "lucide-react";
+import { BookOpen, LogIn, LogOut, Rocket, Settings, UserRound } from "lucide-react";
 import "@/styles/globals.css";
 import { SiteNav } from "@/components/layout/site-nav";
+import { TopbarSearch } from "@/components/layout/topbar-search";
 import { PreferenceControls } from "@/components/layout/theme-controls";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getCurrentSession } from "@/modules/auth/session";
 import { getMessages } from "@/i18n";
 
-export const metadata: Metadata = {
-  title: "NoviqWiki",
-  description: "NoviqWiki"
-};
-
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const site = await getPrimarySiteWithSettings().catch(() => null);
+  const siteName = site?.site.name ?? "NoviqWiki";
+  const title = site?.settings?.seoTitle || siteName;
+  const description = site?.settings?.seoDescription || site?.settings?.tagline || siteName;
+  return {
+    title,
+    description,
+    icons: site?.settings?.faviconUrl ? { icon: site.settings.faviconUrl } : undefined
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const site = await getPrimarySiteWithSettings().catch(() => null);
@@ -54,7 +62,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <aside className="sidebar" aria-label={messages.siteNavigation}>
               <Link href="/" className="brand">
                 <span className="brand-mark" aria-hidden="true">
-                  <BookOpen size={25} aria-hidden="true" />
+                  {site?.settings?.logoUrl ? (
+                    <img className="brand-logo" src={site.settings.logoUrl} alt="" />
+                  ) : (
+                    <BookOpen size={25} aria-hidden="true" />
+                  )}
                 </span>
                 <span>{siteName}</span>
               </Link>
@@ -71,15 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </aside>
             <div className="main">
               <header className="topbar">
-                <form action="/search" className="global-search" role="search">
-                  <label className="sr-only" htmlFor="q">
-                    {messages.search}
-                  </label>
-                  <input id="q" name="q" placeholder={messages.searchThisWikiPlaceholder} />
-                  <button aria-label={messages.search}>
-                    <Search size={18} aria-hidden="true" />
-                  </button>
-                </form>
+                <TopbarSearch messages={messages} />
                 {session ? (
                   <>
                     <span className="topbar-user">

@@ -2,12 +2,13 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Check, Save, X } from "lucide-react";
 import { editPageAction } from "@/app/actions";
-import { MarkdownEditor } from "@/components/editor/markdown-editor";
+import { MarkdownEditor, type EditorMediaItem } from "@/components/editor/markdown-editor";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { getCurrentSession } from "@/modules/auth/session";
 import { requirePermission } from "@/modules/authorization/permissions";
+import { listMedia } from "@/modules/media/service";
 import { getRevisionById } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
 
@@ -33,7 +34,11 @@ export default async function EditPage({ params }: Props) {
   const revision = resolved.page.currentRevisionId
     ? await getRevisionById(resolved.page.currentRevisionId)
     : null;
-  const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+  const [mediaItems, i18n] = await Promise.all([
+    listMedia({ siteId: site.site.id, limit: 40 }),
+    getRequestI18n(site.settings?.defaultLocale)
+  ]);
+  const { messages } = i18n;
   return (
     <section className="page-frame editor-page">
       <header className="editor-header">
@@ -55,6 +60,7 @@ export default async function EditPage({ params }: Props) {
         <MarkdownEditor
           initialValue={revision?.markdown ?? ""}
           messages={messages}
+          mediaItems={serializeEditorMedia(mediaItems)}
           footer={
             <>
               <label>
@@ -83,4 +89,22 @@ export default async function EditPage({ params }: Props) {
       </ActionForm>
     </section>
   );
+}
+
+function serializeEditorMedia(
+  rows: Array<{
+    id: string;
+    safeFilename: string;
+    publicUrl: string;
+    mimeType: string;
+    altText: string;
+  }>
+): EditorMediaItem[] {
+  return rows.map((item) => ({
+    id: item.id,
+    safeFilename: item.safeFilename,
+    publicUrl: item.publicUrl,
+    mimeType: item.mimeType,
+    altText: item.altText
+  }));
 }

@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { RotateCcw } from "lucide-react";
 import { rollbackAction } from "@/app/actions";
-import { ActionForm } from "@/components/ui/action-form";
+import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { getCurrentSession } from "@/modules/auth/session";
@@ -81,24 +80,24 @@ export default async function HistoryPage({ params }: Props) {
                 </Link>
               ) : null}
               {canRollback && resolved.page.currentRevisionId !== revision.id ? (
-                <ActionForm
+                <ConfirmActionForm
                   action={rollbackAction}
-                  className="inline-form"
+                  hiddenFields={[
+                    { name: "pageId", value: resolved.page.id },
+                    { name: "slug", value: resolved.page.slug },
+                    { name: "targetRevisionId", value: revision.id },
+                    { name: "reason", value: `Rollback to revision ${revision.revisionNumber}` }
+                  ]}
+                  triggerLabel={messages.rollback}
+                  triggerClassName="button compact"
+                  icon="rollback"
+                  title={`${messages.rollback} · r${revision.revisionNumber}`}
+                  body={messages.rollbackConfirmBody}
+                  warning={messages.destructiveActionWarning}
+                  confirmLabel={messages.rollback}
+                  cancelLabel={messages.cancel}
                   pendingLabel={messages.working}
-                >
-                  <input type="hidden" name="pageId" value={resolved.page.id} />
-                  <input type="hidden" name="slug" value={resolved.page.slug} />
-                  <input type="hidden" name="targetRevisionId" value={revision.id} />
-                  <input
-                    type="hidden"
-                    name="reason"
-                    value={`Rollback to revision ${revision.revisionNumber}`}
-                  />
-                  <button>
-                    <RotateCcw size={13} aria-hidden="true" />
-                    {messages.rollback}
-                  </button>
-                </ActionForm>
+                />
               ) : null}
             </div>
           </article>

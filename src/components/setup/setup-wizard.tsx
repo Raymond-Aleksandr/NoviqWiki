@@ -207,7 +207,7 @@ export function SetupWizard({
 
           {activeStep === 1 ? (
             <div className="setup-choice-grid">
-              <label className="setup-choice">
+              <label className="setup-choice radio-row">
                 <input
                   type="radio"
                   checked={values.registrationMode === "closed"}
@@ -218,7 +218,7 @@ export function SetupWizard({
                   <small>{messages.registrationClosedDescription}</small>
                 </span>
               </label>
-              <label className="setup-choice">
+              <label className="setup-choice radio-row">
                 <input
                   type="radio"
                   checked={values.registrationMode === "invite"}
@@ -229,7 +229,7 @@ export function SetupWizard({
                   <small>{messages.registrationInviteDescription}</small>
                 </span>
               </label>
-              <label className="setup-choice">
+              <label className="setup-choice radio-row">
                 <input
                   type="radio"
                   checked={values.registrationMode === "open"}
@@ -240,7 +240,7 @@ export function SetupWizard({
                   <small>{messages.registrationOpenDescription}</small>
                 </span>
               </label>
-              <label className="setup-choice">
+              <label className="setup-choice radio-row">
                 <input
                   type="radio"
                   checked={values.registrationMode === "email_verification"}
@@ -256,7 +256,7 @@ export function SetupWizard({
 
           {activeStep === 2 ? (
             <div className="setup-choice-grid">
-              <label className="setup-choice">
+              <label className="setup-choice radio-row">
                 <input
                   type="radio"
                   checked={values.mediaDriver === "local"}
@@ -267,7 +267,7 @@ export function SetupWizard({
                   <small>{messages.localFilesystemDescription}</small>
                 </span>
               </label>
-              <label className="setup-choice">
+              <label className="setup-choice radio-row">
                 <input
                   type="radio"
                   checked={values.mediaDriver === "s3"}

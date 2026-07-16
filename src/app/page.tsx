@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, Clock3, Plus, Search, Tags } from "lucide-react";
+import { BookOpen, ChevronRight, Clock3, Plus, Puzzle, Search, Tags } from "lucide-react";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { listCategories } from "@/modules/categories/service";
-import { listPages } from "@/modules/pages/service";
+import { listPages, listPagesBySlugs } from "@/modules/pages/service";
 import { listRecentChanges } from "@/modules/activity/service";
+import { collectHomepageContributions } from "@/modules/plugins/registry";
 
 export default async function HomePage() {
   const site = await getPrimarySiteWithSettings();
@@ -13,118 +14,213 @@ export default async function HomePage() {
     redirect("/setup");
   }
   const settings = site.settings;
-  const recentPages = await listPages({ siteId: site.site.id, status: "published", limit: 6 });
-  const categories = await listCategories(site.site.id);
-  const changes = await listRecentChanges({ siteId: site.site.id, limit: 8 });
+  const homepageSections = normalizeHomepageSections(settings?.homepageSections);
+  const [recentPages, configuredPages, categories, changes] = await Promise.all([
+    listPages({ siteId: site.site.id, status: "published", limit: 6 }),
+    listPagesBySlugs({
+      siteId: site.site.id,
+      slugs: settings?.homepageFeaturedPages ?? [],
+      limit: 6
+    }),
+    listCategories(site.site.id),
+    listRecentChanges({ siteId: site.site.id, limit: 8 })
+  ]);
   const { locale, messages } = await getRequestI18n(settings?.defaultLocale);
+  const featuredPages = configuredPages.length > 0 ? configuredPages : recentPages.slice(0, 3);
+  const featuredCategories = prioritizeCategories(
+    categories,
+    settings?.homepageFeaturedCategories ?? []
+  ).slice(0, 8);
+  const pluginContributions = collectHomepageContributions({ siteId: site.site.id, locale });
+  const showPanels =
+    homepageSections.recent || homepageSections.categories || pluginContributions.length > 0;
+
   return (
-    <section className="home-page wiki-home">
+    <section className={`home-page wiki-home home-layout-${homepageSections.layout}`}>
       <div className="home-hero">
-        <div className="home-hero-media" aria-hidden="true">
-          <span>cover image · 2400×900</span>
-        </div>
+        <div className="home-hero-media" aria-hidden="true" />
         <div className="home-hero-content">
+          {settings?.logoUrl && homepageSections.showLogo ? (
+            <img className="home-logo" src={settings.logoUrl} alt="" />
+          ) : (
+            <span className="home-logo home-logo-fallback" aria-hidden="true">
+              <BookOpen size={28} />
+            </span>
+          )}
           <p className="eyebrow">{messages.selfHostedKnowledgeBase}</p>
           <h1>{settings?.homepageTitle ?? site.site.name}</h1>
           <p>{settings?.homepageIntro ?? settings?.tagline}</p>
-          <form action="/search" className="home-search" role="search">
-            <input
-              name="q"
-              aria-label={messages.searchThisWiki}
-              placeholder={messages.searchThisWikiPlaceholder}
-            />
-            <button className="primary">
-              <Search size={16} aria-hidden="true" />
-              {messages.search}
-            </button>
-          </form>
+          {homepageSections.search ? (
+            <form action="/search" className="home-search" role="search">
+              <input
+                name="q"
+                aria-label={messages.searchThisWiki}
+                placeholder={messages.searchThisWikiPlaceholder}
+              />
+              <button className="primary">
+                <Search size={16} aria-hidden="true" />
+                {messages.search}
+              </button>
+            </form>
+          ) : null}
         </div>
       </div>
 
-      <div className="section-heading">
-        <h2>{messages.featuredPages}</h2>
-        <Link className="section-action" href="/categories">
-          {messages.browseAll}
-          <ChevronRight size={15} aria-hidden="true" />
-        </Link>
-      </div>
-      <div className="featured-grid">
-        {recentPages.length === 0 ? (
-          <section className="empty-state">
-            <h3>{messages.noPublishedPagesYet}</h3>
-            <p>{messages.createFirstArticle}</p>
-            <Link className="button primary" href="/edit/new">
-              <Plus size={15} aria-hidden="true" />
-              {messages.createPage}
+      {homepageSections.featured ? (
+        <>
+          <div className="section-heading">
+            <h2>{messages.featuredPages}</h2>
+            <Link className="section-action" href="/categories">
+              {messages.browseAll}
+              <ChevronRight size={15} aria-hidden="true" />
             </Link>
-          </section>
-        ) : (
-          recentPages.slice(0, 3).map((page) => (
-            <Link className="feature-card" key={page.id} href={`/page/${page.slug}`}>
-              <span className="feature-card-media" aria-hidden="true">
-                {messages.article}
-              </span>
-              <span className="feature-card-body">
-                <span className="badge info">{messages.article}</span>
-                <strong>{page.title}</strong>
-                <span className="muted">{messages.openLatestRevision}</span>
-              </span>
-            </Link>
-          ))
-        )}
-      </div>
+          </div>
+          <div className="featured-grid">
+            {featuredPages.length === 0 ? (
+              <section className="empty-state">
+                <h3>{messages.noPublishedPagesYet}</h3>
+                <p>{messages.createFirstArticle}</p>
+                <Link className="button primary" href="/edit/new">
+                  <Plus size={15} aria-hidden="true" />
+                  {messages.createPage}
+                </Link>
+              </section>
+            ) : (
+              featuredPages.slice(0, 3).map((page) => (
+                <Link className="feature-card" key={page.id} href={`/page/${page.slug}`}>
+                  <span className="feature-card-media" aria-hidden="true">
+                    {messages.article}
+                  </span>
+                  <span className="feature-card-body">
+                    <span className="badge info">{messages.article}</span>
+                    <strong>{page.title}</strong>
+                    <span className="muted">{messages.openLatestRevision}</span>
+                  </span>
+                </Link>
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
 
-      <div className="home-panels">
-        <section className="panel flush">
-          <header className="panel-header">
-            <h2>
-              <Clock3 size={17} aria-hidden="true" />
-              {messages.recentlyUpdated}
-            </h2>
-          </header>
-          <div className="activity-list">
-            {changes.map((change) => (
-              <p key={change.id}>
-                <span className={`badge audit-action ${badgeForAction(change.action)}`}>
-                  {change.action}
-                </span>
-                <span>{change.actorDisplayName}</span>
-                <span className="muted">{change.createdAt.toLocaleString(locale)}</span>
-              </p>
-            ))}
-          </div>
-        </section>
-        <section className="panel flush">
-          <header className="panel-header">
-            <h2>
-              <Tags size={17} aria-hidden="true" />
-              {messages.featuredCategories}
-            </h2>
-          </header>
-          <div className="category-list">
-            {categories.slice(0, 8).map((category) => (
-              <Link key={category.id} href={`/categories/${category.slug}`}>
-                <span className="category-swatch" aria-hidden="true" />
-                <span>
-                  <strong>{category.name}</strong>
-                  <small>
-                    {category.pageCount} {messages.pagesLower}
-                  </small>
-                </span>
-                <ChevronRight size={15} aria-hidden="true" />
-              </Link>
-            ))}
-          </div>
-          {recentPages.length === 0 ? (
-            <Link className="button" href="/edit/new">
-              <Plus size={15} aria-hidden="true" />
-              {messages.createPage}
-            </Link>
+      {showPanels ? (
+        <div
+          className={`home-panels ${
+            [
+              homepageSections.recent,
+              homepageSections.categories,
+              pluginContributions.length > 0
+            ].filter(Boolean).length === 1
+              ? "single"
+              : ""
+          }`}
+        >
+          {homepageSections.recent ? (
+            <section className="panel flush">
+              <header className="panel-header">
+                <h2>
+                  <Clock3 size={17} aria-hidden="true" />
+                  {messages.recentlyUpdated}
+                </h2>
+              </header>
+              <div className="activity-list">
+                {changes.map((change) => (
+                  <p key={change.id}>
+                    <span className={`badge audit-action ${badgeForAction(change.action)}`}>
+                      {change.action}
+                    </span>
+                    <span>{change.actorDisplayName}</span>
+                    <span className="muted">{change.createdAt.toLocaleString(locale)}</span>
+                  </p>
+                ))}
+              </div>
+            </section>
           ) : null}
-        </section>
-      </div>
+          {homepageSections.categories ? (
+            <section className="panel flush">
+              <header className="panel-header">
+                <h2>
+                  <Tags size={17} aria-hidden="true" />
+                  {messages.featuredCategories}
+                </h2>
+              </header>
+              <div className="category-list">
+                {featuredCategories.map((category) => (
+                  <Link key={category.id} href={`/categories/${category.slug}`}>
+                    <span className="category-swatch" aria-hidden="true" />
+                    <span>
+                      <strong>{category.name}</strong>
+                      <small>
+                        {category.pageCount} {messages.pagesLower}
+                      </small>
+                    </span>
+                    <ChevronRight size={15} aria-hidden="true" />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+          {pluginContributions.length > 0 ? (
+            <section className="panel flush">
+              <header className="panel-header">
+                <h2>
+                  <Puzzle size={17} aria-hidden="true" />
+                  {messages.pluginExtensions}
+                </h2>
+              </header>
+              <div className="category-list">
+                {pluginContributions.map((contribution) => (
+                  <Link key={contribution.id} href={contribution.href ?? "/"}>
+                    <span className="category-swatch" aria-hidden="true" />
+                    <span>
+                      <strong>{contribution.title}</strong>
+                      {contribution.description ? <small>{contribution.description}</small> : null}
+                    </span>
+                    <ChevronRight size={15} aria-hidden="true" />
+                  </Link>
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
+}
+
+function normalizeHomepageSections(sections?: {
+  search?: boolean;
+  featured?: boolean;
+  recent?: boolean;
+  categories?: boolean;
+  layout?: "classic" | "portal" | "compact";
+  showLogo?: boolean;
+}) {
+  return {
+    search: sections?.search ?? true,
+    featured: sections?.featured ?? true,
+    recent: sections?.recent ?? true,
+    categories: sections?.categories ?? true,
+    layout: sections?.layout ?? "classic",
+    showLogo: sections?.showLogo ?? true
+  };
+}
+
+function prioritizeCategories<
+  TCategory extends {
+    slug: string;
+  }
+>(categories: TCategory[], configuredSlugs: string[]) {
+  const normalized = configuredSlugs.map((slug) => slug.trim()).filter(Boolean);
+  if (normalized.length === 0) {
+    return categories;
+  }
+  const bySlug = new Map(categories.map((category) => [category.slug, category]));
+  const configured = normalized
+    .map((slug) => bySlug.get(slug))
+    .filter((category): category is TCategory => Boolean(category));
+  const configuredSet = new Set(configured.map((category) => category.slug));
+  return [...configured, ...categories.filter((category) => !configuredSet.has(category.slug))];
 }
 
 function badgeForAction(action: string) {

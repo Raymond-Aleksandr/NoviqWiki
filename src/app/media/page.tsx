@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import { Upload } from "lucide-react";
 import { deleteMediaAction, uploadMediaAction } from "@/app/actions";
 import { MediaLibrary, type MediaLibraryItem } from "@/components/media-library";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -28,12 +27,6 @@ export default async function MediaPage() {
           <h1 className="page-title">{messages.mediaLibrary}</h1>
           <p className="page-description">{messages.mediaLibraryDescription}</p>
         </div>
-        {canUpload ? (
-          <a className="button primary" href="#media-upload">
-            <Upload size={16} aria-hidden="true" />
-            {messages.upload}
-          </a>
-        ) : null}
       </header>
       <MediaLibrary
         assets={assets.map(serializeMedia)}

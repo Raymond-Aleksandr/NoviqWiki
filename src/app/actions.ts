@@ -343,14 +343,29 @@ export async function updateSettingsAction(
       values: {
         tagline: stringValue(formData, "tagline"),
         baseUrl: stringValue(formData, "baseUrl"),
+        logoUrl: optionalPublicUrl(formData, "logoUrl"),
+        faviconUrl: optionalPublicUrl(formData, "faviconUrl"),
         defaultLocale,
         registrationMode: formData.get("registrationMode") as
           "open" | "email_verification" | "invite" | "closed",
         publicMode: formData.get("publicMode") === "on",
+        defaultHomepage: stringValue(formData, "defaultHomepage"),
         homepageTitle: stringValue(formData, "homepageTitle"),
         homepageIntro: stringValue(formData, "homepageIntro"),
+        homepageFeaturedPages: commaListValue(formData, "homepageFeaturedPages"),
+        homepageFeaturedCategories: commaListValue(formData, "homepageFeaturedCategories"),
+        homepageSections: {
+          search: formData.get("homepageSearch") === "on",
+          featured: formData.get("homepageFeatured") === "on",
+          recent: formData.get("homepageRecent") === "on",
+          categories: formData.get("homepageCategories") === "on",
+          layout: homepageLayoutValue(formData, "homepageLayout"),
+          showLogo: formData.get("homepageShowLogo") === "on"
+        },
         footerContent: optionalString(formData, "footerContent") ?? "",
-        uploadMaxBytes: Number(formData.get("uploadMaxBytes") ?? 5242880)
+        uploadMaxBytes: Number(formData.get("uploadMaxBytes") ?? 5242880),
+        seoTitle: optionalString(formData, "seoTitle") ?? null,
+        seoDescription: optionalString(formData, "seoDescription") ?? null
       }
     });
     revalidatePath("/");
@@ -574,7 +589,40 @@ function optionalString(formData: FormData, key: string) {
   if (typeof value !== "string" || value.trim() === "") {
     return undefined;
   }
-  return value;
+  return value.trim();
+}
+
+function optionalPublicUrl(formData: FormData, key: string) {
+  const value = optionalString(formData, key);
+  if (!value) return null;
+  if (value.startsWith("/") && !value.startsWith("//")) {
+    return value;
+  }
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+      return value;
+    }
+  } catch {
+    throw new AppError(`Invalid URL: ${key}`, "validation_error", 422);
+  }
+  throw new AppError(`Invalid URL: ${key}`, "validation_error", 422);
+}
+
+function commaListValue(formData: FormData, key: string) {
+  return (optionalString(formData, key) ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
+
+function homepageLayoutValue(formData: FormData, key: string): "classic" | "portal" | "compact" {
+  const value = stringValue(formData, key);
+  if (value === "classic" || value === "portal" || value === "compact") {
+    return value;
+  }
+  throw new AppError(`Invalid homepage layout: ${value}`, "validation_error", 422);
 }
 
 function localeValue(formData: FormData, key: string): "en" | "zh-CN" {

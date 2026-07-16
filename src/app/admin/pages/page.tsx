@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { ChevronDown, History, Pencil, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
+import { ChevronDown, History, Pencil, Plus, RotateCcw, Search } from "lucide-react";
 import { deletePageAction, restorePageAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
+import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { listPages } from "@/modules/pages/service";
@@ -76,18 +77,20 @@ export default async function AdminPagesPage() {
                   </button>
                 </ActionForm>
               ) : (
-                <ActionForm
+                <ConfirmActionForm
                   action={deletePageAction}
-                  className="inline-form"
+                  hiddenFields={[{ name: "pageId", value: page.id }]}
+                  triggerLabel={messages.delete}
+                  triggerClassName="button compact danger"
+                  icon="trash"
+                  title={`${messages.delete} · ${page.title}`}
+                  body={messages.deletePageConfirmBody}
+                  warning={messages.destructiveActionWarning}
+                  confirmLabel={messages.delete}
+                  cancelLabel={messages.cancel}
                   pendingLabel={messages.working}
-                >
-                  <input type="hidden" name="pageId" value={page.id} />
-                  <button className="danger">
-                    <Trash2 size={14} aria-hidden="true" />
-                    {messages.delete}
-                    <span className="sr-only"> · {page.title}</span>
-                  </button>
-                </ActionForm>
+                  danger
+                />
               )}
             </div>
           </article>

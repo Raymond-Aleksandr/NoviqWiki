@@ -38,10 +38,9 @@ export default async function AdminRolesPage() {
             <legend>{messages.permissions}</legend>
             <div className="grid">
               {permissionKeys.map((permission) => (
-                <label key={permission}>
-                  <span>
-                    <input type="checkbox" name="permission" value={permission} /> {permission}
-                  </span>
+                <label className="checkbox-row permission-checkbox" key={permission}>
+                  <input type="checkbox" name="permission" value={permission} />
+                  <span className="mono">{permission}</span>
                 </label>
               ))}
             </div>

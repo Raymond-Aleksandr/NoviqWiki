@@ -6,6 +6,14 @@ import { getRequestI18n } from "@/i18n/server";
 export default async function AdminSettingsPage() {
   const site = await getPrimarySiteWithSettings();
   const settings = site!.settings!;
+  const homepageSections = {
+    search: settings.homepageSections.search ?? true,
+    featured: settings.homepageSections.featured ?? true,
+    recent: settings.homepageSections.recent ?? true,
+    categories: settings.homepageSections.categories ?? true,
+    layout: settings.homepageSections.layout ?? "classic",
+    showLogo: settings.homepageSections.showLogo ?? Boolean(settings.logoUrl)
+  };
   const { messages } = await getRequestI18n(settings.defaultLocale);
   return (
     <section className="admin-page compact">
@@ -30,11 +38,40 @@ export default async function AdminSettingsPage() {
             <input className="field mono" name="baseUrl" defaultValue={settings.baseUrl} />
           </label>
           <label>
+            {messages.logoUrl}
+            <input
+              className="field mono"
+              name="logoUrl"
+              defaultValue={settings.logoUrl ?? ""}
+              placeholder="/media/site-logo.png"
+            />
+          </label>
+          <label>
+            {messages.faviconUrl}
+            <input
+              className="field mono"
+              name="faviconUrl"
+              defaultValue={settings.faviconUrl ?? ""}
+              placeholder="/favicon.ico"
+            />
+          </label>
+          <label>
             {messages.defaultLocale}
             <select name="defaultLocale" defaultValue={settings.defaultLocale}>
               <option value="zh-CN">{messages.simplifiedChinese}</option>
               <option value="en">{messages.english}</option>
             </select>
+          </label>
+        </section>
+        <section className="settings-card">
+          <div className="settings-kicker">{messages.homepageTitle}</div>
+          <label>
+            {messages.defaultHomepage}
+            <input
+              className="field"
+              name="defaultHomepage"
+              defaultValue={settings.defaultHomepage}
+            />
           </label>
           <label>
             {messages.homepageTitle}
@@ -43,6 +80,83 @@ export default async function AdminSettingsPage() {
           <label>
             {messages.homepageIntro}
             <textarea name="homepageIntro" defaultValue={settings.homepageIntro} />
+          </label>
+          <label>
+            {messages.homepageLayout}
+            <select name="homepageLayout" defaultValue={homepageSections.layout}>
+              <option value="classic">{messages.homepageClassicLayout}</option>
+              <option value="portal">{messages.homepagePortalLayout}</option>
+              <option value="compact">{messages.homepageCompactLayout}</option>
+            </select>
+          </label>
+          <div className="homepage-section-toggles" aria-label={messages.homepageVisibleSections}>
+            <div className="settings-kicker">{messages.homepageVisibleSections}</div>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                name="homepageShowLogo"
+                defaultChecked={homepageSections.showLogo}
+              />
+              <span>{messages.showHomepageLogo}</span>
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                name="homepageSearch"
+                defaultChecked={homepageSections.search}
+              />
+              <span>{messages.showHomepageSearch}</span>
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                name="homepageFeatured"
+                defaultChecked={homepageSections.featured}
+              />
+              <span>{messages.showHomepageFeatured}</span>
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                name="homepageRecent"
+                defaultChecked={homepageSections.recent}
+              />
+              <span>{messages.showHomepageRecent}</span>
+            </label>
+            <label className="checkbox-row">
+              <input
+                type="checkbox"
+                name="homepageCategories"
+                defaultChecked={homepageSections.categories}
+              />
+              <span>{messages.showHomepageCategories}</span>
+            </label>
+          </div>
+          <label>
+            {messages.featuredPageSlugs}
+            <textarea
+              className="mono"
+              name="homepageFeaturedPages"
+              defaultValue={settings.homepageFeaturedPages.join(", ")}
+              placeholder={messages.commaSeparatedSlugs}
+            />
+          </label>
+          <label>
+            {messages.featuredCategorySlugs}
+            <textarea
+              className="mono"
+              name="homepageFeaturedCategories"
+              defaultValue={settings.homepageFeaturedCategories.join(", ")}
+              placeholder={messages.commaSeparatedSlugs}
+            />
+          </label>
+          <label>
+            {messages.seoTitle}
+            <input className="field" name="seoTitle" defaultValue={settings.seoTitle ?? ""} />
+          </label>
+          <label>
+            {messages.seoDescription}
+            <textarea name="seoDescription" defaultValue={settings.seoDescription ?? ""} />
           </label>
         </section>
         <section className="settings-card">
@@ -56,9 +170,9 @@ export default async function AdminSettingsPage() {
                 {messages.anonymousReadingHelp}
               </div>
             </div>
-            <label>
+            <label className="checkbox-row switch-control">
               <input type="checkbox" name="publicMode" defaultChecked={settings.publicMode} />
-              {messages.publicWiki}
+              <span>{messages.publicWiki}</span>
             </label>
           </div>
           <label>

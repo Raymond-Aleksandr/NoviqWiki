@@ -277,6 +277,30 @@ export async function listPages(
     .offset(input.offset ?? 0);
 }
 
+export async function listPagesBySlugs(
+  input: { siteId: string; slugs: string[]; limit?: number },
+  database: RootDatabase = db
+) {
+  const uniqueSlugs = Array.from(new Set(input.slugs.map((slug) => slug.trim()).filter(Boolean)));
+  if (uniqueSlugs.length === 0) {
+    return [];
+  }
+  const rows = await database
+    .select()
+    .from(pages)
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt),
+        inArray(pages.slug, uniqueSlugs)
+      )
+    )
+    .limit(input.limit ?? uniqueSlugs.length);
+  const order = new Map(uniqueSlugs.map((slug, index) => [slug, index]));
+  return rows.sort((left, right) => (order.get(left.slug) ?? 0) - (order.get(right.slug) ?? 0));
+}
+
 export async function getPageById(pageId: string, database: Database = db) {
   const [page] = await database.select().from(pages).where(eq(pages.id, pageId)).limit(1);
   if (!page) {

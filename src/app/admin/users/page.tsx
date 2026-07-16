@@ -117,6 +117,7 @@ export default async function AdminUsersPage() {
                 action={updateUserStatusAction}
                 className="inline-form"
                 pendingLabel={messages.working}
+                statusMode="compact"
               >
                 <input type="hidden" name="userId" value={user.id} />
                 <input
@@ -143,6 +144,7 @@ export default async function AdminUsersPage() {
                 action={resetUserSessionsAction}
                 className="inline-form"
                 pendingLabel={messages.working}
+                statusMode="compact"
               >
                 <input type="hidden" name="userId" value={user.id} />
                 <button className="icon-button" title={messages.resetSessions}>
