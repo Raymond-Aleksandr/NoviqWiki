@@ -1573,6 +1573,11 @@ textarea {
   color: var(--danger);
 }
 
+.confirm-dialog-icon.neutral {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
 .confirm-warning {
   border-radius: 8px;
   background: var(--warning-bg);
@@ -1586,6 +1591,19 @@ textarea {
 .confirm-action-form {
   display: grid;
   gap: 12px;
+}
+
+.confirm-field-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.confirm-field-grid label:not(.checkbox-row) {
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .confirm-actions {

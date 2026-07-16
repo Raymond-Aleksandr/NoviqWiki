@@ -5,6 +5,7 @@ import {
   webkit,
   type BrowserContextOptions,
   type BrowserType,
+  type ElementHandle,
   type Page
 } from "playwright";
 
@@ -171,6 +172,17 @@ async function auditSourceForNativeDialogs() {
   });
 }
 
+async function auditSourceForActiveTransforms() {
+  const matches = await findActiveTransformMatches(path.join(process.cwd(), "src"));
+  if (matches.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "active_state_source_transform",
+    detail: matches.slice(0, 20)
+  });
+}
+
 async function findNativeDialogMatches(directory: string): Promise<SourceMatch[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const matches: SourceMatch[] = [];
@@ -203,8 +215,69 @@ async function findNativeDialogMatches(directory: string): Promise<SourceMatch[]
   return matches;
 }
 
+async function findActiveTransformMatches(directory: string): Promise<SourceMatch[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const matches: SourceMatch[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      matches.push(...(await findActiveTransformMatches(entryPath)));
+      continue;
+    }
+    if (!entry.isFile() || path.extname(entry.name) !== ".css") {
+      continue;
+    }
+
+    const source = await readFile(entryPath, "utf8");
+    const lines = source.split(/\r?\n/);
+    let selectorBuffer = "";
+    let activeRuleDepth = 0;
+
+    lines.forEach((line, index) => {
+      const opens = countCharacter(line, "{");
+      const closes = countCharacter(line, "}");
+      let enteredActiveRule = false;
+
+      if (activeRuleDepth === 0) {
+        selectorBuffer += ` ${line}`;
+        if (opens > 0) {
+          enteredActiveRule = selectorBuffer.includes(":active");
+          activeRuleDepth = enteredActiveRule ? opens - closes : 0;
+          selectorBuffer = "";
+        }
+      } else {
+        activeRuleDepth += opens - closes;
+      }
+
+      if (
+        (activeRuleDepth > 0 || enteredActiveRule) &&
+        /(^|[;\s])transform\s*:\s*(?!none\b)[^;]+;/i.test(line)
+      ) {
+        matches.push({
+          file: path.relative(process.cwd(), entryPath),
+          line: index + 1,
+          pattern: ":active transform",
+          text: line.trim().slice(0, 160)
+        });
+      }
+
+      if (activeRuleDepth < 0) {
+        activeRuleDepth = 0;
+      }
+    });
+  }
+
+  return matches;
+}
+
+function countCharacter(value: string, character: string) {
+  return [...value].filter((item) => item === character).length;
+}
+
 async function main() {
   await auditSourceForNativeDialogs();
+  await auditSourceForActiveTransforms();
   const storageState = credentials ? await createAuthState(credentials) : undefined;
   const articleSlug =
     process.env.UI_AUDIT_ARTICLE_SLUG ?? (await discoverArticleSlug(storageState));
@@ -275,7 +348,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, design token drift, overflow, duplicate admin controls, stray dialogs, tiny controls, iconless command buttons, modal mismatches, mobile shell drift, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, design token drift, overflow, duplicate admin controls, stray dialogs, tiny controls, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -599,7 +672,11 @@ async function discoverDiffRoute(page: Page, articleSlug: string) {
   if (!response || response.status() >= 400) {
     return undefined;
   }
-  return page.locator('a[href^="/diff/"]').first().getAttribute("href");
+  const diffLink = page.locator('a[href^="/diff/"]').first();
+  if ((await diffLink.count()) === 0) {
+    return undefined;
+  }
+  return diffLink.getAttribute("href");
 }
 
 function recordElementFailures(
@@ -727,7 +804,7 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
 
 async function auditActiveState(page: Page, browserName: string, sizeName: string) {
   await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
-  const target = (await page.evaluate(`(() => {
+  const targetHandle = await page.evaluateHandle(`(() => {
     const visible = (element) => {
       const rect = element.getBoundingClientRect();
       const style = getComputedStyle(element);
@@ -744,21 +821,24 @@ async function auditActiveState(page: Page, browserName: string, sizeName: strin
     if (!element) {
       return null;
     }
-    element.setAttribute("data-ui-audit-active-target", "true");
-    const rect = element.getBoundingClientRect();
-    return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
-  })()`)) as { x: number; y: number } | null;
-  if (!target) {
+    return element;
+  })()`);
+  const targetElement = targetHandle.asElement() as ElementHandle<HTMLElement> | null;
+  if (!targetElement) {
+    await targetHandle.dispose();
     return;
   }
-  await page.mouse.move(target.x, target.y);
+  const rect = await targetElement.boundingBox();
+  if (!rect) {
+    await targetHandle.dispose();
+    return;
+  }
+  await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
   await page.mouse.down();
-  const transform = (await page.evaluate(`(() => {
-    const element = document.querySelector("[data-ui-audit-active-target]");
-    return element ? getComputedStyle(element).transform : "none";
-  })()`)) as string;
+  const transform = await targetElement.evaluate((element) => getComputedStyle(element).transform);
   await page.mouse.move(0, 0);
   await page.mouse.up();
+  await targetHandle.dispose();
   if (transform && transform !== "none") {
     addFailure({
       kind: "active_state_transform",

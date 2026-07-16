@@ -7,8 +7,10 @@ import {
   listPageOutboundLinks,
   listRevisions,
   publishPage,
+  renamePage,
   rollbackPage
 } from "@/modules/pages/service";
+import { resolvePageBySlug } from "@/modules/redirects/service";
 import { searchPages } from "@/modules/search/service";
 import { createTestDatabase } from "../helpers/test-db";
 
@@ -91,6 +93,37 @@ describe("page lifecycle integration", () => {
 
     const search = await searchPages({ siteId: setup.site.id, query: "searchable" }, test.executor);
     expect(search.rows[0]?.title).toBe("Lifecycle");
+
+    const renamed = await renamePage(
+      {
+        pageId: page.id,
+        newTitle: "Moved Topic",
+        newSlug: "moved-topic",
+        createAlias: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    expect(renamed.slug).toBe("moved-topic");
+
+    const resolvedOldSlug = await resolvePageBySlug(
+      { siteId: setup.site.id, slug: "lifecycle" },
+      test.executor
+    );
+    expect(resolvedOldSlug.page.id).toBe(page.id);
+    expect(resolvedOldSlug.redirectedFrom).toBe("lifecycle");
+
+    const aliasSearch = await searchPages(
+      { siteId: setup.site.id, query: "Lifecycle" },
+      test.executor
+    );
+    expect(aliasSearch.rows).toContainEqual(
+      expect.objectContaining({ title: "Moved Topic", slug: "moved-topic" })
+    );
+
+    const revisionsAfterRename = await listRevisions(page.id, test.executor);
+    expect(revisionsAfterRename).toHaveLength(2);
 
     const revisionsBeforeRollback = await listRevisions(page.id, test.executor);
     const rollback = await rollbackPage(

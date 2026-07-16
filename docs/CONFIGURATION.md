@@ -31,6 +31,14 @@ openssl rand -base64 32
 
 Use the Compose service host `db` when the application runs inside Docker Compose. Use `localhost` when running `pnpm dev` directly on the host against a Compose-managed PostgreSQL port.
 
+## Development-Only Variables
+
+| Variable                       | Example      | Description                                                                                             |
+| ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------- |
+| `NEXTWIKI_ALLOWED_DEV_ORIGINS` | `10.0.0.180` | Comma-separated hosts appended to Next.js `allowedDevOrigins` for LAN/mobile checks against `pnpm dev`. |
+
+This setting is only for local development. Production deployments should expose NoviqWiki through the configured `NEXTWIKI_BASE_URL` and reverse proxy instead.
+
 ## Media Storage
 
 | Variable                        | Example                              | Description                                                                                 |

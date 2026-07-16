@@ -311,7 +311,8 @@ export async function renamePageAction(
     const session = await requireSession();
     const site = await requireSite();
     await requirePermission(session.user.id, site.site.id, "page.rename");
-    await renamePage({
+    const oldSlug = optionalString(formData, "oldSlug");
+    const renamedPage = await renamePage({
       pageId: stringValue(formData, "pageId"),
       newTitle: stringValue(formData, "newTitle"),
       newSlug: optionalString(formData, "newSlug"),
@@ -320,6 +321,14 @@ export async function renamePageAction(
       actorDisplayName: session.user.displayName
     });
     revalidatePath("/admin/pages");
+    revalidatePath(`/page/${renamedPage.slug}`);
+    revalidatePath(`/edit/${renamedPage.slug}`);
+    revalidatePath(`/history/${renamedPage.slug}`);
+    if (oldSlug) {
+      revalidatePath(`/page/${oldSlug}`);
+      revalidatePath(`/edit/${oldSlug}`);
+      revalidatePath(`/history/${oldSlug}`);
+    }
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
     return { ok: true, message: messages.pageRenamed };
   } catch (error) {

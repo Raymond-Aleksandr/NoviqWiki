@@ -88,8 +88,8 @@ It checks:
 - Mobile shell/sidebar height and width drift.
 - Duplicate admin settings entries.
 - Missing icons on visible command buttons.
-- History controls, backlinks, category cards, and the first discoverable diff route.
-- Button active-state transform drift.
+- History controls, backlinks, category cards, and a diff route when one is discoverable.
+- Button active-state transform drift, including CSS source rules that add non-`none` transforms to `:active` states.
 
 Run public-route checks against a running local app:
 

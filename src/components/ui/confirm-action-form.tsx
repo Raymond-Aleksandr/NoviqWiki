@@ -2,13 +2,15 @@
 
 import { useActionState, useEffect, useId, useState } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, RotateCcw, Trash2, X } from "lucide-react";
+import { AlertTriangle, Pencil, RotateCcw, Trash2, X } from "lucide-react";
 import type { ActionState } from "@/app/actions";
 
 type HiddenField = {
   name: string;
   value: string;
 };
+
+type ActionIconName = "trash" | "rollback" | "reset" | "rename";
 
 type Props = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
@@ -24,7 +26,7 @@ type Props = {
   warning?: string;
   danger?: boolean;
   triggerClassName?: string;
-  icon?: "trash" | "rollback" | "reset";
+  icon?: ActionIconName;
   children?: ReactNode;
 };
 
@@ -50,6 +52,7 @@ export function ConfirmActionForm({
   const titleId = useId();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(action, initialState);
+  const iconTone = danger ? "danger" : icon === "rename" ? "neutral" : "warning";
 
   useEffect(() => {
     if (state.ok && state.message) {
@@ -82,8 +85,12 @@ export function ConfirmActionForm({
         <div className="modal-backdrop" role="presentation">
           <div className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
             <div className="confirm-dialog-heading">
-              <span className={`confirm-dialog-icon ${danger ? "danger" : "warning"}`}>
-                <AlertTriangle size={19} aria-hidden="true" />
+              <span className={`confirm-dialog-icon ${iconTone}`}>
+                {icon === "rename" ? (
+                  <Pencil size={19} aria-hidden="true" />
+                ) : (
+                  <AlertTriangle size={19} aria-hidden="true" />
+                )}
               </span>
               <div>
                 <h2 id={titleId}>{title}</h2>
@@ -119,12 +126,15 @@ export function ConfirmActionForm({
   );
 }
 
-function ActionIcon({ icon, size }: { icon?: "trash" | "rollback" | "reset"; size: number }) {
+function ActionIcon({ icon, size }: { icon?: ActionIconName; size: number }) {
   if (icon === "trash") {
     return <Trash2 size={size} aria-hidden="true" />;
   }
   if (icon === "rollback" || icon === "reset") {
     return <RotateCcw size={size} aria-hidden="true" />;
+  }
+  if (icon === "rename") {
+    return <Pencil size={size} aria-hidden="true" />;
   }
   return null;
 }

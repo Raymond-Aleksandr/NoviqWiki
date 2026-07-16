@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChevronDown, History, Pencil, Plus, RotateCcw, Search } from "lucide-react";
-import { deletePageAction, restorePageAction } from "@/app/actions";
+import { deletePageAction, renamePageAction, restorePageAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -64,6 +64,38 @@ export default async function AdminPagesPage() {
                 <History size={14} aria-hidden="true" />
                 {messages.revisions}
               </Link>
+              {page.status !== "deleted" ? (
+                <ConfirmActionForm
+                  action={renamePageAction}
+                  hiddenFields={[
+                    { name: "pageId", value: page.id },
+                    { name: "oldSlug", value: page.slug }
+                  ]}
+                  triggerLabel={messages.rename}
+                  triggerClassName="button compact"
+                  icon="rename"
+                  title={`${messages.renamePage} · ${page.title}`}
+                  body={messages.renamePageConfirmBody}
+                  confirmLabel={messages.rename}
+                  cancelLabel={messages.cancel}
+                  pendingLabel={messages.working}
+                >
+                  <div className="confirm-field-grid">
+                    <label>
+                      <span>{messages.newTitle}</span>
+                      <input className="field" name="newTitle" defaultValue={page.title} required />
+                    </label>
+                    <label>
+                      <span>{messages.newSlug}</span>
+                      <input className="field mono" name="newSlug" defaultValue={page.slug} />
+                    </label>
+                    <label className="checkbox-row">
+                      <input type="checkbox" name="createAlias" defaultChecked />
+                      <span>{messages.keepPreviousSlugAsRedirect}</span>
+                    </label>
+                  </div>
+                </ConfirmActionForm>
+              ) : null}
               {page.status === "deleted" ? (
                 <ActionForm
                   action={restorePageAction}

@@ -79,6 +79,9 @@ Last updated: 2026-07-16
 - 2026-07-16: Expanded the non-reset UI release audit to cover registration, article backlinks, and the first discoverable category detail page in addition to the existing public, editor, admin, modal, and diff routes. The authenticated local Chromium/WebKit desktop/mobile run passed without database reset.
 - 2026-07-16: Added light/dark design token checks to `pnpm test:ui` so the design package colors, radius token, and font stacks are now release-gated alongside layout, modal, icon, and Safari form-control checks.
 - 2026-07-16: Added a production-source native dialog scan to `pnpm test:ui`; release UI checks now fail if `src` reintroduces browser `alert`, `confirm`, `prompt`, or `beforeunload` flows instead of the design-package modal components.
+- 2026-07-16: Added a CSS source scan to `pnpm test:ui` that rejects non-`none` `transform` declarations inside `:active` rules, guarding against pressed-button movement returning through future stylesheet edits.
+- 2026-07-16: Exposed page rename/move from `/admin/pages` with the design-package confirmation modal, editable title/slug fields, and a default option to keep the previous slug as a redirect. The page lifecycle integration test now verifies old-slug resolution, alias-backed search, and unchanged immutable revision count after rename.
+- 2026-07-16: Added `NEXTWIKI_ALLOWED_DEV_ORIGINS` so local dev servers can safely allow LAN/mobile browser review without hardcoding workstation IP addresses. The live review server was restarted on `0.0.0.0:3100` and validated through `http://10.0.0.180:3100`.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

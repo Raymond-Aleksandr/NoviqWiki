@@ -6,14 +6,14 @@
 | Auth      | Login, logout, registration, status checks, rate limiting | Playwright login/logout-adjacent flow; auth services; rate limit table; integration auth recovery                       |
 | Recovery  | Password reset and email verification                     | `tests/integration/auth-recovery.test.ts`                                                                               |
 | RBAC      | Permissions enforced server-side                          | Domain permission tests/services; admin routes use `requirePermission`; final Owner guard                               |
-| Pages     | Create, draft, publish, edit, delete, restore             | Playwright create/edit/publish; admin page actions; integration lifecycle                                               |
+| Pages     | Create, draft, publish, edit, rename, delete, restore     | Playwright create/edit/publish; admin page actions; integration lifecycle with rename alias checks                      |
 | Revisions | Immutable history, diff, rollback                         | Playwright history/diff/rollback; unit diff tests; integration lifecycle                                                |
 | Rendering | Sanitized Markdown, wiki links, categories                | `tests/unit/rendering.test.ts`; `tests/unit/wiki-links.test.ts`                                                         |
-| Search    | PostgreSQL ranking, filters, permission checks            | Playwright search; integration lifecycle search indexing; `pnpm search:reindex`                                         |
+| Search    | PostgreSQL ranking, aliases, filters, permission checks   | Playwright search; integration lifecycle search indexing and renamed-page alias lookup; `pnpm search:reindex`           |
 | Media     | Upload, validate, browse, insert syntax, references       | Playwright upload; service validation/reference lookup; editor picker and media delete dialog audits; Safari file input |
 | Admin     | Dashboard, settings, users, groups, roles                 | Playwright user creation; server-rendered admin sections; reset-session modal audit; tab icon and duplicate-entry audit |
 | UI reset  | Imported design package applied consistently              | `pnpm test:ui`; homepage/article/category/media/auth/editor/admin review; modal, icon, and native-dialog source audits  |
-| Theme     | Design package colors and responsive layout               | `pnpm test:ui`; light/dark token/font audit; desktop/mobile overflow checks; WebKit sidebar/search-button/active-state  |
+| Theme     | Design package colors and responsive layout               | `pnpm test:ui`; light/dark token/font audit; overflow checks; WebKit sidebar/search-button/active transform audit       |
 | Settings  | Logo, favicon, homepage layout, featured content, SEO     | Admin settings form, homepage rendering, `tests/unit/homepage-settings.test.ts`, production build, UI audit             |
 | Plugins   | Future extension boundary without v0.1.0 marketplace      | `src/modules/plugins/registry.ts`; `tests/unit/plugin-registry.test.ts`; homepage contributions stay in-process         |
 | Audit     | Append-only audit log and filtering                       | Audit service; auth/page/media/settings actions write audit events                                                      |

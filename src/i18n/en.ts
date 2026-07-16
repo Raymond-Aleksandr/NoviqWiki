@@ -74,6 +74,8 @@ export const en = {
   userStatusPending: "Pending",
   noResults: "No results",
   createPage: "Create page",
+  rename: "Rename",
+  renamePage: "Rename page",
   markdown: "Markdown",
   preview: "Preview",
   dashboard: "Dashboard",
@@ -268,6 +270,11 @@ export const en = {
   mediaPickerSearch: "Search by filename...",
   mediaUrl: "Media URL",
   insertSelectedMedia: "Insert selected media",
+  renamePageConfirmBody:
+    "Update the page title and slug. Revision history is preserved, and the previous slug can remain as a redirect.",
+  newTitle: "New title",
+  newSlug: "New slug",
+  keepPreviousSlugAsRedirect: "Keep the previous slug as a redirect",
   deletePageConfirmBody:
     "This soft-deletes the page and hides it from public browsing until an authorized user restores it.",
   deleteMediaConfirmBody:
