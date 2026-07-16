@@ -38,7 +38,10 @@ export default async function SearchPage({ searchParams }: Props) {
           />
         </label>
         <input type="hidden" name="category" value={category ?? ""} />
-        <button className="primary">{messages.search}</button>
+        <button className="primary">
+          <Search size={16} aria-hidden="true" />
+          {messages.search}
+        </button>
       </form>
       <div className="search-layout">
         <aside>

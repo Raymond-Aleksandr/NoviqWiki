@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useActionState } from "react";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Rocket } from "lucide-react";
 import type { ActionState } from "@/app/actions";
 import type { Messages } from "@/i18n";
 
@@ -376,6 +376,7 @@ export function SetupWizard({
 
           <div className="setup-actions">
             <button type="button" onClick={goBack} disabled={activeStep === 0 || pending}>
+              <ChevronLeft size={15} aria-hidden="true" />
               {messages.back}
             </button>
             {activeStep < steps.length - 1 ? (
@@ -391,6 +392,7 @@ export function SetupWizard({
               </button>
             ) : (
               <button key="submit" type="submit" className="primary" disabled={pending}>
+                <Rocket size={15} aria-hidden="true" />
                 {pending ? messages.creatingSite : messages.completeSetup}
               </button>
             )}

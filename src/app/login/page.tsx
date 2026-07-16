@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import { BookOpen, LogIn } from "lucide-react";
 import { ActionForm } from "@/components/ui/action-form";
 import { getCurrentSession } from "@/modules/auth/session";
 import { loginAction } from "@/app/actions";
@@ -62,7 +62,10 @@ export default async function LoginPage({ searchParams }: Props) {
                 required
               />
             </label>
-            <button className="primary button-primary">{messages.login}</button>
+            <button className="primary button-primary">
+              <LogIn size={16} aria-hidden="true" />
+              {messages.login}
+            </button>
           </ActionForm>
           <div className="auth-links">
             <Link href="/forgot-password">{messages.forgotPassword}</Link>

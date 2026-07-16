@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 import { requestPasswordResetAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -18,7 +18,10 @@ export default async function ForgotPasswordPage() {
             {messages.usernameOrEmail}
             <input className="field input" name="identifier" autoComplete="username" required />
           </label>
-          <button className="primary button-primary">{messages.requestResetLink}</button>
+          <button className="primary button-primary">
+            <Send size={16} aria-hidden="true" />
+            {messages.requestResetLink}
+          </button>
         </ActionForm>
         <p style={{ marginTop: "14px", marginBottom: 0 }}>
           <Link href="/login">

@@ -1,3 +1,4 @@
+import { Save } from "lucide-react";
 import { updateSettingsAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -202,7 +203,10 @@ export default async function AdminSettingsPage() {
           </label>
         </section>
         <div className="settings-actions">
-          <button className="primary">{messages.saveChanges}</button>
+          <button className="primary">
+            <Save size={16} aria-hidden="true" />
+            {messages.saveChanges}
+          </button>
         </div>
       </ActionForm>
     </section>
