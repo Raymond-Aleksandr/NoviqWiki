@@ -24,6 +24,7 @@ pnpm typecheck
 pnpm test
 pnpm test:integration
 pnpm build
+pnpm test:ui
 pnpm test:e2e
 docker compose config
 docker compose build
@@ -67,6 +68,41 @@ pnpm test:integration
 ```
 
 Integration tests need a disposable PostgreSQL database. Do not point integration tests at production or shared staging data.
+
+## UI Release Audit
+
+The UI release audit is a non-reset browser audit for live review builds. It does not recreate the database and is safe to run against a local app that is already being inspected.
+
+It checks:
+
+- Chromium and WebKit at desktop and mobile widths.
+- Horizontal overflow.
+- Sub-32px command targets.
+- Safari/WebKit checkbox, radio, and file-input sizing.
+- Stray visible dialogs on initial route load.
+- Design-package modal radius/backdrop for editor media picker and page deletion confirmation when matching data exists.
+- Duplicate admin settings entries.
+- Missing icons on visible command buttons.
+- History controls and the first discoverable diff route.
+- Button active-state transform drift.
+
+Run public-route checks against a running local app:
+
+```bash
+pnpm test:ui
+```
+
+Run the full authenticated audit:
+
+```bash
+UI_AUDIT_BASE_URL=http://localhost:3100 \
+UI_AUDIT_USERNAME=owner \
+UI_AUDIT_PASSWORD=replace-with-local-password \
+UI_AUDIT_ARTICLE_SLUG=e2e-article \
+pnpm test:ui
+```
+
+If `UI_AUDIT_USERNAME` and `UI_AUDIT_PASSWORD` are omitted, authenticated admin/editor routes are skipped. This command is separate from `pnpm test:e2e`, which intentionally resets the database first.
 
 ## End-to-End Tests
 

@@ -32,6 +32,7 @@ Last updated: 2026-07-16
 | `pnpm typecheck`               | Passed                                              |
 | `pnpm test`                    | Passed, 6 unit files / 12 tests                     |
 | `pnpm test:integration`        | Passed, 2 integration files / 3 tests               |
+| `pnpm test:ui`                 | Passed, non-reset Chromium/WebKit UI release audit  |
 | `pnpm build`                   | Passed                                              |
 | `pnpm test:e2e`                | Passed, 2 Playwright tests                          |
 | `pnpm db:migrate`              | Passed                                              |
@@ -72,6 +73,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Fixed the remaining Safari/mobile polish issues from live review. The mobile sidebar now collapses to a 70px horizontal strip at `439x734`, topbar search icon buttons are fixed at `32x32`, Safari file-upload controls render as 46px design-package fields, and admin reset-session actions now open the same design-package confirmation modal used by deletion/rollback flows. Re-ran a focused Chromium/WebKit desktop/mobile route and modal audit with zero failures.
 - 2026-07-16: Removed the remaining duplicated admin operation entries: the global settings gear is hidden while inside `/admin` because the admin tab bar already exposes settings, and the groups/roles pages no longer show redundant "new" anchors immediately above their create forms. Admin tabs now include icons, and the button pressed state uses inset feedback without transform displacement. Chromium/WebKit desktop/mobile admin audit verified one settings entry per admin page, icon coverage on all admin tabs, no visible `#create-*` anchors, no sub-32px controls, and no active-state transform.
 - 2026-07-16: Standardized remaining command buttons with design-package icon+text treatment across auth/recovery/verification, search, first-run setup navigation, and admin settings save. A Chromium/WebKit desktop/mobile command-control audit of homepage, search, auth/recovery pages, admin settings, and editor found no visible command buttons without icons, no horizontal overflow, and no sub-32px command targets.
+- 2026-07-16: Added `pnpm test:ui`, a repeatable non-reset Chromium/WebKit desktop/mobile release audit for live review databases and the `NoviqWiki.html` design-package requirements. It covers public routes, authenticated admin/editor routes, media picker/page delete modals, active button states, history controls, and the first discoverable diff route, and the local authenticated run passed with zero icon, overflow, dialog, duplicate-control, tiny-control, Safari form-control, modal consistency, or pressed-state failures.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

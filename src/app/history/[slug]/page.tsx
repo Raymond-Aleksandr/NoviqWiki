@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Eye, GitCompare } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { rollbackAction } from "@/app/actions";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
@@ -69,6 +70,7 @@ export default async function HistoryPage({ params }: Props) {
                 className="button compact"
                 href={`/page/${resolved.page.slug}?revision=${revision.revisionNumber}`}
               >
+                <Eye size={14} aria-hidden="true" />
                 {messages.view}
               </Link>
               {revisions[index + 1] ? (
@@ -76,6 +78,7 @@ export default async function HistoryPage({ params }: Props) {
                   className="button compact"
                   href={`/diff/${revisions[index + 1].id}/${revision.id}`}
                 >
+                  <GitCompare size={14} aria-hidden="true" />
                   {messages.compare}
                 </Link>
               ) : null}

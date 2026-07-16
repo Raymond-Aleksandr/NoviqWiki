@@ -18,6 +18,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "test:ui": "tsx scripts/ui-audit.ts",
     "test:e2e": "tsx scripts/e2e-reset.ts && playwright test",
     "build": "next build",
     "db:generate": "drizzle-kit generate",

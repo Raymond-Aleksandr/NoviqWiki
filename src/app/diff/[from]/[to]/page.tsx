@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { rollbackAction } from "@/app/actions";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getRequestI18n } from "@/i18n/server";
@@ -85,7 +86,8 @@ export default async function DiffPage({ params }: Props) {
           -{removed} {messages.removed}
         </span>
         <Link className="button compact" href={`/page/${page.slug}`} style={{ marginLeft: "auto" }}>
-          ← {messages.returnToPage}
+          <ArrowLeft size={14} aria-hidden="true" />
+          {messages.returnToPage}
         </Link>
       </div>
     </section>

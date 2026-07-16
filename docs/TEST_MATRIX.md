@@ -12,8 +12,8 @@
 | Search    | PostgreSQL ranking, filters, permission checks            | Playwright search; integration lifecycle search indexing; `pnpm search:reindex`                                         |
 | Media     | Upload, validate, browse, insert syntax, references       | Playwright upload; media service validation/reference lookup; editor media-picker dialog audit; Safari file input audit |
 | Admin     | Dashboard, settings, users, groups, roles                 | Playwright user creation; server-rendered admin sections; reset-session modal; admin tab icon and duplicate-entry audit |
-| UI reset  | Imported design package applied consistently              | Browser review of homepage, article, search, recent, categories, media, auth, editor, history, diff, admin; icon audit  |
-| Theme     | Design package colors and responsive layout               | CSS token inspection; desktop/mobile overflow checks; WebKit mobile sidebar/modal/search-button/file/active-state audit |
+| UI reset  | Imported design package applied consistently              | `pnpm test:ui`; browser review of homepage, article, search, media, auth, editor, admin, modals, and command icons      |
+| Theme     | Design package colors and responsive layout               | `pnpm test:ui`; CSS token inspection; desktop/mobile overflow checks; WebKit sidebar/search-button/file/active-state    |
 | Settings  | Logo, favicon, homepage layout, featured content, SEO     | Admin settings form, homepage rendering, production build, targeted homepage browser audit                              |
 | Plugins   | Future extension boundary without v0.1.0 marketplace      | `src/modules/plugins/registry.ts`; homepage contribution collection stays in-process and optional                       |
 | Audit     | Append-only audit log and filtering                       | Audit service; auth/page/media/settings actions write audit events                                                      |
