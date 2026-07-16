@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import { BookOpen, LogIn, UserPlus } from "lucide-react";
 import { ActionForm } from "@/components/ui/action-form";
 import { registerAction } from "@/app/actions";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -56,10 +56,17 @@ export default async function RegisterPage() {
               required
             />
           </label>
-          <button className="primary button-primary">Create account</button>
+          <button className="primary button-primary">
+            <UserPlus size={16} aria-hidden="true" />
+            Create account
+          </button>
         </ActionForm>
         <p className="muted" style={{ marginTop: "14px", marginBottom: 0 }}>
-          Already have an account? <Link href="/login">Log in</Link>
+          Already have an account?{" "}
+          <Link href="/login">
+            <LogIn size={14} aria-hidden="true" />
+            Log in
+          </Link>
         </p>
       </div>
     </section>

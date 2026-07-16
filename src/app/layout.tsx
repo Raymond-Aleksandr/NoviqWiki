@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { BookOpen, LogIn, LogOut, Search, Settings, UserRound } from "lucide-react";
+import { BookOpen, LogIn, LogOut, Rocket, Search, Settings, UserRound } from "lucide-react";
 import "@/styles/globals.css";
 import { SiteNav } from "@/components/layout/site-nav";
 import { PreferenceControls } from "@/components/layout/theme-controls";
@@ -61,6 +61,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="sidebar-footer">
                 {!site ? (
                   <Link className="button sidebar-setup-link" href="/setup">
+                    <Rocket size={16} aria-hidden="true" />
                     First-run setup
                   </Link>
                 ) : null}

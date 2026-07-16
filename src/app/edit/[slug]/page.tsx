@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, Save, X } from "lucide-react";
 import { editPageAction } from "@/app/actions";
 import { MarkdownEditor } from "@/components/editor/markdown-editor";
 import { ActionForm } from "@/components/ui/action-form";
@@ -57,9 +57,11 @@ export default async function EditPage({ params }: Props) {
                 <input className="field" name="editSummary" placeholder="Describe this change" />
               </label>
               <Link className="button" href={`/page/${resolved.page.slug}`}>
+                <X size={15} aria-hidden="true" />
                 Cancel
               </Link>
               <button name="intent" value="save-draft">
+                <Save size={15} aria-hidden="true" />
                 Save draft
               </button>
               <button className="primary" name="intent" value="publish">

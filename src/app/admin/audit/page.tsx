@@ -1,3 +1,4 @@
+import { Box, Clock3, ShieldCheck, UserRound } from "lucide-react";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { listAuditLogs } from "@/modules/audit/service";
 
@@ -16,15 +17,40 @@ export default async function AdminAuditPage() {
         </div>
         {logs.rows.map((log) => (
           <article className="admin-grid-row admin-audit-grid" key={log.id}>
-            <div className="mono">{log.action}</div>
-            <div className="muted">
+            <div data-label="Event">
+              <span className={`badge audit-action ${badgeForAudit(log.action)}`}>
+                <ShieldCheck size={13} aria-hidden="true" />
+                {log.action}
+              </span>
+            </div>
+            <div className="muted audit-cell" data-label="Target">
+              <Box size={14} aria-hidden="true" />
               {log.targetType}:{log.targetId}
             </div>
-            <div className="muted">{log.actorDisplayName ?? "System"}</div>
-            <div className="mono muted">{log.createdAt.toLocaleString()}</div>
+            <div className="muted audit-cell" data-label="Actor">
+              <UserRound size={14} aria-hidden="true" />
+              {log.actorDisplayName ?? "System"}
+            </div>
+            <div className="mono muted audit-cell" data-label="Time">
+              <Clock3 size={14} aria-hidden="true" />
+              {log.createdAt.toLocaleString()}
+            </div>
           </article>
         ))}
       </div>
     </section>
   );
+}
+
+function badgeForAudit(action: string) {
+  if (action.includes("delete") || action.includes("failed") || action.includes("suspend")) {
+    return "danger";
+  }
+  if (action.includes("rollback") || action.includes("reset")) {
+    return "warning";
+  }
+  if (action.includes("create") || action.includes("publish") || action.includes("upload")) {
+    return "success";
+  }
+  return "info";
 }

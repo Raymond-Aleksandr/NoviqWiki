@@ -433,6 +433,13 @@ button {
   box-shadow: var(--sh-sm);
 }
 
+.button.compact,
+button.compact {
+  border-radius: 7px;
+  font-size: 12px;
+  padding: 5px 10px;
+}
+
 .button:visited {
   color: var(--text);
 }
@@ -612,6 +619,20 @@ select {
   font-size: 22px;
 }
 
+.section-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--link);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.section-action:visited {
+  color: var(--link);
+}
+
 .featured-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -637,6 +658,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
   aspect-ratio: 16 / 10;
   border-bottom: 1px solid var(--border);
   background: repeating-linear-gradient(
@@ -692,6 +714,9 @@ select {
 
 .panel-header h2,
 .panel h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   font-size: 17px;
 }
@@ -706,6 +731,10 @@ select {
 }
 
 .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   border-radius: 5px;
   background: var(--primary-soft);
   color: var(--primary);
@@ -796,6 +825,9 @@ select {
 }
 
 .filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--surface);
@@ -1405,6 +1437,9 @@ select {
 }
 
 .aside-actions a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--text-muted);
   text-decoration: none;
 }
@@ -1457,6 +1492,13 @@ select {
   gap: 16px;
   margin-top: 14px;
   font-size: 13px;
+}
+
+.auth-links a,
+.auth-compact-card a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .auth-art {
@@ -1585,6 +1627,11 @@ select {
   font-weight: 700;
 }
 
+.setup-step.current .setup-step-index {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 .setup-step.done .setup-step-index {
   background: var(--success);
   border-color: var(--success);
@@ -1705,6 +1752,7 @@ select {
 }
 
 .admin-tabs .button {
+  gap: 7px;
   border-color: var(--border-strong);
   background: var(--surface);
   color: var(--text);
@@ -1824,6 +1872,12 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.admin-status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .admin-dot {
@@ -1996,6 +2050,9 @@ select {
 }
 
 .settings-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: var(--text-faint);
   font-size: 11px;
   font-weight: 700;
@@ -2046,6 +2103,16 @@ select {
 
 .status-error {
   color: var(--danger);
+}
+
+.spin-icon {
+  animation: nw-spin 0.9s linear infinite;
+}
+
+@keyframes nw-spin {
+  to {
+    transform: rotate(1turn);
+  }
 }
 
 .system-grid {
@@ -2335,6 +2402,25 @@ select {
   font-size: 12.5px;
 }
 
+.diff-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 6px;
+  font-weight: 600;
+  padding: 4px 9px;
+}
+
+.diff-count.add {
+  background: var(--diff-add-bg);
+  color: var(--diff-add-text);
+}
+
+.diff-count.remove {
+  background: var(--diff-del-bg);
+  color: var(--diff-del-text);
+}
+
 .table-wrap {
   overflow: hidden;
   border: 1px solid var(--border);
@@ -2405,8 +2491,14 @@ select {
   color: var(--success);
 }
 
+.status-badge.suspended {
+  color: var(--danger);
+}
+
 .role-badge {
   display: inline-flex;
+  align-items: center;
+  gap: 5px;
   border-radius: 5px;
   background: var(--warning-bg);
   color: var(--warning);
@@ -2425,6 +2517,18 @@ select {
 .inline-form button {
   padding: 5px 10px;
   font-size: 12px;
+}
+
+.audit-action {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.audit-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
 }
 
 .grid {
@@ -2600,14 +2704,6 @@ select {
     width: 100%;
   }
 
-  .history-panel {
-    overflow-x: auto;
-  }
-
-  .history-row {
-    min-width: 640px;
-  }
-
   .setup-choice-grid,
   .admin-form-grid,
   .editor-title-grid {
@@ -2618,18 +2714,27 @@ select {
     overflow-x: visible;
   }
 
-  .admin-grid-header.admin-users-grid {
+  .admin-grid-header.admin-users-grid,
+  .admin-grid-header.admin-pages-grid,
+  .admin-grid-header.admin-audit-grid,
+  .history-row.header {
     display: none;
   }
 
-  .admin-grid-row.admin-users-grid {
+  .admin-grid-row.admin-users-grid,
+  .admin-grid-row.admin-pages-grid,
+  .admin-grid-row.admin-audit-grid,
+  .history-row {
     min-width: 0;
     grid-template-columns: 1fr;
     gap: 10px;
     padding: 14px 16px;
   }
 
-  .admin-grid-row.admin-users-grid > div {
+  .admin-grid-row.admin-users-grid > div,
+  .admin-grid-row.admin-pages-grid > *,
+  .admin-grid-row.admin-audit-grid > *,
+  .history-row > * {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2638,14 +2743,23 @@ select {
     text-align: right;
   }
 
-  .admin-grid-row.admin-users-grid > div::before {
+  .admin-grid-row.admin-users-grid > div::before,
+  .admin-grid-row.admin-pages-grid > *::before,
+  .admin-grid-row.admin-audit-grid > *::before,
+  .history-row > *::before {
     content: attr(data-label);
     color: var(--text-muted);
     flex: 0 0 auto;
+    margin-right: auto;
     font-family: var(--nw-font-body);
     font-size: 12px;
     font-weight: 600;
     text-align: left;
+  }
+
+  .admin-grid-row.admin-pages-grid > a,
+  .admin-grid-row.admin-audit-grid > a {
+    text-decoration: none;
   }
 
   .admin-grid-row.admin-users-grid .user-cell {
@@ -2654,12 +2768,18 @@ select {
 
   .admin-grid-row.admin-users-grid .user-cell strong,
   .admin-grid-row.admin-users-grid .mono,
-  .admin-grid-row.admin-users-grid .role-badge {
+  .admin-grid-row.admin-users-grid .role-badge,
+  .admin-grid-row.admin-pages-grid .muted,
+  .admin-grid-row.admin-audit-grid .muted,
+  .history-row .muted,
+  .history-row .mono {
     min-width: 0;
     overflow-wrap: anywhere;
   }
 
-  .admin-grid-row.admin-users-grid .admin-action-list {
+  .admin-grid-row.admin-users-grid .admin-action-list,
+  .admin-grid-row.admin-pages-grid .admin-action-list,
+  .history-row .history-actions {
     justify-content: flex-end;
   }
 

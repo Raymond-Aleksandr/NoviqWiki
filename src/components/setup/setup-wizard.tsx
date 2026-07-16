@@ -1,6 +1,18 @@
 "use client";
 
 import { useMemo, useState, useActionState } from "react";
+import {
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Globe2,
+  HardDrive,
+  LoaderCircle,
+  Rocket,
+  ShieldCheck,
+  UserRound
+} from "lucide-react";
 import type { ActionState } from "@/app/actions";
 
 type SetupValues = {
@@ -28,31 +40,36 @@ const steps = [
     id: "site",
     title: "Site",
     eyebrow: "Identity",
-    description: "Name the wiki and set the canonical address."
+    description: "Name the wiki and set the canonical address.",
+    icon: Globe2
   },
   {
     id: "access",
     title: "Access",
     eyebrow: "Policy",
-    description: "Choose how new users can enter the wiki."
+    description: "Choose how new users can enter the wiki.",
+    icon: ShieldCheck
   },
   {
     id: "storage",
     title: "Storage",
     eyebrow: "Media",
-    description: "Select where uploaded files should live."
+    description: "Select where uploaded files should live.",
+    icon: HardDrive
   },
   {
     id: "owner",
     title: "Owner",
     eyebrow: "Account",
-    description: "Create the first administrator account."
+    description: "Create the first administrator account.",
+    icon: UserRound
   },
   {
     id: "review",
     title: "Review",
     eyebrow: "Launch",
-    description: "Confirm the setup details and create the site."
+    description: "Confirm the setup details and create the site.",
+    icon: Rocket
   }
 ] as const;
 
@@ -115,28 +132,37 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
           <div className="setup-progress" aria-hidden="true">
             <span style={{ inlineSize: `${progress}%` }} />
           </div>
-          {steps.map((step, index) => (
-            <button
-              key={step.id}
-              type="button"
-              className={`setup-step ${index === activeStep ? "current" : ""} ${
-                index < activeStep ? "done" : ""
-              }`}
-              aria-current={index === activeStep ? "step" : undefined}
-              onClick={() => {
-                if (index <= activeStep) {
-                  setActiveStep(index);
-                  setLocalError("");
-                }
-              }}
-            >
-              <span className="setup-step-index">{index + 1}</span>
-              <span>
-                <span className="setup-step-eyebrow">{step.eyebrow}</span>
-                <strong>{step.title}</strong>
-              </span>
-            </button>
-          ))}
+          {steps.map((step, index) => {
+            const StepIcon = step.icon;
+            return (
+              <button
+                key={step.id}
+                type="button"
+                className={`setup-step ${index === activeStep ? "current" : ""} ${
+                  index < activeStep ? "done" : ""
+                }`}
+                aria-current={index === activeStep ? "step" : undefined}
+                onClick={() => {
+                  if (index <= activeStep) {
+                    setActiveStep(index);
+                    setLocalError("");
+                  }
+                }}
+              >
+                <span className="setup-step-index">
+                  {index < activeStep ? (
+                    <Check size={15} aria-hidden="true" />
+                  ) : (
+                    <StepIcon size={15} aria-hidden="true" />
+                  )}
+                </span>
+                <span>
+                  <span className="setup-step-eyebrow">{step.eyebrow}</span>
+                  <strong>{step.title}</strong>
+                </span>
+              </button>
+            );
+          })}
         </aside>
 
         <div className="setup-card">
@@ -341,6 +367,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
 
           <div className="setup-actions">
             <button type="button" onClick={goBack} disabled={activeStep === 0 || pending}>
+              <ArrowLeft size={15} aria-hidden="true" />
               Back
             </button>
             {activeStep < steps.length - 1 ? (
@@ -352,10 +379,21 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                 disabled={pending}
               >
                 Continue
+                <ChevronRight size={15} aria-hidden="true" />
               </button>
             ) : (
               <button key="submit" type="submit" className="primary" disabled={pending}>
-                {pending ? "Creating site..." : "Complete setup"}
+                {pending ? (
+                  <>
+                    <LoaderCircle size={15} aria-hidden="true" className="spin-icon" />
+                    Creating site...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 size={15} aria-hidden="true" />
+                    Complete setup
+                  </>
+                )}
               </button>
             )}
           </div>

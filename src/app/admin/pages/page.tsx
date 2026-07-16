@@ -1,5 +1,14 @@
 import Link from "next/link";
-import { MoreVertical, Plus, Search } from "lucide-react";
+import {
+  ChevronDown,
+  History,
+  MoreVertical,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Trash2
+} from "lucide-react";
 import { deletePageAction, restorePageAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -17,7 +26,10 @@ export default async function AdminPagesPage() {
             <Search size={15} aria-hidden="true" />
             Filter pages...
           </div>
-          <div className="admin-filter-control">Status: All</div>
+          <div className="admin-filter-control">
+            Status: All
+            <ChevronDown size={14} aria-hidden="true" />
+          </div>
           <div style={{ flex: 1 }} />
           <Link className="button primary" href="/edit/new">
             <Plus size={15} aria-hidden="true" />
@@ -33,28 +45,46 @@ export default async function AdminPagesPage() {
         </div>
         {rows.map((page) => (
           <article className="admin-grid-row admin-pages-grid" key={page.id}>
-            <Link href={`/page/${page.slug}`}>{page.title}</Link>
-            <div className="muted">{page.slug}</div>
-            <div>
+            <Link href={`/page/${page.slug}`} data-label="Title">
+              {page.title}
+            </Link>
+            <div className="muted" data-label="Slug">
+              {page.slug}
+            </div>
+            <div data-label="Status">
               <span
                 className={`badge ${page.status === "published" ? "success" : page.status === "deleted" ? "danger" : "warning"}`}
               >
                 {page.status}
               </span>
             </div>
-            <div className="mono muted">{page.updatedAt.toLocaleString()}</div>
-            <div className="admin-action-list">
-              <Link href={`/edit/${page.slug}`}>Edit</Link>
-              <Link href={`/history/${page.slug}`}>Revisions</Link>
+            <div className="mono muted" data-label="Updated">
+              {page.updatedAt.toLocaleString()}
+            </div>
+            <div className="admin-action-list" data-label="Actions">
+              <Link className="button compact" href={`/edit/${page.slug}`}>
+                <Pencil size={14} aria-hidden="true" />
+                Edit
+              </Link>
+              <Link className="button compact" href={`/history/${page.slug}`}>
+                <History size={14} aria-hidden="true" />
+                Revisions
+              </Link>
               {page.status === "deleted" ? (
                 <ActionForm action={restorePageAction} className="inline-form">
                   <input type="hidden" name="pageId" value={page.id} />
-                  <button>Restore</button>
+                  <button>
+                    <RotateCcw size={14} aria-hidden="true" />
+                    Restore
+                  </button>
                 </ActionForm>
               ) : (
                 <ActionForm action={deletePageAction} className="inline-form">
                   <input type="hidden" name="pageId" value={page.id} />
-                  <button className="danger">Delete</button>
+                  <button className="danger">
+                    <Trash2 size={14} aria-hidden="true" />
+                    Delete
+                  </button>
                 </ActionForm>
               )}
               <MoreVertical size={18} aria-hidden="true" />

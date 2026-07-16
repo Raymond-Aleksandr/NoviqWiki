@@ -49,7 +49,10 @@ export default async function AdminGroupsPage() {
               ))}
             </select>
           </label>
-          <button className="primary">Create group</button>
+          <button className="primary">
+            <Plus size={15} aria-hidden="true" />
+            Create group
+          </button>
         </ActionForm>
       </section>
       <div className="group-card-grid">

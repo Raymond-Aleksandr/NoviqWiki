@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import { BookOpen, KeyRound, LogIn, UserPlus } from "lucide-react";
 import { ActionForm } from "@/components/ui/action-form";
 import { getCurrentSession } from "@/modules/auth/session";
 import { loginAction } from "@/app/actions";
@@ -61,13 +61,22 @@ export default async function LoginPage({ searchParams }: Props) {
                 required
               />
             </label>
-            <button className="primary button-primary">Log in</button>
+            <button className="primary button-primary">
+              <LogIn size={16} aria-hidden="true" />
+              Log in
+            </button>
           </ActionForm>
           <div className="auth-links">
-            <Link href="/forgot-password">Forgot password?</Link>
+            <Link href="/forgot-password">
+              <KeyRound size={14} aria-hidden="true" />
+              Forgot password?
+            </Link>
             {site.settings?.registrationMode === "open" ||
             site.settings?.registrationMode === "email_verification" ? (
-              <Link href="/register">Create account</Link>
+              <Link href="/register">
+                <UserPlus size={14} aria-hidden="true" />
+                Create account
+              </Link>
             ) : null}
           </div>
         </div>

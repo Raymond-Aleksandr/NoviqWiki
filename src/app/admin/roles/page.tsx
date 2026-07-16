@@ -46,7 +46,10 @@ export default async function AdminRolesPage() {
               ))}
             </div>
           </fieldset>
-          <button className="primary">Create role</button>
+          <button className="primary">
+            <Plus size={15} aria-hidden="true" />
+            Create role
+          </button>
         </ActionForm>
       </section>
       <div className="data-panel permission-panel">

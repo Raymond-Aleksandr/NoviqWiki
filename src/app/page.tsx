@@ -1,5 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import {
+  Activity,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  FileText,
+  ImageIcon,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Search,
+  Tags,
+  Trash2
+} from "lucide-react";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { listCategories } from "@/modules/categories/service";
 import { listPages } from "@/modules/pages/service";
@@ -26,14 +40,20 @@ export default async function HomePage() {
           <p>{settings?.homepageIntro ?? settings?.tagline}</p>
           <form action="/search" className="home-search" role="search">
             <input name="q" aria-label="Search this wiki" placeholder="Search this wiki..." />
-            <button className="primary">Search</button>
+            <button className="primary">
+              <Search size={16} aria-hidden="true" />
+              Search
+            </button>
           </form>
         </div>
       </div>
 
       <div className="section-heading">
         <h2>Featured pages</h2>
-        <Link href="/categories">Browse all</Link>
+        <Link className="section-action" href="/categories">
+          Browse all
+          <ChevronRight size={15} aria-hidden="true" />
+        </Link>
       </div>
       <div className="featured-grid">
         {recentPages.length === 0 ? (
@@ -41,6 +61,7 @@ export default async function HomePage() {
             <h3>No published pages yet.</h3>
             <p>Create the first article to start shaping this wiki.</p>
             <Link className="button primary" href="/edit/new">
+              <Plus size={15} aria-hidden="true" />
               Create page
             </Link>
           </section>
@@ -48,10 +69,14 @@ export default async function HomePage() {
           recentPages.slice(0, 3).map((page) => (
             <Link className="feature-card" key={page.id} href={`/page/${page.slug}`}>
               <span className="feature-card-media" aria-hidden="true">
+                <FileText size={22} aria-hidden="true" />
                 Article
               </span>
               <span className="feature-card-body">
-                <span className="badge">Updated</span>
+                <span className="badge info">
+                  <Clock3 size={13} aria-hidden="true" />
+                  Updated
+                </span>
                 <strong>{page.title}</strong>
                 <span className="muted">Open the latest published revision.</span>
               </span>
@@ -63,12 +88,18 @@ export default async function HomePage() {
       <div className="home-panels">
         <section className="panel flush">
           <header className="panel-header">
-            <h2>Recently updated</h2>
+            <h2>
+              <Clock3 size={17} aria-hidden="true" />
+              Recently updated
+            </h2>
           </header>
           <div className="activity-list">
             {changes.map((change) => (
               <p key={change.id}>
-                <span className="badge">{change.action}</span>
+                <span className={`badge audit-action ${badgeForAction(change.action)}`}>
+                  {iconForAction(change.action)}
+                  {change.action}
+                </span>
                 <span>{change.actorDisplayName}</span>
                 <span className="muted">{change.createdAt.toLocaleString()}</span>
               </p>
@@ -77,7 +108,10 @@ export default async function HomePage() {
         </section>
         <section className="panel flush">
           <header className="panel-header">
-            <h2>Featured categories</h2>
+            <h2>
+              <Tags size={17} aria-hidden="true" />
+              Featured categories
+            </h2>
           </header>
           <div className="category-list">
             {categories.slice(0, 8).map((category) => (
@@ -92,6 +126,7 @@ export default async function HomePage() {
           </div>
           {recentPages.length === 0 ? (
             <Link className="button" href="/edit/new">
+              <Plus size={15} aria-hidden="true" />
               Create page
             </Link>
           ) : null}
@@ -99,4 +134,39 @@ export default async function HomePage() {
       </div>
     </section>
   );
+}
+
+function badgeForAction(action: string) {
+  if (action.includes("delete") || action.includes("failed") || action.includes("suspend")) {
+    return "danger";
+  }
+  if (action.includes("rollback") || action.includes("reset")) {
+    return "warning";
+  }
+  if (action.includes("create") || action.includes("publish") || action.includes("upload")) {
+    return "success";
+  }
+  return "info";
+}
+
+function iconForAction(action: string) {
+  if (action.includes("delete")) {
+    return <Trash2 size={13} aria-hidden="true" />;
+  }
+  if (action.includes("rollback")) {
+    return <RotateCcw size={13} aria-hidden="true" />;
+  }
+  if (action.includes("publish")) {
+    return <CheckCircle2 size={13} aria-hidden="true" />;
+  }
+  if (action.includes("create")) {
+    return <Plus size={13} aria-hidden="true" />;
+  }
+  if (action.includes("upload") || action.includes("media")) {
+    return <ImageIcon size={13} aria-hidden="true" />;
+  }
+  if (action.includes("edit")) {
+    return <Pencil size={13} aria-hidden="true" />;
+  }
+  return <Activity size={13} aria-hidden="true" />;
 }

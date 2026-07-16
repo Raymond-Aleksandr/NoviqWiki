@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
-import { Bold, Heading2, Image, Italic, Link, List, Quote } from "lucide-react";
+import { Bold, Heading2, Image, Italic, Link, List, Quote, Tags } from "lucide-react";
 
 type Props = {
   name?: string;
@@ -154,6 +154,7 @@ function renderPreview(value: string): ReactNode[] | ReactNode {
       nodes.push(
         <p key={index}>
           <span className="badge">
+            <Tags size={13} aria-hidden="true" />
             {trimmed.replace(/^\[\[Category:/, "").replace(/\]\]$/, "")}
           </span>
         </p>

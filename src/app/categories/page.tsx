@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, FileText, Tags } from "lucide-react";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { listCategories } from "@/modules/categories/service";
 
@@ -43,8 +43,14 @@ export default async function CategoriesPage() {
       </div>
       <section className="data-panel page-list-panel">
         <header className="panel-header">
-          <span className="badge">All</span>
-          <h2>Pages in this category</h2>
+          <span className="badge info">
+            <Tags size={13} aria-hidden="true" />
+            All
+          </span>
+          <h2>
+            <FileText size={17} aria-hidden="true" />
+            Pages in this category
+          </h2>
         </header>
         <p className="muted" style={{ padding: "14px 18px", margin: 0 }}>
           Select a category card to see its published pages.

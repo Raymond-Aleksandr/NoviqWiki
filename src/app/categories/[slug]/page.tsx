@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ChevronRight, FileText } from "lucide-react";
+import { ChevronRight, FileText, Tags } from "lucide-react";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getCategoryWithPages } from "@/modules/categories/service";
 
@@ -37,8 +37,14 @@ export default async function CategoryPage({ params }: Props) {
       </div>
       <section className="data-panel page-list-panel">
         <header className="panel-header">
-          <span className="badge">{result.category.name}</span>
-          <h2>Pages in this category</h2>
+          <span className="badge info">
+            <Tags size={13} aria-hidden="true" />
+            {result.category.name}
+          </span>
+          <h2>
+            <FileText size={17} aria-hidden="true" />
+            Pages in this category
+          </h2>
         </header>
         {result.pages.length === 0 ? (
           <div className="empty-state">

@@ -53,6 +53,7 @@ Last updated: 2026-07-16
 - Admin surfaces aligned with the package: dashboard, pages, users, groups, roles/permissions, settings, audit log, operational status, and admin media.
 - Theme colors use the design package tokens (`--bg`, `--surface`, `--surface-muted`, `--surface-sunken`, `--text`, `--primary`, `--border`) with compatibility aliases for automated verification.
 - Browser review checked representative desktop and mobile routes on `http://127.0.0.1:3100`; no horizontal overflow remained on the sampled public, editor, and admin user pages after the responsive table fix.
+- 2026-07-16: Completed a stricter design-package parity pass for icons, semantic badge colors, admin tabs, setup steps, auth actions, homepage actions, editor preview badges, and mobile admin/history table layouts. Browser DOM audit on 599px-wide viewport found no visible command controls without icons and no horizontal overflow on sampled public, editor, admin, and history routes.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

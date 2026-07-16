@@ -1,5 +1,5 @@
 import { eq, inArray } from "drizzle-orm";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { Pause, Play, Plus, RotateCcw } from "lucide-react";
 import { createUserAction, resetUserSessionsAction, updateUserStatusAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { db } from "@/db/client";
@@ -69,7 +69,10 @@ export default async function AdminUsersPage() {
               ))}
             </select>
           </label>
-          <button className="primary">Create user</button>
+          <button className="primary">
+            <Plus size={15} aria-hidden="true" />
+            Create user
+          </button>
         </ActionForm>
       </section>
       <div className="data-panel admin-table admin-grid-users">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { RotateCcw } from "lucide-react";
+import { CheckCircle2, GitCompare, Eye, RotateCcw } from "lucide-react";
 import { rollbackAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -38,30 +38,43 @@ export default async function HistoryPage({ params }: Props) {
         </div>
         {revisions.map((revision, index) => (
           <article className="history-row" key={revision.id}>
-            <div className="mono" style={{ fontWeight: 600 }}>
+            <div className="mono" data-label="Rev" style={{ fontWeight: 600 }}>
               r{revision.revisionNumber}
               {resolved.page.currentRevisionId === revision.id ? (
                 <span
                   className="badge success"
                   style={{ display: "block", width: "fit-content", marginTop: 4 }}
                 >
+                  <CheckCircle2 size={13} aria-hidden="true" />
                   current
                 </span>
               ) : null}
             </div>
-            <div>
+            <div data-label="Summary">
               <div>{revision.editSummary || "No edit summary"}</div>
               <div className="mono muted" style={{ fontSize: "11px" }}>
                 {revision.createdAt.toLocaleString()}
               </div>
             </div>
-            <div className="muted">{revision.editorDisplayName}</div>
-            <div className="history-actions">
-              <Link href={`/page/${resolved.page.slug}?revision=${revision.revisionNumber}`}>
+            <div className="muted" data-label="Editor">
+              {revision.editorDisplayName}
+            </div>
+            <div className="history-actions" data-label="Actions">
+              <Link
+                className="button compact"
+                href={`/page/${resolved.page.slug}?revision=${revision.revisionNumber}`}
+              >
+                <Eye size={14} aria-hidden="true" />
                 View
               </Link>
               {revisions[index + 1] ? (
-                <Link href={`/diff/${revisions[index + 1].id}/${revision.id}`}>Compare</Link>
+                <Link
+                  className="button compact"
+                  href={`/diff/${revisions[index + 1].id}/${revision.id}`}
+                >
+                  <GitCompare size={14} aria-hidden="true" />
+                  Compare
+                </Link>
               ) : null}
               {canRollback && resolved.page.currentRevisionId !== revision.id ? (
                 <ActionForm action={rollbackAction} className="inline-form">

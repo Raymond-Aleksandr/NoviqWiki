@@ -62,8 +62,16 @@ export function ArticleView({
             </nav>
           ) : null}
           <div className="aside-actions">
-            <Link href={`/history/${page.slug}`}>History</Link>
-            {canEdit ? <Link href={`/edit/${page.slug}`}>Edit source</Link> : null}
+            <Link href={`/history/${page.slug}`}>
+              <History size={15} aria-hidden="true" />
+              History
+            </Link>
+            {canEdit ? (
+              <Link href={`/edit/${page.slug}`}>
+                <Edit3 size={15} aria-hidden="true" />
+                Edit source
+              </Link>
+            ) : null}
           </div>
         </aside>
       </div>
