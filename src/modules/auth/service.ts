@@ -93,7 +93,10 @@ export async function registerUser(
     throw new ForbiddenError("Public registration is closed.");
   }
   const status = mode === "email_verification" ? "pending" : "active";
-  const user = await createUser({ ...input, status }, database);
+  const user = await createUser(
+    { ...input, status, locale: site.settings.defaultLocale },
+    database
+  );
   if (mode === "email_verification") {
     await sendEmailVerification(
       { userId: user.id, email: user.email, displayName: user.displayName },

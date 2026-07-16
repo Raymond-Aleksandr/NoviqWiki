@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { eq } from "drizzle-orm";
 import { users } from "@/db/schema";
 import { completeSetup } from "@/modules/setup/service";
-import { login } from "@/modules/auth/service";
+import { login, registerUser } from "@/modules/auth/service";
 import {
   issueEmailVerification,
   issuePasswordReset,
@@ -13,6 +13,35 @@ import { createUser } from "@/modules/users/service";
 import { createTestDatabase } from "../helpers/test-db";
 
 describe("auth recovery integration", () => {
+  it("registers users with the site default locale", async () => {
+    const test = await createTestDatabase();
+    await completeSetup(
+      {
+        siteName: "Locale Wiki",
+        tagline: "Test",
+        baseUrl: "http://localhost:3000",
+        defaultLocale: "zh-CN",
+        registrationMode: "open",
+        mediaDriver: "local",
+        ownerUsername: "owner",
+        ownerEmail: "owner@example.test",
+        ownerPassword: "OwnerPassword123"
+      },
+      test.db
+    );
+
+    const user = await registerUser(
+      {
+        username: "reader",
+        email: "reader@example.test",
+        password: "ReaderPassword123"
+      },
+      test.executor
+    );
+
+    expect(user.locale).toBe("zh-CN");
+  });
+
   it("verifies pending users and resets passwords with single-use tokens", async () => {
     const test = await createTestDatabase();
     await completeSetup(

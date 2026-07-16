@@ -2,8 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { ZodError } from "zod";
 import { db } from "@/db/client";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { localizeErrorMessage } from "@/i18n/errors";
 import { getRequestI18n } from "@/i18n/server";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { requirePermission } from "@/modules/authorization/permissions";
@@ -584,12 +586,9 @@ function localeValue(formData: FormData, key: string): "en" | "zh-CN" {
 }
 
 async function actionError(error: unknown): Promise<ActionState> {
-  if (error instanceof AppError) {
-    return { ok: false, message: error.message };
-  }
-  if (error instanceof Error) {
-    return { ok: false, message: error.message };
-  }
   const { messages } = await getRequestI18n();
-  return { ok: false, message: messages.unexpectedError };
+  if (error instanceof AppError || error instanceof ZodError || error instanceof Error) {
+    return { ok: false, message: localizeErrorMessage(error, messages) };
+  }
+  return { ok: false, message: localizeErrorMessage(error, messages) };
 }

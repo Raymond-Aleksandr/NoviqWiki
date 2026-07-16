@@ -63,11 +63,12 @@ Last updated: 2026-07-16
 - 2026-07-16: Expanded the English/Simplified Chinese translation set and wired it into the shell, homepage, article page, page tools, backlinks, media library, recent changes, categories, search, auth/recovery pages, editor, history, diff, admin navigation, admin dashboard, pages, users, groups, roles, settings, audit, status, localized date display, server action success messages, and first-run setup wizard.
 - 2026-07-16: Smoke-tested `noviqwiki-locale=zh-CN` on mobile-width homepage/media/recent/categories/search/article/admin groups/admin settings/admin status. The previously reported media library page now shows Chinese labels for upload, file, alt text, search, empty state, copy actions, references, and delete controls. No sampled page had horizontal overflow.
 - 2026-07-16: Added explicit default-language controls to first-run setup and admin site settings, persisted setup Owner/admin-created user locales from the site default, and switched the live review database to `zh-CN`. Browser verification on `http://localhost:3100/media` now reports `lang=zh-CN`, Chinese media-library heading/description/empty state, and no horizontal overflow.
+- 2026-07-16: Tightened locale resolution to prefer explicit locale cookie, then active user locale, then browser `Accept-Language`, then site default. Localized common service/API errors for auth, setup, validation, pages, revisions, categories, redirects, media, users, and permission failures. Verified the live API with `noviqwiki-locale=zh-CN` returning `未找到分类。` and `noviqwiki-locale=en` returning `Category not found.` for the same missing category request.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes
 
 - A live development server is currently running locally on port `3100` for visual review. Do not stop it while live review is in progress.
 - The Docker Compose deployment path has also been validated on port `3000` during release checks.
-- `pnpm test:e2e` was last run before the live-review i18n pass and passed; it was not re-run afterward because the project E2E reset flow intentionally recreates the database and would disrupt the live server state under review.
+- `pnpm test:e2e` was last run before the live-review i18n/API localization pass and passed; it was not re-run afterward because the project E2E reset flow intentionally recreates the database and would disrupt the live server state under review.
 - SMTP is optional. Password reset and email verification tokens are created server-side; email delivery happens when `NEXTWIKI_SMTP_URL` and `NEXTWIKI_EMAIL_FROM` are configured.
