@@ -45,7 +45,7 @@ export default async function AdminDashboard() {
             ))
           )}
         </section>
-        <section className="data-panel status-card">
+        <section className="data-panel admin-status-panel">
           <div className="admin-panel-heading">Operational status</div>
           <div className="admin-panel-row admin-status-row">
             <span>Database</span>

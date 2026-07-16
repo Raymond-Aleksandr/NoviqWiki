@@ -1923,7 +1923,7 @@ select {
 }
 
 .group-card,
-.status-card,
+.status-card-grid .status-card,
 .settings-card {
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -2029,7 +2029,7 @@ select {
   gap: 10px;
 }
 
-.status-card {
+.status-card-grid .status-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
