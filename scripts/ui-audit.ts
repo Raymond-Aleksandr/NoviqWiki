@@ -1,3 +1,5 @@
+import { readdir, readFile } from "node:fs/promises";
+import path from "node:path";
 import {
   chromium,
   webkit,
@@ -18,6 +20,13 @@ type Failure = {
   sizeName?: string;
   route?: string;
   detail?: unknown;
+};
+
+type SourceMatch = {
+  file: string;
+  line: number;
+  pattern: string;
+  text: string;
 };
 
 type RectSummary = {
@@ -108,6 +117,18 @@ const expectedDarkTokens = {
   "--nw-radius": "8px"
 };
 
+const sourceExtensions = new Set([".css", ".ts", ".tsx"]);
+
+const nativeDialogPatterns: Array<{ label: string; pattern: RegExp }> = [
+  { label: "window.alert", pattern: /\bwindow\s*\.\s*alert\s*\(/ },
+  { label: "window.confirm", pattern: /\bwindow\s*\.\s*confirm\s*\(/ },
+  { label: "window.prompt", pattern: /\bwindow\s*\.\s*prompt\s*\(/ },
+  { label: "global alert", pattern: /(^|[^\w.])alert\s*\(/ },
+  { label: "global confirm", pattern: /(^|[^\w.])confirm\s*\(/ },
+  { label: "global prompt", pattern: /(^|[^\w.])prompt\s*\(/ },
+  { label: "beforeunload", pattern: /\b(onbeforeunload|beforeunload)\b/ }
+];
+
 const publicRoutes = [
   "/",
   "/search?q=E2E",
@@ -139,7 +160,51 @@ function addFailure(failure: Failure) {
   failures.push(failure);
 }
 
+async function auditSourceForNativeDialogs() {
+  const matches = await findNativeDialogMatches(path.join(process.cwd(), "src"));
+  if (matches.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "native_browser_dialog_api",
+    detail: matches.slice(0, 20)
+  });
+}
+
+async function findNativeDialogMatches(directory: string): Promise<SourceMatch[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const matches: SourceMatch[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      matches.push(...(await findNativeDialogMatches(entryPath)));
+      continue;
+    }
+    if (!entry.isFile() || !sourceExtensions.has(path.extname(entry.name))) {
+      continue;
+    }
+    const source = await readFile(entryPath, "utf8");
+    const lines = source.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      for (const { label, pattern } of nativeDialogPatterns) {
+        if (pattern.test(line)) {
+          matches.push({
+            file: path.relative(process.cwd(), entryPath),
+            line: index + 1,
+            pattern: label,
+            text: line.trim().slice(0, 160)
+          });
+        }
+      }
+    });
+  }
+
+  return matches;
+}
+
 async function main() {
+  await auditSourceForNativeDialogs();
   const storageState = credentials ? await createAuthState(credentials) : undefined;
   const articleSlug =
     process.env.UI_AUDIT_ARTICLE_SLUG ?? (await discoverArticleSlug(storageState));
@@ -210,7 +275,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no design token drift, overflow, duplicate admin controls, stray dialogs, tiny controls, iconless command buttons, modal mismatches, mobile shell drift, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, design token drift, overflow, duplicate admin controls, stray dialogs, tiny controls, iconless command buttons, modal mismatches, mobile shell drift, or active-state transform drift."
   );
 }
 
