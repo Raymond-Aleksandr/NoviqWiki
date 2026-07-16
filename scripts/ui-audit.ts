@@ -147,7 +147,12 @@ async function main() {
         await auditMediaPicker(page, articleSlug, browserName, viewport.name);
       }
       if (storageState) {
-        await auditConfirmDialog(page, browserName, viewport.name);
+        await auditPageDeleteDialog(page, browserName, viewport.name);
+        await auditMediaDeleteDialog(page, browserName, viewport.name);
+        await auditUserResetDialog(page, browserName, viewport.name);
+      }
+      if (viewport.name === "mobile") {
+        await auditMobileShell(page, browserName, viewport.name);
       }
       await context.close();
     }
@@ -165,7 +170,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no overflow, duplicate admin controls, stray dialogs, tiny controls, iconless command buttons, or active-state transform drift."
+    "UI audit passed: no overflow, duplicate admin controls, stray dialogs, tiny controls, iconless command buttons, modal mismatches, mobile shell drift, or active-state transform drift."
   );
 }
 
@@ -550,20 +555,95 @@ async function auditMediaPicker(
   }
 }
 
-async function auditConfirmDialog(page: Page, browserName: string, sizeName: string) {
+async function auditMobileShell(page: Page, browserName: string, sizeName: string) {
+  await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  const shell = (await page.evaluate(`(() => {
+    const sidebar = document.querySelector(".sidebar");
+    const rect = sidebar ? sidebar.getBoundingClientRect() : null;
+    return {
+      hasSidebar: Boolean(sidebar),
+      sidebarHeight: rect?.height ?? 0,
+      sidebarWidth: rect?.width ?? 0,
+      clientWidth: document.documentElement.clientWidth,
+      bodyScrollWidth: document.body.scrollWidth
+    };
+  })()`)) as {
+    hasSidebar: boolean;
+    sidebarHeight: number;
+    sidebarWidth: number;
+    clientWidth: number;
+    bodyScrollWidth: number;
+  };
+
+  if (
+    !shell.hasSidebar ||
+    shell.sidebarHeight > 96 ||
+    shell.sidebarWidth > shell.clientWidth + 2 ||
+    shell.bodyScrollWidth > shell.clientWidth + 2
+  ) {
+    addFailure({
+      kind: "mobile_shell_mismatch",
+      browserName,
+      sizeName,
+      route: "/",
+      detail: shell
+    });
+  }
+}
+
+async function auditPageDeleteDialog(page: Page, browserName: string, sizeName: string) {
   await page.goto(`${baseUrl}/admin/pages`, { waitUntil: "domcontentloaded" });
   const deleteButtons = page.locator("button.button.danger");
   if ((await deleteButtons.count()) === 0) {
     return;
   }
-  await deleteButtons.first().click();
+  await deleteButtons.nth(0).click();
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
   if (!modal.hasBackdrop || !modal.hasDialog || modal.radius !== "14px" || modal.overflow) {
     addFailure({
-      kind: "confirm_modal_mismatch",
+      kind: "page_delete_modal_mismatch",
       browserName,
       sizeName,
       route: "/admin/pages",
+      detail: modal
+    });
+  }
+}
+
+async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName: string) {
+  await page.goto(`${baseUrl}/media`, { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
+  const deleteButtons = page.locator(".media-delete-form button.danger");
+  if ((await deleteButtons.count()) === 0) {
+    return;
+  }
+  await deleteButtons.nth(0).click();
+  const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
+  if (!modal.hasBackdrop || !modal.hasDialog || modal.radius !== "14px" || modal.overflow) {
+    addFailure({
+      kind: "media_delete_modal_mismatch",
+      browserName,
+      sizeName,
+      route: "/media",
+      detail: modal
+    });
+  }
+}
+
+async function auditUserResetDialog(page: Page, browserName: string, sizeName: string) {
+  await page.goto(`${baseUrl}/admin/users`, { waitUntil: "domcontentloaded" });
+  const resetButtons = page.locator(".admin-action-list button.icon-button[aria-label]");
+  if ((await resetButtons.count()) === 0) {
+    return;
+  }
+  await resetButtons.nth(0).click();
+  const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
+  if (!modal.hasBackdrop || !modal.hasDialog || modal.radius !== "14px" || modal.overflow) {
+    addFailure({
+      kind: "user_reset_modal_mismatch",
+      browserName,
+      sizeName,
+      route: "/admin/users",
       detail: modal
     });
   }

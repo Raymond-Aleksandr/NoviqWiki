@@ -80,7 +80,8 @@ It checks:
 - Sub-32px command targets.
 - Safari/WebKit checkbox, radio, and file-input sizing.
 - Stray visible dialogs on initial route load.
-- Design-package modal radius/backdrop for editor media picker and page deletion confirmation when matching data exists.
+- Design-package modal radius/backdrop for editor media picker, page deletion, media deletion, and user session reset confirmation when matching data exists.
+- Mobile shell/sidebar height and width drift.
 - Duplicate admin settings entries.
 - Missing icons on visible command buttons.
 - History controls and the first discoverable diff route.

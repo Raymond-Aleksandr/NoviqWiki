@@ -10,8 +10,8 @@
 | Revisions | Immutable history, diff, rollback                         | Playwright history/diff/rollback; unit diff tests; integration lifecycle                                                |
 | Rendering | Sanitized Markdown, wiki links, categories                | `tests/unit/rendering.test.ts`; `tests/unit/wiki-links.test.ts`                                                         |
 | Search    | PostgreSQL ranking, filters, permission checks            | Playwright search; integration lifecycle search indexing; `pnpm search:reindex`                                         |
-| Media     | Upload, validate, browse, insert syntax, references       | Playwright upload; media service validation/reference lookup; editor media-picker dialog audit; Safari file input audit |
-| Admin     | Dashboard, settings, users, groups, roles                 | Playwright user creation; server-rendered admin sections; reset-session modal; admin tab icon and duplicate-entry audit |
+| Media     | Upload, validate, browse, insert syntax, references       | Playwright upload; service validation/reference lookup; editor picker and media delete dialog audits; Safari file input |
+| Admin     | Dashboard, settings, users, groups, roles                 | Playwright user creation; server-rendered admin sections; reset-session modal audit; tab icon and duplicate-entry audit |
 | UI reset  | Imported design package applied consistently              | `pnpm test:ui`; browser review of homepage, article, search, media, auth, editor, admin, modals, and command icons      |
 | Theme     | Design package colors and responsive layout               | `pnpm test:ui`; CSS token inspection; desktop/mobile overflow checks; WebKit sidebar/search-button/file/active-state    |
 | Settings  | Logo, favicon, homepage layout, featured content, SEO     | Admin settings form, homepage rendering, production build, targeted homepage browser audit                              |
