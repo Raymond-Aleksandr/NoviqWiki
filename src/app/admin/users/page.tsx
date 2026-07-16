@@ -105,7 +105,9 @@ export default async function AdminUsersPage() {
               <span className="role-badge">{roleMap.get(user.id)?.join(", ") ?? "-"}</span>
             </div>
             <div data-label={messages.status}>
-              <span className={`status-badge ${user.status}`}>{user.status}</span>
+              <span className={`status-badge ${user.status}`}>
+                {userStatusLabel(user.status, messages)}
+              </span>
             </div>
             <div className="mono muted" data-label={messages.lastLogin}>
               {user.lastLoginAt?.toLocaleString(locale) ?? messages.never}
@@ -132,7 +134,8 @@ export default async function AdminUsersPage() {
                     <Play size={15} aria-hidden="true" />
                   )}
                   <span className="sr-only">
-                    {user.status === "active" ? messages.suspend : messages.activate}
+                    {user.status === "active" ? messages.suspend : messages.activate} ·{" "}
+                    {user.username}
                   </span>
                 </button>
               </ActionForm>
@@ -144,7 +147,9 @@ export default async function AdminUsersPage() {
                 <input type="hidden" name="userId" value={user.id} />
                 <button className="icon-button" title={messages.resetSessions}>
                   <RotateCcw size={15} aria-hidden="true" />
-                  <span className="sr-only">{messages.resetSessions}</span>
+                  <span className="sr-only">
+                    {messages.resetSessions} · {user.username}
+                  </span>
                 </button>
               </ActionForm>
             </div>
@@ -153,4 +158,14 @@ export default async function AdminUsersPage() {
       </div>
     </section>
   );
+}
+
+function userStatusLabel(
+  status: string,
+  messages: Awaited<ReturnType<typeof getRequestI18n>>["messages"]
+) {
+  if (status === "active") return messages.userStatusActive;
+  if (status === "suspended") return messages.userStatusSuspended;
+  if (status === "pending") return messages.userStatusPending;
+  return status;
 }

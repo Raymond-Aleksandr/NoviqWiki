@@ -1,14 +1,5 @@
 import Link from "next/link";
-import {
-  ChevronDown,
-  History,
-  MoreVertical,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Search,
-  Trash2
-} from "lucide-react";
+import { ChevronDown, History, Pencil, Plus, RotateCcw, Search, Trash2 } from "lucide-react";
 import { deletePageAction, restorePageAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -57,7 +48,7 @@ export default async function AdminPagesPage() {
               <span
                 className={`badge ${page.status === "published" ? "success" : page.status === "deleted" ? "danger" : "warning"}`}
               >
-                {page.status}
+                {pageStatusLabel(page.status, messages)}
               </span>
             </div>
             <div className="mono muted" data-label={messages.updatedColumn}>
@@ -94,14 +85,25 @@ export default async function AdminPagesPage() {
                   <button className="danger">
                     <Trash2 size={14} aria-hidden="true" />
                     {messages.delete}
+                    <span className="sr-only"> · {page.title}</span>
                   </button>
                 </ActionForm>
               )}
-              <MoreVertical size={18} aria-hidden="true" />
             </div>
           </article>
         ))}
       </div>
     </section>
   );
+}
+
+function pageStatusLabel(
+  status: string,
+  messages: Awaited<ReturnType<typeof getRequestI18n>>["messages"]
+) {
+  if (status === "published") return messages.statusPublished;
+  if (status === "draft") return messages.statusDraft;
+  if (status === "archived") return messages.statusArchived;
+  if (status === "deleted") return messages.statusDeleted;
+  return status;
 }

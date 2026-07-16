@@ -31,7 +31,7 @@ export function ArticleView({
   }).format(revision.createdAt);
   const articleFacts = [
     { label: messages.type, value: messages.article },
-    { label: messages.pageStatus, value: page.status },
+    { label: messages.pageStatus, value: pageStatusLabel(page.status, messages) },
     { label: messages.pageRevision, value: `r${revision.revisionNumber}` },
     { label: messages.pageRevisions, value: String(revisionCount) },
     {
@@ -134,10 +134,6 @@ export function ArticleView({
               <Info size={15} aria-hidden="true" />
               {messages.pageInformation}
             </a>
-            <Link href={`/history/${page.slug}`}>
-              <History size={15} aria-hidden="true" />
-              {messages.history}
-            </Link>
             {canEdit ? (
               <Link href={`/edit/${page.slug}`}>
                 <Edit3 size={15} aria-hidden="true" />
@@ -149,4 +145,12 @@ export function ArticleView({
       </div>
     </div>
   );
+}
+
+function pageStatusLabel(status: string, messages: Messages) {
+  if (status === "published") return messages.statusPublished;
+  if (status === "draft") return messages.statusDraft;
+  if (status === "archived") return messages.statusArchived;
+  if (status === "deleted") return messages.statusDeleted;
+  return status;
 }

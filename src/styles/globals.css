@@ -497,16 +497,19 @@ button {
   cursor: pointer;
   font-size: 13.5px;
   line-height: 1.2;
+  min-block-size: 36px;
   padding: 8px 14px;
   text-decoration: none;
   box-shadow: var(--sh-sm);
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 .button.compact,
 button.compact {
   border-radius: 7px;
   font-size: 12px;
+  min-block-size: 32px;
   padding: 5px 10px;
 }
 
@@ -747,6 +750,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-block-size: 32px;
   color: var(--link);
   font-size: 13.5px;
   font-weight: 600;
@@ -1456,6 +1460,10 @@ textarea {
 }
 
 .breadcrumbs a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 32px;
+  min-inline-size: 32px;
   color: var(--text-muted);
   text-decoration: none;
 }
@@ -1499,6 +1507,7 @@ textarea {
   color: var(--text-muted);
   box-shadow: none;
   font-size: 13px;
+  min-block-size: 32px;
   padding: 6px 14px;
 }
 
@@ -1610,6 +1619,9 @@ textarea {
 }
 
 .article-categories a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: 32px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface-muted);
@@ -1709,7 +1721,8 @@ textarea {
   display: block;
   color: var(--text-muted);
   text-decoration: none;
-  margin: 9px 0;
+  min-block-size: 32px;
+  padding-block: 6px;
 }
 
 .toc a:first-of-type {
@@ -1734,9 +1747,18 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 9px;
+  min-block-size: 36px;
+  border-radius: 8px;
+  padding: 4px 8px;
+  margin-inline: -8px;
   color: var(--text-muted);
   font-size: 13px;
   text-decoration: none;
+}
+
+.aside-actions a:hover {
+  background: var(--surface-muted);
+  color: var(--text);
 }
 
 .backlink-list {
@@ -1833,6 +1855,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  min-block-size: 36px;
 }
 
 .auth-art {
@@ -2301,8 +2324,8 @@ textarea {
 }
 
 .icon-button {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   border-radius: 7px;
   padding: 0;
 }
@@ -2747,6 +2770,12 @@ textarea {
   flex-wrap: wrap;
 }
 
+.admin-grid-row.admin-pages-grid > a {
+  display: flex;
+  align-items: center;
+  min-block-size: 32px;
+}
+
 .diff-page-header {
   display: flex;
   align-items: flex-start;
@@ -2877,6 +2906,7 @@ textarea {
 }
 
 .inline-form button {
+  min-block-size: 32px;
   padding: 5px 10px;
   font-size: 12px;
 }
