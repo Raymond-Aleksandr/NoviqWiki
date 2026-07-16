@@ -1,18 +1,7 @@
 "use client";
 
 import { useMemo, useState, useActionState } from "react";
-import {
-  ArrowLeft,
-  Check,
-  CheckCircle2,
-  ChevronRight,
-  Globe2,
-  HardDrive,
-  LoaderCircle,
-  Rocket,
-  ShieldCheck,
-  UserRound
-} from "lucide-react";
+import { Check, ChevronRight } from "lucide-react";
 import type { ActionState } from "@/app/actions";
 
 type SetupValues = {
@@ -40,36 +29,31 @@ const steps = [
     id: "site",
     title: "Site",
     eyebrow: "Identity",
-    description: "Name the wiki and set the canonical address.",
-    icon: Globe2
+    description: "Name the wiki and set the canonical address."
   },
   {
     id: "access",
     title: "Access",
     eyebrow: "Policy",
-    description: "Choose how new users can enter the wiki.",
-    icon: ShieldCheck
+    description: "Choose how new users can enter the wiki."
   },
   {
     id: "storage",
     title: "Storage",
     eyebrow: "Media",
-    description: "Select where uploaded files should live.",
-    icon: HardDrive
+    description: "Select where uploaded files should live."
   },
   {
     id: "owner",
     title: "Owner",
     eyebrow: "Account",
-    description: "Create the first administrator account.",
-    icon: UserRound
+    description: "Create the first administrator account."
   },
   {
     id: "review",
     title: "Review",
     eyebrow: "Launch",
-    description: "Confirm the setup details and create the site.",
-    icon: Rocket
+    description: "Confirm the setup details and create the site."
   }
 ] as const;
 
@@ -133,7 +117,6 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
             <span style={{ inlineSize: `${progress}%` }} />
           </div>
           {steps.map((step, index) => {
-            const StepIcon = step.icon;
             return (
               <button
                 key={step.id}
@@ -150,11 +133,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
                 }}
               >
                 <span className="setup-step-index">
-                  {index < activeStep ? (
-                    <Check size={15} aria-hidden="true" />
-                  ) : (
-                    <StepIcon size={15} aria-hidden="true" />
-                  )}
+                  {index < activeStep ? <Check size={15} aria-hidden="true" /> : index + 1}
                 </span>
                 <span>
                   <span className="setup-step-eyebrow">{step.eyebrow}</span>
@@ -367,7 +346,6 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
 
           <div className="setup-actions">
             <button type="button" onClick={goBack} disabled={activeStep === 0 || pending}>
-              <ArrowLeft size={15} aria-hidden="true" />
               Back
             </button>
             {activeStep < steps.length - 1 ? (
@@ -383,17 +361,7 @@ export function SetupWizard({ action, defaultBaseUrl, defaultMediaDriver }: Prop
               </button>
             ) : (
               <button key="submit" type="submit" className="primary" disabled={pending}>
-                {pending ? (
-                  <>
-                    <LoaderCircle size={15} aria-hidden="true" className="spin-icon" />
-                    Creating site...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 size={15} aria-hidden="true" />
-                    Complete setup
-                  </>
-                )}
+                {pending ? "Creating site..." : "Complete setup"}
               </button>
             )}
           </div>

@@ -1,4 +1,3 @@
-import { Globe2, Paintbrush, Save, UploadCloud } from "lucide-react";
 import { updateSettingsAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -11,10 +10,7 @@ export default async function AdminSettingsPage() {
       <h1>Site settings</h1>
       <ActionForm action={updateSettingsAction} className="settings-grid">
         <section className="settings-card">
-          <div className="settings-kicker">
-            <Globe2 size={15} aria-hidden="true" />
-            Identity
-          </div>
+          <div className="settings-kicker">Identity</div>
           <label>
             Site name
             <input className="field" value={site!.site.name} readOnly />
@@ -37,10 +33,7 @@ export default async function AdminSettingsPage() {
           </label>
         </section>
         <section className="settings-card">
-          <div className="settings-kicker">
-            <Paintbrush size={15} aria-hidden="true" />
-            Access &amp; appearance
-          </div>
+          <div className="settings-kicker">Access &amp; appearance</div>
           <div className="switch-row">
             <div>
               <div style={{ fontSize: "14px", fontWeight: 500 }}>Allow anonymous reading</div>
@@ -68,10 +61,7 @@ export default async function AdminSettingsPage() {
           </label>
         </section>
         <section className="settings-card">
-          <div className="settings-kicker">
-            <UploadCloud size={15} aria-hidden="true" />
-            Upload policy
-          </div>
+          <div className="settings-kicker">Upload policy</div>
           <label>
             Upload max bytes
             <input
@@ -83,10 +73,7 @@ export default async function AdminSettingsPage() {
           </label>
         </section>
         <div className="settings-actions">
-          <button className="primary">
-            <Save size={15} aria-hidden="true" />
-            Save changes
-          </button>
+          <button className="primary">Save changes</button>
         </div>
       </ActionForm>
     </section>

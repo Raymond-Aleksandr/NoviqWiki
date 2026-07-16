@@ -1,19 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import {
-  Activity,
-  CheckCircle2,
-  ChevronRight,
-  Clock3,
-  FileText,
-  ImageIcon,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Search,
-  Tags,
-  Trash2
-} from "lucide-react";
+import { ChevronRight, Clock3, Plus, Search, Tags } from "lucide-react";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { listCategories } from "@/modules/categories/service";
 import { listPages } from "@/modules/pages/service";
@@ -32,7 +19,7 @@ export default async function HomePage() {
     <section className="home-page wiki-home">
       <div className="home-hero">
         <div className="home-hero-media" aria-hidden="true">
-          <span>cover image</span>
+          <span>cover image · 2400×900</span>
         </div>
         <div className="home-hero-content">
           <p className="eyebrow">Self-hosted knowledge base</p>
@@ -69,14 +56,10 @@ export default async function HomePage() {
           recentPages.slice(0, 3).map((page) => (
             <Link className="feature-card" key={page.id} href={`/page/${page.slug}`}>
               <span className="feature-card-media" aria-hidden="true">
-                <FileText size={22} aria-hidden="true" />
                 Article
               </span>
               <span className="feature-card-body">
-                <span className="badge info">
-                  <Clock3 size={13} aria-hidden="true" />
-                  Updated
-                </span>
+                <span className="badge info">Article</span>
                 <strong>{page.title}</strong>
                 <span className="muted">Open the latest published revision.</span>
               </span>
@@ -97,7 +80,6 @@ export default async function HomePage() {
             {changes.map((change) => (
               <p key={change.id}>
                 <span className={`badge audit-action ${badgeForAction(change.action)}`}>
-                  {iconForAction(change.action)}
                   {change.action}
                 </span>
                 <span>{change.actorDisplayName}</span>
@@ -121,6 +103,7 @@ export default async function HomePage() {
                   <strong>{category.name}</strong>
                   <small>{category.pageCount} pages</small>
                 </span>
+                <ChevronRight size={15} aria-hidden="true" />
               </Link>
             ))}
           </div>
@@ -147,26 +130,4 @@ function badgeForAction(action: string) {
     return "success";
   }
   return "info";
-}
-
-function iconForAction(action: string) {
-  if (action.includes("delete")) {
-    return <Trash2 size={13} aria-hidden="true" />;
-  }
-  if (action.includes("rollback")) {
-    return <RotateCcw size={13} aria-hidden="true" />;
-  }
-  if (action.includes("publish")) {
-    return <CheckCircle2 size={13} aria-hidden="true" />;
-  }
-  if (action.includes("create")) {
-    return <Plus size={13} aria-hidden="true" />;
-  }
-  if (action.includes("upload") || action.includes("media")) {
-    return <ImageIcon size={13} aria-hidden="true" />;
-  }
-  if (action.includes("edit")) {
-    return <Pencil size={13} aria-hidden="true" />;
-  }
-  return <Activity size={13} aria-hidden="true" />;
 }

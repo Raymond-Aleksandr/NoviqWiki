@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, KeyRound } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { resetPasswordAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 
@@ -27,10 +27,7 @@ export default async function ResetPasswordPage({ searchParams }: Props) {
                 required
               />
             </label>
-            <button className="primary button-primary">
-              <KeyRound size={16} aria-hidden="true" />
-              Reset password
-            </button>
+            <button className="primary button-primary">Reset password</button>
           </ActionForm>
         ) : (
           <p role="alert" className="error">

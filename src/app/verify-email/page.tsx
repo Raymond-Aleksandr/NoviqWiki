@@ -20,10 +20,7 @@ export default async function VerifyEmailPage({ searchParams }: Props) {
         {token ? (
           <ActionForm action={verifyEmailAction}>
             <input type="hidden" name="token" value={token} />
-            <button className="primary button-primary">
-              <CheckCircle2 size={16} aria-hidden="true" />
-              Verify email address
-            </button>
+            <button className="primary button-primary">Verify email address</button>
           </ActionForm>
         ) : (
           <p role="alert" className="error">

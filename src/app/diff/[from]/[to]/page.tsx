@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Minus, Plus, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { rollbackAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getCurrentSession } from "@/modules/auth/session";
@@ -65,17 +65,10 @@ export default async function DiffPage({ params }: Props) {
         ))}
       </div>
       <div className="diff-summary">
-        <span className="diff-count add">
-          <Plus size={13} aria-hidden="true" />
-          {added} added
-        </span>
-        <span className="diff-count remove">
-          <Minus size={13} aria-hidden="true" />
-          {removed} removed
-        </span>
+        <span className="diff-count add">+{added} added</span>
+        <span className="diff-count remove">-{removed} removed</span>
         <Link className="button compact" href={`/page/${page.slug}`} style={{ marginLeft: "auto" }}>
-          <ArrowLeft size={14} aria-hidden="true" />
-          Return to page
+          ← Return to page
         </Link>
       </div>
     </section>

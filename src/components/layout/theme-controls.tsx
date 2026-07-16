@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Languages, Moon, Sun } from "lucide-react";
 
 type Appearance = "light" | "dark";
 type Locale = "zh-CN" | "en";
@@ -47,7 +46,6 @@ export function PreferenceControls({
           aria-pressed={locale === "zh-CN"}
           onClick={() => chooseLocale("zh-CN")}
         >
-          <Languages size={13} aria-hidden="true" />
           中文
         </button>
         <button
@@ -56,7 +54,6 @@ export function PreferenceControls({
           aria-pressed={locale === "en"}
           onClick={() => chooseLocale("en")}
         >
-          <Languages size={13} aria-hidden="true" />
           EN
         </button>
       </div>
@@ -67,7 +64,6 @@ export function PreferenceControls({
           aria-pressed={appearance === "light"}
           onClick={() => chooseAppearance("light")}
         >
-          <Sun size={13} aria-hidden="true" />
           Light
         </button>
         <button
@@ -76,7 +72,6 @@ export function PreferenceControls({
           aria-pressed={appearance === "dark"}
           onClick={() => chooseAppearance("dark")}
         >
-          <Moon size={13} aria-hidden="true" />
           Dark
         </button>
       </div>

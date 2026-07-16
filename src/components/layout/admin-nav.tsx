@@ -2,34 +2,24 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Database,
-  FileText,
-  ImageIcon,
-  LayoutDashboard,
-  ScrollText,
-  Settings,
-  ShieldCheck,
-  Users,
-  UsersRound
-} from "lucide-react";
+import { LayoutDashboard } from "lucide-react";
 
 export function AdminNav() {
   const pathname = usePathname();
   const links = [
-    { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/admin/pages", label: "Pages", icon: FileText },
-    { href: "/admin/users", label: "Users", icon: Users },
-    { href: "/admin/groups", label: "Groups", icon: UsersRound },
-    { href: "/admin/roles", label: "Roles", icon: ShieldCheck },
-    { href: "/admin/media", label: "Media", icon: ImageIcon },
-    { href: "/admin/settings", label: "Settings", icon: Settings },
-    { href: "/admin/audit", label: "Audit", icon: ScrollText },
-    { href: "/admin/status", label: "Status", icon: Database }
+    { href: "/admin", label: "Dashboard" },
+    { href: "/admin/pages", label: "Pages" },
+    { href: "/admin/users", label: "Users" },
+    { href: "/admin/groups", label: "Groups" },
+    { href: "/admin/roles", label: "Roles" },
+    { href: "/admin/media", label: "Media" },
+    { href: "/admin/settings", label: "Settings" },
+    { href: "/admin/audit", label: "Audit" },
+    { href: "/admin/status", label: "Status" }
   ] as const;
   return (
     <nav className="admin-tabs" aria-label="Admin navigation">
-      {links.map(({ href, label, icon: Icon }) => {
+      {links.map(({ href, label }) => {
         const active = href === "/admin" ? pathname === href : pathname.startsWith(href);
         return (
           <Link
@@ -38,7 +28,7 @@ export function AdminNav() {
             href={href}
             aria-current={active ? "page" : undefined}
           >
-            <Icon size={15} aria-hidden="true" />
+            {active && href === "/admin" ? <LayoutDashboard size={15} aria-hidden="true" /> : null}
             {label}
           </Link>
         );

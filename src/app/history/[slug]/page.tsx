@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { CheckCircle2, GitCompare, Eye, RotateCcw } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { rollbackAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -45,7 +45,6 @@ export default async function HistoryPage({ params }: Props) {
                   className="badge success"
                   style={{ display: "block", width: "fit-content", marginTop: 4 }}
                 >
-                  <CheckCircle2 size={13} aria-hidden="true" />
                   current
                 </span>
               ) : null}
@@ -64,7 +63,6 @@ export default async function HistoryPage({ params }: Props) {
                 className="button compact"
                 href={`/page/${resolved.page.slug}?revision=${revision.revisionNumber}`}
               >
-                <Eye size={14} aria-hidden="true" />
                 View
               </Link>
               {revisions[index + 1] ? (
@@ -72,7 +70,6 @@ export default async function HistoryPage({ params }: Props) {
                   className="button compact"
                   href={`/diff/${revisions[index + 1].id}/${revision.id}`}
                 >
-                  <GitCompare size={14} aria-hidden="true" />
                   Compare
                 </Link>
               ) : null}
