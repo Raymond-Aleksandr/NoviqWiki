@@ -7,6 +7,7 @@ import { listCategories } from "@/modules/categories/service";
 import { listPages, listPagesBySlugs } from "@/modules/pages/service";
 import { listRecentChanges } from "@/modules/activity/service";
 import { collectHomepageContributions } from "@/modules/plugins/registry";
+import { normalizeHomepageSections, prioritizeCategories } from "@/modules/settings/homepage";
 
 export default async function HomePage() {
   const site = await getPrimarySiteWithSettings();
@@ -186,41 +187,6 @@ export default async function HomePage() {
       ) : null}
     </section>
   );
-}
-
-function normalizeHomepageSections(sections?: {
-  search?: boolean;
-  featured?: boolean;
-  recent?: boolean;
-  categories?: boolean;
-  layout?: "classic" | "portal" | "compact";
-  showLogo?: boolean;
-}) {
-  return {
-    search: sections?.search ?? true,
-    featured: sections?.featured ?? true,
-    recent: sections?.recent ?? true,
-    categories: sections?.categories ?? true,
-    layout: sections?.layout ?? "classic",
-    showLogo: sections?.showLogo ?? true
-  };
-}
-
-function prioritizeCategories<
-  TCategory extends {
-    slug: string;
-  }
->(categories: TCategory[], configuredSlugs: string[]) {
-  const normalized = configuredSlugs.map((slug) => slug.trim()).filter(Boolean);
-  if (normalized.length === 0) {
-    return categories;
-  }
-  const bySlug = new Map(categories.map((category) => [category.slug, category]));
-  const configured = normalized
-    .map((slug) => bySlug.get(slug))
-    .filter((category): category is TCategory => Boolean(category));
-  const configuredSet = new Set(configured.map((category) => category.slug));
-  return [...configured, ...categories.filter((category) => !configuredSet.has(category.slug))];
 }
 
 function badgeForAction(action: string) {
