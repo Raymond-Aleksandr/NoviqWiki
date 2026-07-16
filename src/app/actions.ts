@@ -27,7 +27,7 @@ import {
   invalidateUserSessions,
   setSessionCookies
 } from "@/modules/auth/session";
-import { uploadMedia } from "@/modules/media/service";
+import { deleteMedia, uploadMedia } from "@/modules/media/service";
 import {
   createPage,
   publishPage,
@@ -371,6 +371,30 @@ export async function uploadMediaAction(
     revalidatePath("/media");
     revalidatePath("/admin/media");
     return { ok: true, message: "Media uploaded." };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function deleteMediaAction(
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    const session = await requireSession();
+    const site = await requireSite();
+    await requirePermission(session.user.id, site.site.id, "media.delete");
+    await deleteMedia({
+      assetId: stringValue(formData, "assetId"),
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName,
+      force: formData.get("force") === "on"
+    });
+    revalidatePath("/media");
+    revalidatePath("/admin/media");
+    revalidatePath("/admin");
+    revalidatePath("/recent");
+    return { ok: true, message: "Media deleted." };
   } catch (error) {
     return actionError(error);
   }

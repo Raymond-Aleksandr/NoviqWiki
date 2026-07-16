@@ -1034,6 +1034,16 @@ select {
   padding: 9px 13px;
 }
 
+.media-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+}
+
 .media-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1048,7 +1058,15 @@ select {
   box-shadow: var(--sh-sm);
 }
 
-.media-card:first-child {
+.media-card-button {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+}
+
+.media-card.active,
+.media-card-button[aria-pressed="true"] {
   border-color: var(--primary);
 }
 
@@ -1117,11 +1135,26 @@ select {
   padding: 16px;
 }
 
+.media-detail-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.media-detail-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
 .media-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
   margin-top: 16px;
+}
+
+.media-detail-copy-status {
+  margin: 10px 0 0;
 }
 
 .media-code {
@@ -1132,7 +1165,40 @@ select {
   background: var(--bg);
   color: var(--code-text);
   font-size: 11px;
+  margin-top: 8px;
   padding: 8px;
+}
+
+.media-reference-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.media-reference-panel p {
+  margin: 0;
+}
+
+.media-reference-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.media-delete-form {
+  display: grid;
+  gap: 10px;
+}
+
+.media-force-delete {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-muted);
+  font-size: 12.5px;
 }
 
 .upload-panel {

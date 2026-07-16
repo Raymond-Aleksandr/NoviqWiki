@@ -7,7 +7,7 @@ coverage
 playwright-report
 test-results
 dist
-media
-backups
+/media
+/backups
 *.log
 *.tsbuildinfo

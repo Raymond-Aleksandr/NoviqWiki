@@ -54,6 +54,8 @@ Last updated: 2026-07-16
 - Theme colors use the design package tokens (`--bg`, `--surface`, `--surface-muted`, `--surface-sunken`, `--text`, `--primary`, `--border`) with compatibility aliases for automated verification.
 - Browser review checked representative desktop and mobile routes on `http://127.0.0.1:3100`; no horizontal overflow remained on the sampled public, editor, and admin user pages after the responsive table fix.
 - 2026-07-16: Completed a stricter design-package parity pass for icons, semantic badge colors, admin tabs, setup steps, auth actions, homepage actions, editor preview badges, and mobile admin/history table layouts. Browser DOM audit on 599px-wide viewport found no visible command controls without icons and no horizontal overflow on sampled public, editor, admin, and history routes.
+- 2026-07-16: Recovered ignored media source files by narrowing root media/backups ignore rules, completed the design-package media library workflow with search, selection, copy URL/Markdown, reference lookup, and guarded deletion, and disabled the Next.js dev indicator that visually overlapped the mobile admin dashboard during local review.
+- 2026-07-16: Re-ran desktop and mobile Playwright screenshot/DOM audit across homepage, article, search, recent changes, categories, media, editor, history/diff, admin dashboard, admin sections, and mobile admin/media. Design tokens matched the package (`#2c5f8f`, `#ffffff`, `#1e2328`), there was no horizontal overflow, oversized hidden icons, or abnormal checkbox/radio sizing.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

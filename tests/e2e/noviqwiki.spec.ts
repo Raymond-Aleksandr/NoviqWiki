@@ -90,6 +90,14 @@ test("media upload, user administration, and mobile article layout", async ({
   await page.getByLabel("Alt text").fill("Tiny pixel");
   await page.getByRole("button", { name: "Upload" }).click();
   await expect(page.locator(".media-grid").getByText(`upload-${browserName}.png`)).toBeVisible();
+  await page.getByPlaceholder("Search by filename...").fill(`upload-${browserName}`);
+  await expect(page.locator(".media-grid").getByText(`upload-${browserName}.png`)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy public URL" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy Markdown" })).toBeVisible();
+
+  await page.goto("/admin/media");
+  await expect(page.locator(".media-grid").getByText(`upload-${browserName}.png`)).toBeVisible();
+  await expect(page.getByLabel("Media references")).toBeVisible();
 
   await page.goto("/admin/users");
   await page.getByLabel("Username").fill(`viewer-${browserName}`);
