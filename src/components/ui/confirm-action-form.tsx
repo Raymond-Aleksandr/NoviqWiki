@@ -14,6 +14,8 @@ type Props = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   hiddenFields: HiddenField[];
   triggerLabel: string;
+  triggerTitle?: string;
+  triggerIconOnly?: boolean;
   title: string;
   body: string;
   confirmLabel: string;
@@ -22,7 +24,7 @@ type Props = {
   warning?: string;
   danger?: boolean;
   triggerClassName?: string;
-  icon?: "trash" | "rollback";
+  icon?: "trash" | "rollback" | "reset";
   children?: ReactNode;
 };
 
@@ -32,6 +34,8 @@ export function ConfirmActionForm({
   action,
   hiddenFields,
   triggerLabel,
+  triggerTitle,
+  triggerIconOnly = false,
   title,
   body,
   warning,
@@ -55,9 +59,15 @@ export function ConfirmActionForm({
 
   return (
     <>
-      <button type="button" className={triggerClassName} onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className={triggerClassName}
+        aria-label={triggerIconOnly ? triggerLabel : undefined}
+        title={triggerTitle ?? (triggerIconOnly ? triggerLabel : undefined)}
+        onClick={() => setOpen(true)}
+      >
         <ActionIcon icon={icon} size={14} />
-        {triggerLabel}
+        <span className={triggerIconOnly ? "sr-only" : undefined}>{triggerLabel}</span>
       </button>
       {state.message && !open ? (
         <span
@@ -109,11 +119,11 @@ export function ConfirmActionForm({
   );
 }
 
-function ActionIcon({ icon, size }: { icon?: "trash" | "rollback"; size: number }) {
+function ActionIcon({ icon, size }: { icon?: "trash" | "rollback" | "reset"; size: number }) {
   if (icon === "trash") {
     return <Trash2 size={size} aria-hidden="true" />;
   }
-  if (icon === "rollback") {
+  if (icon === "rollback" || icon === "reset") {
     return <RotateCcw size={size} aria-hidden="true" />;
   }
   return null;

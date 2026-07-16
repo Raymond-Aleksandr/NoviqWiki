@@ -1,7 +1,8 @@
 import { eq, inArray } from "drizzle-orm";
-import { Pause, Play, Plus, RotateCcw } from "lucide-react";
+import { Pause, Play, Plus } from "lucide-react";
 import { createUserAction, resetUserSessionsAction, updateUserStatusAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
+import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { db } from "@/db/client";
 import { groupRoles, groups, roles, userGroups } from "@/db/schema";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -140,20 +141,21 @@ export default async function AdminUsersPage() {
                   </span>
                 </button>
               </ActionForm>
-              <ActionForm
+              <ConfirmActionForm
                 action={resetUserSessionsAction}
-                className="inline-form"
+                hiddenFields={[{ name: "userId", value: user.id }]}
+                triggerLabel={`${messages.resetSessions} · ${user.username}`}
+                triggerTitle={messages.resetSessions}
+                triggerIconOnly
+                triggerClassName="icon-button"
+                icon="reset"
+                title={`${messages.resetSessions} · ${user.username}`}
+                body={messages.resetSessionsConfirmBody}
+                warning={messages.resetSessionsConfirmWarning}
+                confirmLabel={messages.resetSessions}
+                cancelLabel={messages.cancel}
                 pendingLabel={messages.working}
-                statusMode="compact"
-              >
-                <input type="hidden" name="userId" value={user.id} />
-                <button className="icon-button" title={messages.resetSessions}>
-                  <RotateCcw size={15} aria-hidden="true" />
-                  <span className="sr-only">
-                    {messages.resetSessions} · {user.username}
-                  </span>
-                </button>
-              </ActionForm>
+              />
             </div>
           </article>
         ))}

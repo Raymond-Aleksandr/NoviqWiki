@@ -103,7 +103,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                   </Link>
                 )}
                 {session ? (
-                  <Link className="button" href="/admin/settings" aria-label={messages.settings}>
+                  <Link
+                    className="button"
+                    href="/admin/settings"
+                    aria-label={messages.siteSettings}
+                  >
                     <Settings size={18} aria-hidden="true" />
                   </Link>
                 ) : null}

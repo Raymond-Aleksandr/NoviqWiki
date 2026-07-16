@@ -319,6 +319,10 @@ export const en = {
   suspend: "Suspend",
   activate: "Activate",
   resetSessions: "Reset sessions",
+  resetSessionsConfirmBody:
+    "This invalidates this user's active sessions and requires them to sign in again.",
+  resetSessionsConfirmWarning:
+    "Use this after account recovery, suspected compromise, or role changes.",
   rolesAndPermissions: "Roles & permissions",
   rolesDescription: "Each role grants a set of capabilities across the wiki.",
   newRole: "New role",

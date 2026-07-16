@@ -30,8 +30,8 @@ Last updated: 2026-07-16
 | `pnpm format`                  | Passed                                              |
 | `pnpm lint`                    | Passed                                              |
 | `pnpm typecheck`               | Passed                                              |
-| `pnpm test`                    | Passed, 5 unit files / 10 tests                     |
-| `pnpm test:integration`        | Passed, 2 integration files / 2 tests               |
+| `pnpm test`                    | Passed, 6 unit files / 12 tests                     |
+| `pnpm test:integration`        | Passed, 2 integration files / 3 tests               |
 | `pnpm build`                   | Passed                                              |
 | `pnpm test:e2e`                | Passed, 2 Playwright tests                          |
 | `pnpm db:migrate`              | Passed                                              |
@@ -69,6 +69,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Added lightweight site customization for release: configured logo/favicon URLs, default homepage, homepage layout mode, homepage section visibility, featured page/category slug lists, and SEO title/description. The homepage now consumes configured featured slugs before falling back to recent content.
 - 2026-07-16: Added a minimal `src/modules/plugins/registry.ts` extension boundary for future in-process plugin contributions without introducing a marketplace, runtime loader, or extra service dependency in v0.1.0.
 - 2026-07-16: Targeted mobile release UI audit passed on Chromium and WebKit at `439x734`: homepage sidebar <= 150px, no duplicate visible homepage search buttons, compact admin user status feedback, editor media picker dialog, page/media delete confirmation dialogs, and no horizontal overflow on homepage, admin users, editor, admin pages, or media.
+- 2026-07-16: Fixed the remaining Safari/mobile polish issues from live review. The mobile sidebar now collapses to a 70px horizontal strip at `439x734`, topbar search icon buttons are fixed at `32x32`, Safari file-upload controls render as 46px design-package fields, and admin reset-session actions now open the same design-package confirmation modal used by deletion/rollback flows. Re-ran a focused Chromium/WebKit desktop/mobile route and modal audit with zero failures.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

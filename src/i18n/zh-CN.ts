@@ -310,6 +310,8 @@ export const zhCN = {
   suspend: "暂停",
   activate: "启用",
   resetSessions: "重置会话",
+  resetSessionsConfirmBody: "这会让该用户的所有有效会话失效，并要求其重新登录。",
+  resetSessionsConfirmWarning: "建议在账号恢复、疑似被盗或权限变更后使用。",
   rolesAndPermissions: "角色与权限",
   rolesDescription: "每个角色授予一组 wiki 能力。",
   newRole: "新建角色",
