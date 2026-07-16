@@ -1,0 +1,41 @@
+name: Maintenance task
+description: Track refactors, dependency work, CI updates, or operational cleanup.
+title: "[Maintenance]: "
+labels:
+  - maintenance
+body:
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What should change, and what is explicitly out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale
+      description: Why is this maintenance needed now?
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: Proposed plan
+      description: List the expected implementation or verification steps.
+      placeholder: |
+        - 
+        -
+    validations:
+      required: true
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: Which commands, checks, or manual reviews should prove this is complete?
+      placeholder: |
+        - pnpm format
+        - pnpm lint
+        - pnpm typecheck
+        - pnpm test
+        - pnpm build

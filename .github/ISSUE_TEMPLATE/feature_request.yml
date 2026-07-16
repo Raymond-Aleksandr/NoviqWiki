@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose a product or engineering improvement for NoviqWiki.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or maintainer problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired behavior and any important constraints.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - App Router route or page
+        - Server action or route handler
+        - Domain service
+        - PostgreSQL or Drizzle
+        - Markdown rendering
+        - Search
+        - Authentication or authorization
+        - Docker or deployment
+        - CI or automation
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: What must be true for this to be complete?
+      placeholder: |
+        - 
+        -
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: Link related issues, designs, decisions, or constraints.

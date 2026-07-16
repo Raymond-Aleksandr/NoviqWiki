@@ -1,0 +1,298 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  NEXT_TELEMETRY_DISABLED: "1"
+  NODE_VERSION: "22"
+  PNPM_VERSION: "10"
+  DATABASE_URL: postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki_test
+
+jobs:
+  quality:
+    name: Quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: noviqwiki
+          POSTGRES_PASSWORD: noviqwiki
+          POSTGRES_DB: noviqwiki_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U noviqwiki -d noviqwiki_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify required package scripts
+        run: |
+          node <<'NODE'
+          const scripts = require("./package.json").scripts || {};
+          const required = [
+            ["formatting check", ["format:check", "check:format", "format"]],
+            ["lint", ["lint"]],
+            ["typecheck", ["typecheck"]],
+            ["unit tests", ["test:unit", "test"]],
+            ["integration tests", ["test:integration", "integration"]],
+            ["build", ["build"]],
+          ];
+
+          let missing = false;
+          for (const [label, candidates] of required) {
+            if (!candidates.some((script) => scripts[script])) {
+              console.error(`::error::Missing ${label} script. Expected one of: ${candidates.join(", ")}`);
+              missing = true;
+            }
+          }
+
+          process.exit(missing ? 1 : 0);
+          NODE
+
+      - name: Formatting check
+        run: |
+          set -euo pipefail
+          run_first_available() {
+            local label="$1"
+            shift
+            for script in "$@"; do
+              if node -e "process.exit(require('./package.json').scripts?.[process.argv[1]] ? 0 : 1)" "$script"; then
+                pnpm run "$script"
+                return 0
+              fi
+            done
+            echo "::error::$label failed because none of these scripts exist: $*"
+            return 1
+          }
+
+          run_first_available "Formatting check" format:check check:format format
+
+      - name: Verify formatting did not change files
+        run: |
+          git diff --check
+          git diff --exit-code
+
+      - name: Lint
+        run: |
+          set -euo pipefail
+          if node -e "process.exit(require('./package.json').scripts?.lint ? 0 : 1)"; then
+            pnpm run lint
+          else
+            echo "::error::Lint failed because package.json has no lint script."
+            exit 1
+          fi
+
+      - name: Typecheck
+        run: |
+          set -euo pipefail
+          if node -e "process.exit(require('./package.json').scripts?.typecheck ? 0 : 1)"; then
+            pnpm run typecheck
+          else
+            echo "::error::Typecheck failed because package.json has no typecheck script."
+            exit 1
+          fi
+
+      - name: Unit tests
+        run: |
+          set -euo pipefail
+          run_first_available() {
+            local label="$1"
+            shift
+            for script in "$@"; do
+              if node -e "process.exit(require('./package.json').scripts?.[process.argv[1]] ? 0 : 1)" "$script"; then
+                pnpm run "$script"
+                return 0
+              fi
+            done
+            echo "::error::$label failed because none of these scripts exist: $*"
+            return 1
+          }
+
+          run_first_available "Unit tests" test:unit test
+
+      - name: Integration tests
+        run: |
+          set -euo pipefail
+          run_first_available() {
+            local label="$1"
+            shift
+            for script in "$@"; do
+              if node -e "process.exit(require('./package.json').scripts?.[process.argv[1]] ? 0 : 1)" "$script"; then
+                pnpm run "$script"
+                return 0
+              fi
+            done
+            echo "::error::$label failed because none of these scripts exist: $*"
+            return 1
+          }
+
+          run_first_available "Integration tests" test:integration integration
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          if node -e "process.exit(require('./package.json').scripts?.build ? 0 : 1)"; then
+            pnpm run build
+          else
+            echo "::error::Build failed because package.json has no build script."
+            exit 1
+          fi
+
+  e2e:
+    name: Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quality
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: noviqwiki
+          POSTGRES_PASSWORD: noviqwiki
+          POSTGRES_DB: noviqwiki_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U noviqwiki -d noviqwiki_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Detect Playwright
+        id: playwright
+        run: |
+          node <<'NODE' >> "$GITHUB_OUTPUT"
+          const fs = require("node:fs");
+          const p = require("./package.json");
+          const all = { ...p.dependencies, ...p.devDependencies };
+          const hasPackage = Boolean(all["@playwright/test"] || all.playwright);
+          const hasConfig = fs.readdirSync(".").some((name) => /^playwright\.config\./.test(name));
+          const hasScript = Boolean(p.scripts?.["test:e2e"] || p.scripts?.e2e);
+          console.log(`available=${hasPackage || hasConfig || hasScript}`);
+          console.log(`install_browsers=${hasPackage || hasConfig}`);
+          NODE
+
+      - name: Report skipped Playwright tests
+        if: steps.playwright.outputs.available != 'true'
+        run: echo "::warning::Playwright skipped because no Playwright dependency, config, or e2e script was found."
+
+      - name: Install Playwright browsers
+        if: steps.playwright.outputs.install_browsers == 'true'
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        if: steps.playwright.outputs.available == 'true'
+        run: |
+          set -euo pipefail
+          if node -e "process.exit(require('./package.json').scripts?.['test:e2e'] ? 0 : 1)"; then
+            pnpm run test:e2e
+          elif node -e "process.exit(require('./package.json').scripts?.e2e ? 0 : 1)"; then
+            pnpm run e2e
+          else
+            pnpm exec playwright test
+          fi
+
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quality
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker Compose config
+        id: compose
+        run: |
+          set -euo pipefail
+          compose_file=""
+          for candidate in docker-compose.yml docker-compose.yaml compose.yml compose.yaml; do
+            if [ -f "$candidate" ]; then
+              compose_file="$candidate"
+              break
+            fi
+          done
+
+          if [ -n "$compose_file" ]; then
+            echo "file=$compose_file" >> "$GITHUB_OUTPUT"
+            docker compose -f "$compose_file" config
+          else
+            echo "file=" >> "$GITHUB_OUTPUT"
+            echo "::warning::Docker Compose config skipped because no compose file was found."
+          fi
+
+      - name: Docker build
+        run: |
+          set -euo pipefail
+          if [ -n "${{ steps.compose.outputs.file }}" ]; then
+            docker compose -f "${{ steps.compose.outputs.file }}" build
+            exit 0
+          fi
+
+          dockerfile=""
+          for candidate in Dockerfile docker/Dockerfile; do
+            if [ -f "$candidate" ]; then
+              dockerfile="$candidate"
+              break
+            fi
+          done
+
+          if [ -n "$dockerfile" ]; then
+            docker buildx build --file "$dockerfile" --tag noviqwiki:${{ github.sha }} --load .
+          else
+            echo "::error::Docker build failed because no compose file, Dockerfile, or docker/Dockerfile was found."
+            exit 1
+          fi
