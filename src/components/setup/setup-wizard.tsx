@@ -113,9 +113,11 @@ export function SetupWizard({
   return (
     <section className="setup-shell" aria-labelledby="setup-title">
       <div className="setup-hero">
-        <p className="setup-kicker">{messages.firstRunSetup}</p>
-        <h1 id="setup-title">{messages.setupTitle}</h1>
-        <p>{messages.setupIntro}</p>
+        <div className="setup-hero-content">
+          <p className="setup-kicker">{messages.firstRunSetup}</p>
+          <h1 id="setup-title">{messages.setupTitle}</h1>
+          <p>{messages.setupIntro}</p>
+        </div>
       </div>
 
       <form action={formAction} className="setup-wizard">

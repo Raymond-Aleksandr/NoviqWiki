@@ -3400,7 +3400,6 @@ pre.citation-block {
   border-radius: 14px;
   background: var(--surface);
   box-shadow: var(--sh-sm);
-  padding: 28px 32px;
   margin-bottom: 18px;
 }
 
@@ -3421,6 +3420,16 @@ pre.citation-block {
 .setup-hero > * {
   position: relative;
   z-index: 1;
+}
+
+.setup-hero-content {
+  padding: 28px 32px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--surface) 92%, transparent) 0%,
+    color-mix(in srgb, var(--surface) 78%, transparent) 55%,
+    transparent 100%
+  );
 }
 
 .setup-hero h1 {
@@ -5346,7 +5355,7 @@ pre.citation-block {
 
   .home-hero-content,
   .article,
-  .setup-hero,
+  .setup-hero-content,
   .setup-card,
   .auth-form-panel {
     padding: 24px;
