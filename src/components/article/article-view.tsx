@@ -8,7 +8,8 @@ import {
   Info,
   Link2,
   Link2Off,
-  ListTree
+  ListTree,
+  RouteOff
 } from "lucide-react";
 import type { Page, PageRevision } from "@/db/schema";
 import type { Messages } from "@/i18n";
@@ -169,6 +170,10 @@ export function ArticleView({
             <Link href="/orphaned">
               <Link2Off size={15} aria-hidden="true" />
               {messages.orphanedPages}
+            </Link>
+            <Link href="/dead-end">
+              <RouteOff size={15} aria-hidden="true" />
+              {messages.deadEndPages}
             </Link>
             <Link href="/redirects">
               <GitBranch size={15} aria-hidden="true" />

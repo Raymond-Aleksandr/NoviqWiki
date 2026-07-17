@@ -496,6 +496,13 @@ export type OrphanedPage = {
   updatedAt: Date;
 };
 
+export type DeadEndPage = {
+  pageId: string;
+  title: string;
+  slug: string;
+  updatedAt: Date;
+};
+
 export type PublishedPageIndexEntry = {
   pageId: string;
   title: string;
@@ -616,6 +623,44 @@ export async function listOrphanedPages(
               ${pageLinks.targetPageId} = ${pages.id}
               or ${pageLinks.targetNormalizedTitle} = ${pages.normalizedTitle}
             )
+        )`
+      )
+    )
+    .orderBy(desc(pages.updatedAt), asc(pages.title))
+    .limit(input.limit ?? 100)
+    .offset(input.offset ?? 0);
+}
+
+export async function listDeadEndPages(
+  input: { siteId: string; limit?: number; offset?: number },
+  database: Database = db
+): Promise<DeadEndPage[]> {
+  return database
+    .select({
+      pageId: pages.id,
+      title: pages.title,
+      slug: pages.slug,
+      updatedAt: pages.updatedAt
+    })
+    .from(pages)
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt),
+        sql`not exists (
+          select 1
+          from ${pageLinks}
+          inner join ${pages} as dead_target_pages
+            on dead_target_pages.site_id = ${input.siteId}
+            and dead_target_pages.status = 'published'
+            and dead_target_pages.deleted_at is null
+            and dead_target_pages.id <> ${pages.id}
+            and (
+              ${pageLinks.targetPageId} = dead_target_pages.id
+              or ${pageLinks.targetNormalizedTitle} = dead_target_pages.normalized_title
+            )
+          where ${pageLinks.sourcePageId} = ${pages.id}
         )`
       )
     )

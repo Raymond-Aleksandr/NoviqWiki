@@ -174,6 +174,7 @@ const publicRoutes = [
   "/pages",
   "/wanted",
   "/orphaned",
+  "/dead-end",
   "/redirects",
   "/categories",
   "/media",
