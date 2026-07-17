@@ -71,6 +71,7 @@ type RouteMetrics = {
   createAnchors: ElementSummary[];
   rawAuditActions: string[];
   unlocalizedRevisionSummaries: string[];
+  unlocalizedAuthorizationLabels: ElementSummary[];
 };
 
 type ModalMetrics = {
@@ -466,7 +467,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, unlocalized revision summaries, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, unlocalized revision summaries, unlocalized authorization labels, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -875,6 +876,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
       detail: metrics.unlocalizedRevisionSummaries
     });
   }
+  recordElementFailures(
+    "unlocalized_authorization_labels",
+    metrics.unlocalizedAuthorizationLabels,
+    browserName,
+    sizeName,
+    route
+  );
 
   if (
     new URL(page.url()).pathname.startsWith("/admin") &&
@@ -1009,6 +1017,27 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
                 text
               )
             )
+            .slice(0, 12)
+        : [];
+    const unlocalizedAuthorizationLabels =
+      document.documentElement.lang.startsWith("zh") &&
+      ["/admin/users", "/admin/groups", "/admin/roles"].includes(location.pathname)
+        ? visibleMatches(
+            [
+              ".user-group-badges .badge",
+              ".role-badge",
+              ".group-card-name",
+              ".group-role-badges .badge.success",
+              ".role-card-header h2",
+              ".permission-row.header .permission-cell-center"
+            ].join(",")
+          )
+            .filter((element) =>
+              /^(?:Owner|Administrator|Moderator|Editor|Contributor|Reader|owners|readers)$/.test(
+                labelOf(element)
+              )
+            )
+            .map(summarize)
             .slice(0, 12)
         : [];
 
@@ -1224,7 +1253,8 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         summarize
       ),
       rawAuditActions,
-      unlocalizedRevisionSummaries
+      unlocalizedRevisionSummaries,
+      unlocalizedAuthorizationLabels
     };
   })()`) as Promise<RouteMetrics>;
 }

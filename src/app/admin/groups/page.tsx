@@ -2,6 +2,7 @@ import { Plus, Save, Users } from "lucide-react";
 import { createGroupAction, updateGroupAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { groupDescription, groupDisplayName, roleDisplayName } from "@/i18n/authorization";
 import { getRequestI18n } from "@/i18n/server";
 import { getGroupSummaries, getRoleSummaries } from "@/modules/authorization/permissions";
 
@@ -36,7 +37,7 @@ export default async function AdminGroupsPage() {
               <option value="">{messages.noRole}</option>
               {roleRows.map((role) => (
                 <option key={role.id} value={role.id}>
-                  {role.name}
+                  {roleDisplayName(role, messages)}
                 </option>
               ))}
             </select>
@@ -55,23 +56,27 @@ export default async function AdminGroupsPage() {
                 <Users size={17} aria-hidden="true" />
               </span>
               <div>
-                <div className="group-card-name">{group.name}</div>
+                <div className="group-card-name">{groupDisplayName(group, messages)}</div>
                 <div className="muted group-card-kind">
                   {group.builtIn ? messages.builtInGroup : messages.customGroup}
                 </div>
               </div>
             </div>
-            <p className="muted group-card-description">
-              {group.description || messages.noDescriptionProvided}
-            </p>
+            <p className="muted group-card-description">{groupDescription(group, messages)}</p>
             <div className="group-role-badges">
               <span className={`badge ${group.builtIn ? "warning" : "info"}`}>
                 {group.builtIn ? messages.protected : messages.editable}
               </span>
-              {group.roleNames.length > 0 ? (
-                group.roleNames.map((roleName) => (
-                  <span className="badge success" key={`${group.id}-${roleName}`}>
-                    {roleName}
+              {group.roleIds.length > 0 ? (
+                group.roleIds.map((roleId, index) => (
+                  <span className="badge success" key={`${group.id}-${roleId}`}>
+                    {roleDisplayName(
+                      {
+                        name: group.roleNames[index] ?? roleId,
+                        normalizedName: group.roleNormalizedNames[index] ?? null
+                      },
+                      messages
+                    )}
                   </span>
                 ))
               ) : (
@@ -109,7 +114,7 @@ export default async function AdminGroupsPage() {
                         value={role.id}
                         defaultChecked={group.roleIds.includes(role.id)}
                       />
-                      <span>{role.name}</span>
+                      <span>{roleDisplayName(role, messages)}</span>
                     </label>
                   ))}
                 </div>

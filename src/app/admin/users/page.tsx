@@ -9,6 +9,7 @@ import {
 import { ActionForm } from "@/components/ui/action-form";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { groupDisplayName, roleDisplayName } from "@/i18n/authorization";
 import { getRequestI18n } from "@/i18n/server";
 import { getGroupSummaries, getUserGroupMemberships } from "@/modules/authorization/permissions";
 import { listUsers } from "@/modules/users/service";
@@ -27,22 +28,27 @@ export default async function AdminUsersPage({ searchParams }: Props) {
     site!.site.id,
     rows.map((user) => user.id)
   );
-  const roleMap = new Map<string, Set<string>>();
-  const groupMap = new Map<string, { id: string; name: string }[]>();
+  const roleMap = new Map<string, Map<string, { name: string; normalizedName: string | null }>>();
+  const groupMap = new Map<string, { id: string; name: string; normalizedName: string | null }[]>();
   const groupSeenMap = new Map<string, Set<string>>();
   for (const row of memberships) {
     const seenGroups = groupSeenMap.get(row.userId) ?? new Set<string>();
     if (!seenGroups.has(row.groupId)) {
       groupMap.set(row.userId, [
         ...(groupMap.get(row.userId) ?? []),
-        { id: row.groupId, name: row.groupName }
+        { id: row.groupId, name: row.groupName, normalizedName: row.groupNormalizedName }
       ]);
       seenGroups.add(row.groupId);
       groupSeenMap.set(row.userId, seenGroups);
     }
     if (row.roleName) {
-      const roles = roleMap.get(row.userId) ?? new Set<string>();
-      roles.add(row.roleName);
+      const roles =
+        roleMap.get(row.userId) ??
+        new Map<string, { name: string; normalizedName: string | null }>();
+      roles.set(row.roleNormalizedName ?? row.roleName, {
+        name: row.roleName,
+        normalizedName: row.roleNormalizedName
+      });
       roleMap.set(row.userId, roles);
     }
   }
@@ -79,7 +85,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
               <option value="">{messages.noGroup}</option>
               {groupRows.map((group) => (
                 <option key={group.id} value={group.id}>
-                  {group.name}
+                  {groupDisplayName(group, messages)}
                 </option>
               ))}
             </select>
@@ -133,7 +139,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
               {(groupMap.get(user.id) ?? []).length > 0 ? (
                 groupMap.get(user.id)?.map((group) => (
                   <span className="badge info" key={group.id}>
-                    {group.name}
+                    {groupDisplayName(group, messages)}
                   </span>
                 ))
               ) : (
@@ -142,7 +148,9 @@ export default async function AdminUsersPage({ searchParams }: Props) {
             </div>
             <div data-label={messages.role}>
               <span className="role-badge">
-                {[...(roleMap.get(user.id) ?? new Set<string>())].join(", ") || "-"}
+                {[...(roleMap.get(user.id)?.values() ?? [])]
+                  .map((role) => roleDisplayName(role, messages))
+                  .join(", ") || "-"}
               </span>
             </div>
             <div data-label={messages.status}>
@@ -181,7 +189,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
                               value={group.id}
                               defaultChecked={userGroupIds.has(group.id)}
                             />
-                            <span>{group.name}</span>
+                            <span>{groupDisplayName(group, messages)}</span>
                           </label>
                         );
                       })}

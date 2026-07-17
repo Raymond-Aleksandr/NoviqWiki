@@ -3,6 +3,7 @@ import { Check, Plus, Save } from "lucide-react";
 import { createRoleAction, updateRoleAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { roleDescription, roleDisplayName } from "@/i18n/authorization";
 import { getRequestI18n } from "@/i18n/server";
 import { getRoleSummaries, permissionKeys } from "@/modules/authorization/permissions";
 
@@ -52,8 +53,8 @@ export default async function AdminRolesPage() {
           <article className="role-card" key={role.id}>
             <div className="role-card-header">
               <div>
-                <h2>{role.name}</h2>
-                <p className="muted">{role.description || messages.noDescriptionProvided}</p>
+                <h2>{roleDisplayName(role, messages)}</h2>
+                <p className="muted">{roleDescription(role, messages)}</p>
               </div>
               <span className={`badge ${role.builtIn ? "warning" : "info"}`}>
                 {role.builtIn ? messages.protected : messages.editable}
@@ -113,7 +114,7 @@ export default async function AdminRolesPage() {
             <div>{messages.capability}</div>
             {rows.map((role) => (
               <div className="permission-cell-center" key={role.id}>
-                {role.name}
+                {roleDisplayName(role, messages)}
               </div>
             ))}
           </div>

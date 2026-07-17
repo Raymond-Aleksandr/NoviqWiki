@@ -251,7 +251,10 @@ export async function getGroupSummaries(siteId: string, database: Database = db)
       >`coalesce(array_agg(${roles.id}::text order by ${roles.name}) filter (where ${roles.id} is not null), ARRAY[]::text[])`,
       roleNames: sql<
         string[]
-      >`coalesce(array_agg(${roles.name} order by ${roles.name}) filter (where ${roles.id} is not null), ARRAY[]::text[])`
+      >`coalesce(array_agg(${roles.name} order by ${roles.name}) filter (where ${roles.id} is not null), ARRAY[]::text[])`,
+      roleNormalizedNames: sql<
+        string[]
+      >`coalesce(array_agg(${roles.normalizedName} order by ${roles.name}) filter (where ${roles.id} is not null), ARRAY[]::text[])`
     })
     .from(groups)
     .leftJoin(groupRoles, eq(groupRoles.groupId, groups.id))
@@ -531,7 +534,9 @@ export async function getUserGroupMemberships(
       userId: userGroups.userId,
       groupId: groups.id,
       groupName: groups.name,
-      roleName: roles.name
+      groupNormalizedName: groups.normalizedName,
+      roleName: roles.name,
+      roleNormalizedName: roles.normalizedName
     })
     .from(userGroups)
     .innerJoin(groups, eq(groups.id, userGroups.groupId))
