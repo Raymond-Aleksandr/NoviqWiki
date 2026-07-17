@@ -71,6 +71,7 @@ type RouteMetrics = {
   articleMediaWrapperOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
   articleMediaTooTall: ElementSummary[];
+  articleMediaSizingMismatches: ElementSummary[];
   visibleDialogs: ElementSummary[];
   commandButtonsWithoutIcons: ElementSummary[];
   iconOnlyControlsWithoutNames: ElementSummary[];
@@ -988,7 +989,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, form-layout, page-header, or content-row rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, form-layout, page-header, or content-row rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1413,6 +1414,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "article_media_too_tall",
     metrics.articleMediaTooTall,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "article_media_sizing_mismatch",
+    metrics.articleMediaSizingMismatches,
     browserName,
     sizeName,
     route
@@ -2888,6 +2896,60 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             ? Math.min(window.innerHeight * 0.38, 260)
             : Math.min(window.innerHeight * 0.56, 460);
           return rect.height > maxAllowedHeight + 2;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      articleMediaSizingMismatches: visibleMatches(
+        ".article-body img, .article-body video, .article-body iframe, .article-body svg"
+      )
+        .filter((element) => {
+          const articleBody = element.closest(".article-body");
+          if (!articleBody) return false;
+          const rect = element.getBoundingClientRect();
+          const bodyRect = articleBody.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const maxWidthOk =
+            style.maxWidth === "100%" ||
+            (Number.isFinite(Number.parseFloat(style.maxWidth)) &&
+              Number.parseFloat(style.maxWidth) <= bodyRect.width + 1);
+          const mediaFitOk =
+            !["IMG", "VIDEO"].includes(element.tagName) || style.objectFit === "contain";
+          const boundedByArticle =
+            rect.width <= bodyRect.width + 1 &&
+            rect.left >= bodyRect.left - 1 &&
+            rect.right <= bodyRect.right + 1;
+          const wrapper = element.closest("p, figure");
+          const directMediaOnly =
+            wrapper !== null &&
+            articleBody.contains(wrapper) &&
+            wrapper.children.length === 1 &&
+            wrapper.firstElementChild === element;
+          const linkWrapper = element.parentElement?.tagName === "A" ? element.parentElement : null;
+          const linkedMediaOnly =
+            wrapper !== null &&
+            linkWrapper !== null &&
+            articleBody.contains(wrapper) &&
+            wrapper.children.length === 1 &&
+            wrapper.firstElementChild === linkWrapper &&
+            linkWrapper.children.length === 1 &&
+            linkWrapper.firstElementChild === element;
+          const wrapperElement = directMediaOnly ? wrapper : linkedMediaOnly ? wrapper : null;
+          const wrapperOk =
+            wrapperElement === null ||
+            (() => {
+              const wrapperRect = wrapperElement.getBoundingClientRect();
+              const wrapperStyle = getComputedStyle(wrapperElement);
+              const overflowOk =
+                wrapperStyle.overflowX === "hidden" || wrapperStyle.overflowX === "clip";
+              return (
+                overflowOk &&
+                wrapperStyle.maxWidth !== "none" &&
+                wrapperRect.width <= bodyRect.width + 1 &&
+                wrapperRect.left >= bodyRect.left - 1 &&
+                wrapperRect.right <= bodyRect.right + 1
+              );
+            })();
+          return !maxWidthOk || !mediaFitOk || !boundedByArticle || !wrapperOk;
         })
         .map(summarize)
         .slice(0, 12),

@@ -2560,17 +2560,11 @@ pre.citation-block {
   display: block;
   flex: 0 1 auto;
   width: auto;
-  inline-size: auto;
   min-width: 0;
-  min-inline-size: 0;
   max-width: 100%;
-  max-inline-size: min(100%, var(--article-media-max-inline-size));
-  max-width: min(100%, var(--article-media-max-inline-size));
   max-height: 520px;
-  max-block-size: var(--article-media-max-block-size);
   max-height: var(--article-media-max-block-size);
   height: auto;
-  block-size: auto;
   object-fit: contain;
 }
 
@@ -2578,11 +2572,9 @@ pre.citation-block {
 .article-body p > a > img,
 .article-body figure > a > img {
   width: auto;
-  inline-size: auto;
   max-width: 100%;
-  max-inline-size: 100%;
   max-height: var(--article-media-max-block-size);
-  max-block-size: var(--article-media-max-block-size);
+  height: auto;
 }
 
 .article-body :where(img, video) {
@@ -2602,18 +2594,11 @@ pre.citation-block {
   display: grid;
   place-items: center;
   width: 100%;
-  inline-size: min(
-    100%,
-    calc(var(--article-media-max-inline-size) + (var(--article-media-padding) * 2))
-  );
+  max-width: calc(var(--article-media-max-inline-size) + (var(--article-media-padding) * 2));
   min-width: 0;
-  min-inline-size: 0;
-  max-width: 100%;
-  max-inline-size: 100%;
   margin-inline: auto;
   padding: var(--article-media-padding);
   overflow: hidden;
-  contain: inline-size;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-muted);
@@ -2625,11 +2610,8 @@ pre.citation-block {
   display: grid;
   place-items: center;
   width: 100%;
-  inline-size: 100%;
   min-width: 0;
-  min-inline-size: 0;
   max-width: 100%;
-  max-inline-size: 100%;
   overflow: hidden;
 }
 
@@ -2637,10 +2619,9 @@ pre.citation-block {
   :where(p, figure):has(> :where(img, video, iframe, svg):only-child)
   > :where(img, video, iframe, svg),
 .article-body p:has(> a:only-child > img:only-child) > a > img {
-  max-inline-size: 100%;
   max-width: 100%;
-  max-block-size: var(--article-media-max-block-size);
   max-height: var(--article-media-max-block-size);
+  height: auto;
 }
 
 .article-body p > img:only-child,
