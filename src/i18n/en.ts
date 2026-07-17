@@ -342,6 +342,7 @@ export const en = {
   returnToPage: "Return to page",
   rollBackToRevision: "Roll back to",
   filterPages: "Filter pages...",
+  filterUsers: "Filter users...",
   clearFilters: "Clear filters",
   title: "Title",
   statusAll: "Status: All",

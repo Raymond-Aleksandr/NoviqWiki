@@ -107,6 +107,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Completed group editing and role assignment as a real wiki administration workflow. `/admin/groups` now shows current role badges and lets administrators update group names/descriptions and assigned roles, while `POST /api/v1/admin/groups` and `PATCH /api/v1/admin/groups/{id}` expose the same service-layer behavior. Group role replacement is transactional and refuses changes that would remove the final active Owner.
 - 2026-07-16: Completed safe custom role editing. `/admin/roles` now exposes editable permission forms for custom roles, `POST /api/v1/admin/roles` and `PATCH /api/v1/admin/roles/{id}` expose the same JSON workflows, and the authorization service now rejects attempts to create/update built-in roles such as Owner so default role permissions cannot be overwritten through upsert behavior.
 - 2026-07-16: Completed user group membership administration. `/admin/users` now shows assigned groups, exposes editable group membership forms, `PATCH /api/v1/admin/users/{id}` updates group IDs through the same authorization service, and membership replacement refuses changes that would remove the final active Owner.
+- 2026-07-16: Completed admin user search. `/admin/users` now supports the design-package filter bar, `?q=` username/email filtering, clear-filter navigation, and an empty state while reusing the existing permission-protected `listUsers` query path.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

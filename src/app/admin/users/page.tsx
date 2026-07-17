@@ -1,4 +1,5 @@
-import { Pause, Play, Plus, Save, UsersRound } from "lucide-react";
+import Link from "next/link";
+import { Pause, Play, Plus, Save, Search, UsersRound, X } from "lucide-react";
 import {
   createUserAction,
   resetUserSessionsAction,
@@ -12,9 +13,15 @@ import { getRequestI18n } from "@/i18n/server";
 import { getGroupSummaries, getUserGroupMemberships } from "@/modules/authorization/permissions";
 import { listUsers } from "@/modules/users/service";
 
-export default async function AdminUsersPage() {
+type Props = {
+  searchParams: Promise<{ q?: string }>;
+};
+
+export default async function AdminUsersPage({ searchParams }: Props) {
   const site = await getPrimarySiteWithSettings();
-  const rows = await listUsers({ limit: 200 });
+  const params = await searchParams;
+  const query = params.q?.trim() ?? "";
+  const rows = await listUsers({ query: query || undefined, limit: 200 });
   const groupRows = await getGroupSummaries(site!.site.id);
   const memberships = await getUserGroupMemberships(
     site!.site.id,
@@ -84,6 +91,23 @@ export default async function AdminUsersPage() {
         </ActionForm>
       </section>
       <div className="data-panel admin-table admin-grid-users">
+        <form className="admin-filter-bar" action="/admin/users">
+          <label className="admin-filter-control admin-filter-search">
+            <Search size={15} aria-hidden="true" />
+            <input name="q" defaultValue={query} placeholder={messages.filterUsers} />
+          </label>
+          <button className="button compact">
+            <Search size={14} aria-hidden="true" />
+            {messages.search}
+          </button>
+          {query ? (
+            <Link className="button compact" href="/admin/users">
+              <X size={14} aria-hidden="true" />
+              {messages.clearFilters}
+            </Link>
+          ) : null}
+          <div className="admin-filter-spacer" />
+        </form>
         <div className="admin-grid-header admin-users-grid admin-grid-users">
           <div>{messages.user}</div>
           <div>{messages.email}</div>
@@ -93,6 +117,7 @@ export default async function AdminUsersPage() {
           <div>{messages.lastLogin}</div>
           <div style={{ textAlign: "right" }}>{messages.actions}</div>
         </div>
+        {rows.length === 0 ? <div className="admin-empty-state">{messages.noResults}</div> : null}
         {rows.map((user) => (
           <article className="admin-grid-row admin-users-grid admin-grid-users" key={user.id}>
             <div className="user-cell" data-label={messages.user}>
