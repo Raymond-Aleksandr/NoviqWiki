@@ -74,6 +74,7 @@ type RouteMetrics = {
   diffRhythmMismatches: ElementSummary[];
   editorToolbarRhythmMismatches: ElementSummary[];
   mediaPickerRhythmMismatches: ElementSummary[];
+  userGroupEditorRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
   articleMediaWrapperOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
@@ -979,6 +980,7 @@ async function main() {
         await auditPageDeleteDialog(page, browserName, viewport.name);
         await auditMediaDeleteDialog(page, browserName, viewport.name);
         await auditUserResetDialog(page, browserName, viewport.name);
+        await auditUserGroupEditor(page, browserName, viewport.name);
       }
       if (viewport.width <= 560) {
         await auditMobileShell(page, browserName, viewport.name);
@@ -999,7 +1001,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, citation, permission-matrix, admin-summary, diff, article-prose, editor-toolbar, media-picker, or history-action rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, citation, permission-matrix, admin-summary, diff, article-prose, editor-toolbar, media-picker, user-group-editor, or history-action rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1448,6 +1450,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "media_picker_rhythm_mismatch",
     metrics.mediaPickerRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "user_group_editor_rhythm_mismatch",
+    metrics.userGroupEditorRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -3911,6 +3920,200 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         })
         .map(summarize)
         .slice(0, 12),
+      userGroupEditorRhythmMismatches: visibleMatches(
+        [
+          ".user-group-editor[open]",
+          ".user-group-editor[open] > summary",
+          ".user-group-editor[open] .user-group-form",
+          ".user-group-editor[open] .user-group-form fieldset",
+          ".user-group-editor[open] .user-group-form legend",
+          ".user-group-editor[open] .user-group-checkboxes",
+          ".user-group-editor[open] .checkbox-row",
+          ".user-group-editor[open] .checkbox-row span",
+          ".user-group-editor[open] .user-group-form button"
+        ].join(",")
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const viewportWidth = document.documentElement.clientWidth;
+          const isMobile = viewportWidth <= 560;
+          const viewportMismatch =
+            isMobile && (rect.left < -1 || rect.right > viewportWidth + 1);
+          const childOverflow = [...element.children].filter(visible).some((child) => {
+            const childRect = child.getBoundingClientRect();
+            return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+          });
+
+          if (element.matches(".user-group-editor[open]")) {
+            return rect.width > viewportWidth + 1 || childOverflow;
+          }
+
+          if (element.matches(".user-group-editor[open] > summary")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const gap = Number.parseFloat(style.gap || style.columnGap);
+            return (
+              !["flex", "inline-flex"].includes(style.display) ||
+              style.alignItems !== "center" ||
+              style.justifyContent !== "center" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12.5 ||
+              fontSize > 13.5 ||
+              !Number.isFinite(gap) ||
+              gap < 5 ||
+              gap > 9 ||
+              rect.height < 32 ||
+              rect.height > 36 ||
+              viewportMismatch ||
+              childOverflow ||
+              element.scrollWidth > element.clientWidth + 1
+            );
+          }
+
+          if (element.matches(".user-group-editor[open] .user-group-form")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const lineHeight = Number.parseFloat(style.lineHeight);
+            const gap = Number.parseFloat(style.gap || style.rowGap);
+            const paddingTop = Number.parseFloat(style.paddingTop);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            const borderWidth = Number.parseFloat(style.borderTopWidth);
+            const radius = Number.parseFloat(style.borderTopLeftRadius);
+            return (
+              style.display !== "grid" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12.5 ||
+              fontSize > 13.5 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight < 18 ||
+              lineHeight > 22 ||
+              !Number.isFinite(gap) ||
+              gap < 8 ||
+              gap > 12 ||
+              !Number.isFinite(paddingTop) ||
+              paddingTop < 10 ||
+              paddingTop > 14 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 10 ||
+              paddingInline > 14 ||
+              borderWidth < 1 ||
+              !Number.isFinite(radius) ||
+              radius < 8 ||
+              radius > 12 ||
+              (style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+                style.backgroundImage === "none") ||
+              !/rgba\\(20, 22, 20, 0\\.16\\)|var\\(--sh-lg\\)/i.test(style.boxShadow) ||
+              style.overflowWrap !== "anywhere" ||
+              viewportMismatch ||
+              element.scrollWidth > element.clientWidth + 1 ||
+              childOverflow
+            );
+          }
+
+          if (element.matches(".user-group-editor[open] .user-group-form fieldset")) {
+            const paddingTop = Number.parseFloat(style.paddingTop);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            const radius = Number.parseFloat(style.borderTopLeftRadius);
+            return (
+              Number.parseFloat(style.borderTopWidth) < 1 ||
+              !Number.isFinite(radius) ||
+              radius < 7 ||
+              radius > 10 ||
+              !Number.isFinite(paddingTop) ||
+              paddingTop < 8 ||
+              paddingTop > 12 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 9 ||
+              paddingInline > 13 ||
+              viewportMismatch ||
+              childOverflow
+            );
+          }
+
+          if (element.matches(".user-group-editor[open] .user-group-form legend")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            return (
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 11.5 ||
+              fontSize > 12.5 ||
+              Number.parseFloat(style.fontWeight) < 650 ||
+              viewportMismatch
+            );
+          }
+
+          if (element.matches(".user-group-editor[open] .user-group-checkboxes")) {
+            const gap = Number.parseFloat(style.gap || style.rowGap);
+            return (
+              style.display !== "grid" ||
+              !Number.isFinite(gap) ||
+              gap < 5 ||
+              gap > 8 ||
+              viewportMismatch ||
+              childOverflow
+            );
+          }
+
+          if (element.matches(".user-group-editor[open] .checkbox-row")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const lineHeight = Number.parseFloat(style.lineHeight);
+            const gap = Number.parseFloat(style.gap || style.columnGap);
+            return (
+              !["flex", "inline-flex"].includes(style.display) ||
+              style.alignItems !== "center" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12.5 ||
+              fontSize > 13.5 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight < 18 ||
+              lineHeight > 22 ||
+              !Number.isFinite(gap) ||
+              gap < 8 ||
+              gap > 12 ||
+              rect.height < 32 ||
+              rect.height > 42 ||
+              viewportMismatch ||
+              element.scrollWidth > element.clientWidth + 1 ||
+              childOverflow
+            );
+          }
+
+          if (element.matches(".user-group-editor[open] .checkbox-row span")) {
+            return (
+              style.overflowWrap !== "anywhere" ||
+              viewportMismatch ||
+              element.scrollWidth > element.clientWidth + 1
+            );
+          }
+
+          if (element.matches(".user-group-editor[open] .user-group-form button")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const gap = Number.parseFloat(style.gap || style.columnGap);
+            return (
+              !["flex", "inline-flex"].includes(style.display) ||
+              style.alignItems !== "center" ||
+              style.justifyContent !== "center" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12.5 ||
+              fontSize > 13.5 ||
+              !Number.isFinite(gap) ||
+              gap < 5 ||
+              gap > 9 ||
+              rect.height < 32 ||
+              rect.height > 36 ||
+              viewportMismatch ||
+              element.scrollWidth > element.clientWidth + 1 ||
+              childOverflow
+            );
+          }
+
+          return false;
+        })
+        .map(summarize)
+        .slice(0, 12),
       articleContainerOverflow: visibleMatches(
         ".article-page, .article-layout, .article, .article-body"
       )
@@ -4734,6 +4937,52 @@ async function auditUserResetDialog(page: Page, browserName: string, sizeName: s
       detail: modal
     });
   }
+}
+
+async function auditUserGroupEditor(page: Page, browserName: string, sizeName: string) {
+  const ready = await gotoDialogAuditRoute(page, "/admin/users", browserName, sizeName);
+  if (!ready) return;
+  const summary = page.locator(".user-group-editor > summary");
+  const count = await summary.count();
+  if (count === 0) {
+    return;
+  }
+  await summary
+    .first()
+    .click({ timeout: 5000 })
+    .catch((error: unknown) => {
+      addFailure({
+        kind: "user_group_editor_rhythm_mismatch",
+        browserName,
+        sizeName,
+        route: "/admin/users",
+        detail: error instanceof Error ? error.message : String(error)
+      });
+    });
+  await page
+    .locator(".user-group-editor[open] .user-group-form")
+    .first()
+    .waitFor({ state: "visible", timeout: 5000 })
+    .catch((error: unknown) => {
+      addFailure({
+        kind: "user_group_editor_rhythm_mismatch",
+        browserName,
+        sizeName,
+        route: "/admin/users",
+        detail: error instanceof Error ? error.message : String(error)
+      });
+    });
+  const metrics = await readRouteMetricsWithRetry(page, browserName, sizeName, "/admin/users");
+  if (!metrics) {
+    return;
+  }
+  recordElementFailures(
+    "user_group_editor_rhythm_mismatch",
+    metrics.userGroupEditorRhythmMismatches,
+    browserName,
+    sizeName,
+    "/admin/users"
+  );
 }
 
 async function gotoDialogAuditRoute(

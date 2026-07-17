@@ -4801,11 +4801,16 @@ pre.citation-block {
 }
 
 .user-group-editor {
+  min-width: 0;
   position: relative;
 }
 
 .user-group-editor > summary {
+  align-items: center;
+  justify-content: center;
   list-style: none;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .user-group-editor > summary::-webkit-details-marker {
@@ -4816,16 +4821,23 @@ pre.citation-block {
   display: grid;
   gap: 10px;
   margin-top: 8px;
+  max-width: 100%;
   width: min(320px, calc(100vw - 40px));
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--surface);
   box-shadow: var(--sh-lg);
   padding: 12px;
+  color: var(--text);
+  font-family: var(--nw-font-body);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
   text-align: left;
 }
 
 .user-group-form fieldset {
+  min-width: 0;
   margin: 0;
   border: 1px solid var(--border);
   border-radius: 9px;
@@ -4842,6 +4854,16 @@ pre.citation-block {
 .user-group-checkboxes {
   display: grid;
   gap: 6px;
+  min-width: 0;
+}
+
+.user-group-checkboxes .checkbox-row {
+  width: 100%;
+}
+
+.user-group-checkboxes .checkbox-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .inline-form {
