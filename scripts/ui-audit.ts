@@ -363,6 +363,50 @@ async function auditSourceForHardcodedVisibleText() {
   });
 }
 
+async function auditSourceForI18nDictionaryShape() {
+  const dictionaries = await Promise.all([
+    readI18nDictionaryKeys(path.join(process.cwd(), "src/i18n/en.ts")),
+    readI18nDictionaryKeys(path.join(process.cwd(), "src/i18n/zh-CN.ts"))
+  ]);
+  const [english, simplifiedChinese] = dictionaries;
+  const failures = [
+    ...english.duplicates.map((key) => ({
+      file: english.file,
+      line: english.linesByKey.get(key)?.[1] ?? english.linesByKey.get(key)?.[0] ?? 1,
+      pattern: "duplicate i18n key",
+      text: key
+    })),
+    ...simplifiedChinese.duplicates.map((key) => ({
+      file: simplifiedChinese.file,
+      line:
+        simplifiedChinese.linesByKey.get(key)?.[1] ??
+        simplifiedChinese.linesByKey.get(key)?.[0] ??
+        1,
+      pattern: "duplicate i18n key",
+      text: key
+    })),
+    ...difference(english.keys, simplifiedChinese.keys).map((key) => ({
+      file: simplifiedChinese.file,
+      line: 1,
+      pattern: "missing i18n key",
+      text: key
+    })),
+    ...difference(simplifiedChinese.keys, english.keys).map((key) => ({
+      file: simplifiedChinese.file,
+      line: simplifiedChinese.linesByKey.get(key)?.[0] ?? 1,
+      pattern: "extra i18n key",
+      text: key
+    }))
+  ];
+  if (failures.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "i18n_dictionary_shape_drift",
+    detail: failures.slice(0, 30)
+  });
+}
+
 async function auditSourceForI18nDefaultLocaleDrift() {
   const matches = await findI18nDefaultLocaleDriftMatches(path.join(process.cwd(), "src/app"));
   if (matches.length === 0) {
@@ -542,6 +586,34 @@ async function findColorDriftMatches(directory: string): Promise<SourceMatch[]> 
 function isAllowedRawColorLine(line: string) {
   const trimmed = line.trim();
   return trimmed.startsWith("--") || trimmed.includes("data:image/");
+}
+
+async function readI18nDictionaryKeys(filePath: string) {
+  const source = await readFile(filePath, "utf8");
+  const relativeFile = path.relative(process.cwd(), filePath);
+  const linesByKey = new Map<string, number[]>();
+  source.split(/\r?\n/).forEach((line, index) => {
+    const match = /^\s{2}([A-Za-z][A-Za-z0-9_]*)\s*:/.exec(line);
+    if (!match) {
+      return;
+    }
+    const key = match[1];
+    linesByKey.set(key, [...(linesByKey.get(key) ?? []), index + 1]);
+  });
+  const keys = new Set(linesByKey.keys());
+  const duplicates = [...linesByKey.entries()]
+    .filter(([, lines]) => lines.length > 1)
+    .map(([key]) => key);
+  return {
+    file: relativeFile,
+    keys,
+    linesByKey,
+    duplicates
+  };
+}
+
+function difference(left: Set<string>, right: Set<string>) {
+  return [...left].filter((item) => !right.has(item));
 }
 
 async function findI18nDefaultLocaleDriftMatches(directory: string): Promise<SourceMatch[]> {
@@ -753,6 +825,7 @@ async function main() {
   await auditSourceForTypographyDrift();
   await auditSourceForColorDrift();
   await auditSourceForHardcodedVisibleText();
+  await auditSourceForI18nDictionaryShape();
   await auditSourceForI18nDefaultLocaleDrift();
   await auditSourceForPageRouteCoverage();
   const storageState = credentials ? await createAuthState(credentials) : undefined;
@@ -825,7 +898,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 

@@ -1,3 +1,5 @@
+import type { en } from "./en";
+
 export const zhCN = {
   brand: "NoviqWiki",
   skipToContent: "跳到正文",
@@ -603,4 +605,4 @@ export const zhCN = {
   unsafeFilename: "文件名不安全。",
   mediaNotFound: "未找到媒体文件。",
   mediaStillReferenced: "此媒体仍被已发布页面引用。"
-};
+} satisfies typeof en;
