@@ -3,6 +3,7 @@ import { Eye, GitCompare } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { requirePageReadAccess } from "@/app/access";
 import { rollbackAction } from "@/app/actions";
+import { RevisionCompareForm } from "@/components/article/revision-compare-form";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
@@ -40,6 +41,12 @@ export default async function HistoryPage({ params }: Props) {
       <h1 className="page-title history-title">
         {messages.history} · {resolved.page.title}
       </h1>
+      <RevisionCompareForm
+        pageSlug={resolved.page.slug}
+        revisions={revisions}
+        locale={locale}
+        messages={messages}
+      />
       <div className="history-panel">
         <div className="history-row header">
           <div>{messages.revisionShort}</div>

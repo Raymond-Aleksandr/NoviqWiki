@@ -47,7 +47,9 @@ test("fresh setup and core wiki workflow", async ({ page }) => {
 
   await page.goto("/history/e2e-article");
   await expect(page.getByRole("heading", { name: "History · E2E Article" })).toBeVisible();
-  await page.getByRole("link", { name: "Compare" }).first().click();
+  await page.getByLabel("From revision").selectOption({ index: 1 });
+  await page.getByLabel("To revision").selectOption({ index: 0 });
+  await page.getByRole("button", { name: "Compare" }).click();
   await expect(page.getByRole("heading", { name: /Compare revision/ })).toBeVisible();
   await expect(page.locator(".diff-add")).toContainText("Updated searchable body");
 
