@@ -57,6 +57,8 @@ test("fresh setup and core wiki workflow", async ({ page }) => {
 
   await page.goto("/search?q=Initial");
   await expect(page.getByRole("link", { name: "E2E Article" })).toBeVisible();
+  await page.goto("/search?q=test");
+  await expect(page.getByRole("link", { name: "E2E Article" })).toBeVisible();
 
   await page.goto("/edit/new");
   await page.getByLabel("Page title").fill("Linked Source");

@@ -10,6 +10,8 @@ type Props = {
   searchParams: Promise<{ q?: string; category?: string }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function SearchPage({ searchParams }: Props) {
   const site = await getPrimarySiteWithSettings();
   if (!site) {

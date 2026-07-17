@@ -2,6 +2,8 @@ import { apiError, ok } from "@/modules/api/responses";
 import { requireApiContext } from "@/modules/api/auth";
 import { searchPages } from "@/modules/search/service";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(request: Request) {
   try {
     const { site } = await requireApiContext("page.read");
