@@ -166,6 +166,8 @@ const typographyDriftPatterns: Array<{ label: string; pattern: RegExp }> = [
   }
 ];
 
+const rawColorLiteralPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\(/i;
+
 const rawAuditActionValues = [
   "setup.complete",
   "auth.login",
@@ -331,6 +333,17 @@ async function auditSourceForTypographyDrift() {
   });
 }
 
+async function auditSourceForColorDrift() {
+  const matches = await findColorDriftMatches(path.join(process.cwd(), "src"));
+  if (matches.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "color_source_drift",
+    detail: matches.slice(0, 20)
+  });
+}
+
 async function auditSourceForHardcodedVisibleText() {
   const matches = [
     ...(await findUnexpectedHardcodedVisibleTextMatches(path.join(process.cwd(), "src/app"))),
@@ -477,6 +490,42 @@ async function findTypographyDriftMatches(directory: string): Promise<SourceMatc
   }
 
   return matches;
+}
+
+async function findColorDriftMatches(directory: string): Promise<SourceMatch[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const matches: SourceMatch[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      matches.push(...(await findColorDriftMatches(entryPath)));
+      continue;
+    }
+    if (!entry.isFile() || path.extname(entry.name) !== ".css") {
+      continue;
+    }
+    const source = await readFile(entryPath, "utf8");
+    const lines = source.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      if (!rawColorLiteralPattern.test(line) || isAllowedRawColorLine(line)) {
+        return;
+      }
+      matches.push({
+        file: path.relative(process.cwd(), entryPath),
+        line: index + 1,
+        pattern: "raw color literal",
+        text: line.trim().slice(0, 160)
+      });
+    });
+  }
+
+  return matches;
+}
+
+function isAllowedRawColorLine(line: string) {
+  const trimmed = line.trim();
+  return trimmed.startsWith("--") || trimmed.includes("data:image/");
 }
 
 async function findUnexpectedHardcodedVisibleTextMatches(
@@ -645,6 +694,7 @@ async function main() {
   await auditSourceForActiveTransforms();
   await auditSourceForInlineStyles();
   await auditSourceForTypographyDrift();
+  await auditSourceForColorDrift();
   await auditSourceForHardcodedVisibleText();
   await auditSourceForPageRouteCoverage();
   const storageState = credentials ? await createAuthState(credentials) : undefined;
@@ -717,7 +767,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, hardcoded visible text, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1507,7 +1557,10 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       )
         .filter((element) => {
           const rect = element.getBoundingClientRect();
-          const maxAllowedHeight = Math.min(window.innerHeight * 0.72, 560);
+          const isMobile = document.documentElement.clientWidth <= 560;
+          const maxAllowedHeight = isMobile
+            ? Math.min(window.innerHeight * 0.46, 340)
+            : Math.min(window.innerHeight * 0.64, 520);
           return rect.height > maxAllowedHeight + 2;
         })
         .map(summarize)
