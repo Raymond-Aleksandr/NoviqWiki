@@ -57,6 +57,10 @@ type RouteMetrics = {
   badFileInputs: ElementSummary[];
   visibleDialogs: ElementSummary[];
   commandButtonsWithoutIcons: ElementSummary[];
+  oversizedText: ElementSummary[];
+  overlappingActivityRows: ElementSummary[];
+  duplicateTimelineActions: ElementSummary[];
+  unevenAdminPageActions: ElementSummary[];
   adminSettingsLinks: ElementSummary[];
   adminTabsWithoutIcons: ElementSummary[];
   createAnchors: ElementSummary[];
@@ -191,6 +195,7 @@ const publicRoutes = [
 ];
 
 const authenticatedRoutes = [
+  "/watchlist",
   "/admin",
   "/admin/pages",
   "/admin/users",
@@ -399,7 +404,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, design token drift, overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, design token drift, overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -719,6 +724,28 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     sizeName,
     route
   );
+  recordElementFailures("oversized_text", metrics.oversizedText, browserName, sizeName, route);
+  recordElementFailures(
+    "overlapping_activity_rows",
+    metrics.overlappingActivityRows,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "duplicate_timeline_actions",
+    metrics.duplicateTimelineActions,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "uneven_admin_page_actions",
+    metrics.unevenAdminPageActions,
+    browserName,
+    sizeName,
+    route
+  );
   recordElementFailures(
     "admin_tabs_without_icons",
     metrics.adminTabsWithoutIcons,
@@ -824,6 +851,14 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
     });
     const visibleMatches = (selector) =>
       [...document.querySelectorAll(selector)].filter(visible);
+    const oversizedText = [
+      ...visibleMatches(".activity-main strong, .timeline-title strong")
+        .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) > 15.5),
+      ...visibleMatches(".activity-meta, .timeline-meta")
+        .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) > 13)
+    ]
+      .map(summarize)
+      .slice(0, 12);
     const clientWidth = document.documentElement.clientWidth;
     const rawAuditTextNodes = [];
     const rawAuditWalker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
@@ -870,6 +905,7 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       ".nav-list a",
       ".admin-tabs a",
       ".aside-actions a",
+      ".aside-action-form button",
       ".category-list a",
       ".search-filter-link",
       ".search-result",
@@ -930,6 +966,41 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         .map(summarize)
         .slice(0, 12),
       commandButtonsWithoutIcons,
+      oversizedText,
+      overlappingActivityRows: visibleMatches(".activity-row, .timeline-row:not(.timeline-footer)")
+        .filter((element) => {
+          const badge = element.querySelector(".audit-action, .timeline-action");
+          const title = element.querySelector(".activity-main, .timeline-title");
+          if (!badge || !title) return false;
+          const badgeRect = badge.getBoundingClientRect();
+          const titleRect = title.getBoundingClientRect();
+          return badgeRect.right > titleRect.left - 2;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      duplicateTimelineActions: visibleMatches(".timeline-row:not(.timeline-footer)")
+        .filter((element) => {
+          const badge = element.querySelector(".timeline-action");
+          const title = element.querySelector(".timeline-title");
+          return Boolean(
+            badge &&
+              title &&
+              labelOf(badge) &&
+              labelOf(title).trim() === labelOf(badge).trim()
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      unevenAdminPageActions: visibleMatches(".admin-grid-row.admin-pages-grid .admin-action-list")
+        .filter((element) => {
+          if (document.documentElement.clientWidth > 560) return false;
+          const actions = [...element.querySelectorAll(".button, button")].filter(visible);
+          if (actions.length < 2) return false;
+          const widths = actions.map((item) => item.getBoundingClientRect().width);
+          return Math.max(...widths) - Math.min(...widths) > 4;
+        })
+        .map(summarize)
+        .slice(0, 12),
       adminSettingsLinks: visibleMatches("a[href='/admin/settings']").map(summarize),
       adminTabsWithoutIcons: visibleMatches(".admin-tabs a")
         .filter((element) => !element.querySelector("svg"))

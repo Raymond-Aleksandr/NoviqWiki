@@ -16,6 +16,7 @@ import {
   Settings,
   ShieldCheck,
   Shuffle,
+  Star,
   Tags,
   UserCog,
   UsersRound,
@@ -47,7 +48,8 @@ const specialPageIcons: Record<SpecialPageIcon, typeof Search> = {
   status: Wrench,
   uncategorized: Tags,
   users: UsersRound,
-  wanted: FileQuestion
+  wanted: FileQuestion,
+  watchlist: Star
 };
 
 export default async function SpecialPages() {

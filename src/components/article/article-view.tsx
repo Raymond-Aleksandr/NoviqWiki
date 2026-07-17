@@ -14,8 +14,11 @@ import {
   Ruler,
   RouteOff,
   ShieldCheck,
+  Star,
+  StarOff,
   Tags
 } from "lucide-react";
+import { toggleWatchPageAction } from "@/app/actions";
 import type { Page, PageRevision } from "@/db/schema";
 import type { Messages } from "@/i18n";
 import type { PageOutboundLink } from "@/modules/pages/service";
@@ -32,6 +35,8 @@ export function ArticleView({
   backlinkCount = 0,
   revisionCount = revision.revisionNumber,
   currentRevisionNumber = revision.revisionNumber,
+  canWatch = false,
+  watched = false,
   locale,
   messages
 }: {
@@ -45,6 +50,8 @@ export function ArticleView({
   backlinkCount?: number;
   revisionCount?: number;
   currentRevisionNumber?: number;
+  canWatch?: boolean;
+  watched?: boolean;
   locale: string;
   messages: Messages;
 }) {
@@ -160,6 +167,22 @@ export function ArticleView({
           ) : null}
           <nav className="aside-actions" aria-label={messages.pageTools}>
             <strong>{messages.tools}</strong>
+            {canWatch ? (
+              <form action={toggleWatchPageAction} className="aside-action-form">
+                <input type="hidden" name="pageId" value={page.id} />
+                <input type="hidden" name="slug" value={page.slug} />
+                <input type="hidden" name="intent" value={watched ? "unwatch" : "watch"} />
+                <input type="hidden" name="returnTo" value={`/page/${page.slug}`} />
+                <button type="submit">
+                  {watched ? (
+                    <StarOff size={15} aria-hidden="true" />
+                  ) : (
+                    <Star size={15} aria-hidden="true" />
+                  )}
+                  {watched ? messages.unwatchPage : messages.watchPage}
+                </button>
+              </form>
+            ) : null}
             <Link href={`/page/${page.slug}/backlinks`}>
               <Link2 size={15} aria-hidden="true" />
               {messages.whatLinksHere}

@@ -25,26 +25,26 @@ Last updated: 2026-07-17
 
 ## Verification Log
 
-| Command                        | Result                                              |
-| ------------------------------ | --------------------------------------------------- |
-| `pnpm format`                  | Passed                                              |
-| `pnpm lint`                    | Passed                                              |
-| `pnpm typecheck`               | Passed                                              |
-| `pnpm test`                    | Passed, 13 unit files / 33 tests                    |
-| `pnpm test:integration`        | Passed, 14 integration files / 20 tests             |
-| `pnpm test:ui`                 | Passed, non-reset Chromium/WebKit UI release audit  |
-| `pnpm build`                   | Passed                                              |
-| `pnpm test:e2e`                | Passed, 2 Playwright tests                          |
-| `pnpm db:migrate`              | Passed                                              |
-| `pnpm backup`                  | Passed, generated SQL and local media archive       |
-| `pnpm restore`                 | Passed with generated backup and confirmation       |
-| `pnpm openapi`                 | Passed, generated `docs/openapi.json`               |
-| `docker compose config`        | Passed                                              |
-| `docker compose build`         | Passed                                              |
-| `docker compose up --build -d` | Passed from clean project volumes after final gates |
-| `GET /api/health`              | Passed, `{"data":{"status":"ok"}}`                  |
-| `GET /api/ready`               | Passed, database/storage true                       |
-| `GET /setup`                   | Passed, first-run setup page loads                  |
+| Command                        | Result                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `pnpm format:check`            | Passed                                                                           |
+| `pnpm lint`                    | Passed                                                                           |
+| `pnpm typecheck`               | Passed                                                                           |
+| `pnpm test`                    | Passed, 15 unit files / 37 tests                                                 |
+| `pnpm test:integration`        | Passed, 16 integration files / 23 tests                                          |
+| `pnpm test:ui`                 | Passed, authenticated non-reset Chromium/WebKit UI release audit                 |
+| `pnpm build`                   | Passed                                                                           |
+| `pnpm test:e2e`                | Not run in current checkpoint; reset flow would disrupt the live review database |
+| `pnpm db:migrate`              | Passed                                                                           |
+| `pnpm backup`                  | Passed, generated SQL and local media archive                                    |
+| `pnpm restore`                 | Passed with generated backup and confirmation                                    |
+| `pnpm openapi`                 | Passed, generated `docs/openapi.json`                                            |
+| `docker compose config`        | Passed                                                                           |
+| `docker compose build`         | Passed                                                                           |
+| `docker compose up --build -d` | Passed from clean project volumes after final gates                              |
+| `GET /api/health`              | Passed, `{"data":{"status":"ok"}}`                                               |
+| `GET /api/ready`               | Passed, database/storage true                                                    |
+| `GET /setup`                   | Passed, first-run setup page loads                                               |
 
 ## UI Reset Verification
 
@@ -125,6 +125,10 @@ Last updated: 2026-07-17
 - 2026-07-17: Added a `/special` wiki index that groups public browsing links, content-maintenance reports, and permission-aware administration links. The site navigation and article page tools now expose Special pages, unit coverage locks the section/link model, and the UI audit covers the route.
 - 2026-07-17: Added `GET /random` for a traditional random-article workflow. The route enforces page-read permission, redirects to a random published non-redirect article, falls back to `/pages` when no readable article exists, appears in Special pages, and integration coverage verifies draft, archived, deleted, and redirect pages are excluded.
 - 2026-07-17: Added `/page/{slug}/cite` for APA, MLA, Chicago, and BibTeX citations pinned to the current permanent revision URL. Article tools now expose "Cite this page", citation formatting is unit-covered, and the UI audit covers the citation route when an article exists.
+- 2026-07-17: Added a real user watchlist workflow. Authenticated users can watch/unwatch articles from page tools, `/watchlist` shows changes only for watched pages plus the watched-page list, Special pages links to the watchlist, and integration coverage verifies idempotent watch/unwatch plus activity filtering.
+- 2026-07-17: Tightened activity-list UI consistency after mobile review. Homepage recent activity and `/recent`/`/watchlist` timeline rows now avoid duplicate action labels, use compact body/meta font sizing, and reflow into a stable badge/content grid on mobile. `pnpm test:ui` now checks activity/timeline text sizes.
+- 2026-07-17: Fixed the latest mobile admin alignment regressions from live review. `/admin/pages` action buttons now use an equal-width mobile grid so Chinese labels of different lengths do not shift columns, and `/admin/users` keeps the avatar and username on the same row beside the `用户` label. Authenticated `pnpm test:ui` passed after adding the mobile page-action alignment check.
+- 2026-07-17: Fixed the homepage "Recently updated" activity row overlap seen in English on mobile. Activity and timeline action badges now use fixed design-token columns, English labels such as `Media uploaded` no longer touch filenames, and `pnpm test:ui` now fails on badge/title overlap.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

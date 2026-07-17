@@ -86,7 +86,6 @@ export default async function RecentChangesPage({ searchParams }: Props) {
                 ) : (
                   <strong>{change.targetLabel}</strong>
                 )}
-                <span className="muted">{auditActionLabel(change.action, messages)}</span>
               </span>
               <span className="timeline-meta">
                 <span>{change.actorDisplayName ?? messages.system}</span>
@@ -95,7 +94,7 @@ export default async function RecentChangesPage({ searchParams }: Props) {
             </article>
           ))
         )}
-        <footer className="timeline-row">
+        <footer className="timeline-row timeline-footer">
           <span className="muted">
             {count} {messages.changes}
           </span>

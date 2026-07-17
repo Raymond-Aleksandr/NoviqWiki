@@ -10,6 +10,7 @@ describe("special pages", () => {
     expect(sections.flatMap((section) => section.links.map((link) => link.href))).toEqual([
       "/search",
       "/random",
+      "/watchlist",
       "/pages",
       "/recent",
       "/categories",

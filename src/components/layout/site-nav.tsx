@@ -59,7 +59,8 @@ export function SiteNav({ messages, showAdmin }: { messages: Messages; showAdmin
         pathname.startsWith("/short-pages") ||
         pathname.startsWith("/protected-pages") ||
         pathname.startsWith("/uncategorized") ||
-        pathname.startsWith("/redirects")
+        pathname.startsWith("/redirects") ||
+        pathname.startsWith("/watchlist")
     },
     {
       href: "/admin",

@@ -120,16 +120,33 @@ export default async function HomePage() {
                 </h2>
               </header>
               <div className="activity-list">
-                {changes.map((change) => (
-                  <p key={change.id}>
-                    <span className={`badge audit-action ${badgeForAction(change.action)}`}>
-                      {auditActionLabel(change.action, messages)}
-                    </span>
-                    <span>{change.targetLabel}</span>
-                    <span className="muted">{change.actorDisplayName ?? messages.system}</span>
-                    <span className="muted">{change.createdAt.toLocaleString(locale)}</span>
-                  </p>
-                ))}
+                {changes.length === 0 ? (
+                  <div className="empty-state">
+                    <strong>{messages.noRecentActivity}</strong>
+                    <p className="muted">{messages.activityAppears}</p>
+                  </div>
+                ) : (
+                  changes.map((change) => (
+                    <article className="activity-row" key={change.id}>
+                      <span className={`badge audit-action ${badgeForAction(change.action)}`}>
+                        {auditActionLabel(change.action, messages)}
+                      </span>
+                      <span className="activity-main">
+                        {change.targetHref ? (
+                          <Link href={change.targetHref}>
+                            <strong>{change.targetLabel}</strong>
+                          </Link>
+                        ) : (
+                          <strong>{change.targetLabel}</strong>
+                        )}
+                      </span>
+                      <span className="activity-meta">
+                        <span>{change.actorDisplayName ?? messages.system}</span>
+                        <span className="mono">{change.createdAt.toLocaleString(locale)}</span>
+                      </span>
+                    </article>
+                  ))
+                )}
               </div>
             </section>
           ) : null}

@@ -20,7 +20,8 @@ export type SpecialPageIcon =
   | "status"
   | "uncategorized"
   | "users"
-  | "wanted";
+  | "wanted"
+  | "watchlist";
 
 export type SpecialPageLink = {
   href: string;
@@ -57,6 +58,12 @@ export function getSpecialPageSections(
           title: messages.randomPage,
           description: messages.randomPageDescription,
           icon: "random"
+        },
+        {
+          href: "/watchlist",
+          title: messages.watchlist,
+          description: messages.watchlistDescription,
+          icon: "watchlist"
         },
         {
           href: "/pages",

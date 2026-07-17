@@ -49,6 +49,7 @@ type ListRecentChangesInput = {
   offset?: number;
   action?: AuditLog["action"];
   actions?: readonly AuditLog["action"][];
+  pageIds?: readonly string[];
   publicOnly?: boolean;
 };
 
@@ -195,9 +196,13 @@ function recentChangesWhere(input: ListRecentChangesInput) {
     : input.action
       ? eq(auditLogs.action, input.action)
       : undefined;
+  const pageFilter = input.pageIds?.length
+    ? and(eq(auditLogs.targetType, "page"), inArray(auditLogs.targetId, [...input.pageIds]))
+    : undefined;
   return and(
     eq(auditLogs.siteId, input.siteId),
     actionFilter,
+    pageFilter,
     input.publicOnly ? inArray(auditLogs.action, [...publicRecentChangeActions]) : undefined
   );
 }

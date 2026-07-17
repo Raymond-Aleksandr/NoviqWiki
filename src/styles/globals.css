@@ -995,13 +995,68 @@ textarea {
   font-size: 17px;
 }
 
-.activity-list p {
-  display: flex;
+.activity-list {
+  display: grid;
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) max-content;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   margin: 0;
   padding: 12px 18px;
   border-bottom: 1px solid var(--border);
+}
+
+.activity-row:last-child {
+  border-bottom: 0;
+}
+
+.activity-row .audit-action {
+  justify-self: start;
+  inline-size: 116px;
+  min-width: 0;
+  justify-content: center;
+  line-height: 1.15;
+  text-align: center;
+  white-space: normal;
+}
+
+.activity-main {
+  min-width: 0;
+}
+
+.activity-main a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.activity-main a:hover,
+.activity-main a:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.activity-main strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.activity-meta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
 .badge {
@@ -1135,7 +1190,8 @@ textarea {
 }
 
 .timeline-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr) max-content;
   align-items: center;
   gap: 14px;
   padding: 14px 18px;
@@ -1147,14 +1203,16 @@ textarea {
 }
 
 .timeline-action {
-  width: 78px;
-  flex-shrink: 0;
+  inline-size: 116px;
+  min-width: 0;
+  justify-content: center;
+  line-height: 1.15;
   text-align: center;
+  white-space: normal;
 }
 
 .timeline-title {
   min-width: 0;
-  flex: 1;
 }
 
 .timeline-title a {
@@ -1422,6 +1480,79 @@ pre.citation-block {
   flex-wrap: wrap;
   justify-content: flex-end;
   margin-left: auto;
+}
+
+.watchlist-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.85fr);
+  gap: 16px;
+}
+
+.watchlist-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.watchlist-heading > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.watchlist-heading small {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.watchlist-pages {
+  display: grid;
+}
+
+.watchlist-page-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+}
+
+.watchlist-page-row:last-child {
+  border-bottom: 0;
+}
+
+.watchlist-page-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.watchlist-page-copy a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.watchlist-page-copy a:hover,
+.watchlist-page-copy a:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.watchlist-page-copy strong {
+  display: block;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.watchlist-page-copy small {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .mono {
@@ -2481,7 +2612,29 @@ pre.citation-block {
   text-decoration: none;
 }
 
-.aside-actions a:hover {
+.aside-action-form {
+  margin: 0;
+}
+
+.aside-action-form button {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-block-size: 36px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 8px;
+  margin-inline: -8px;
+  text-align: left;
+}
+
+.aside-actions a:hover,
+.aside-action-form button:hover {
   background: var(--surface-muted);
   color: var(--text);
 }
@@ -4447,7 +4600,6 @@ pre.citation-block {
   .timeline-pagination,
   .editor-footer {
     align-items: flex-start;
-    flex-direction: column;
   }
 
   .timeline-pagination {
@@ -4455,7 +4607,7 @@ pre.citation-block {
   }
 
   .timeline-action {
-    width: auto;
+    inline-size: 104px;
   }
 
   .page-index-row {
@@ -4496,13 +4648,15 @@ pre.citation-block {
 
   .admin-filter-bar {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: flex-start;
     gap: 8px;
     min-height: 0;
-    overflow: visible;
+    overflow-x: auto;
+    overflow-y: hidden;
     padding: 10px 12px;
+    scrollbar-width: none;
   }
 
   .admin-filter-bar::-webkit-scrollbar {
@@ -4510,7 +4664,7 @@ pre.citation-block {
   }
 
   .admin-filter-control {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
   }
 
   .admin-filter-control input,
@@ -4519,19 +4673,19 @@ pre.citation-block {
   }
 
   .admin-filter-search {
-    flex: 1 1 100%;
-    width: 100%;
+    flex: 0 0 min(220px, calc(100vw - 160px));
+    width: min(220px, calc(100vw - 160px));
     min-width: 0;
-    max-width: none;
+    max-width: 220px;
   }
 
   .admin-filter-bar:not(:has(.admin-filter-select)) .admin-filter-search {
-    flex-basis: 0;
-    width: auto;
+    flex-basis: min(260px, calc(100vw - 150px));
+    width: min(260px, calc(100vw - 150px));
   }
 
   .admin-filter-select {
-    flex: 1 1 156px;
+    flex: 0 0 auto;
     min-width: 0;
     width: auto;
     max-width: none;
@@ -4617,7 +4771,24 @@ pre.citation-block {
   }
 
   .admin-grid-row.admin-users-grid .user-cell {
+    grid-template-columns: minmax(72px, max-content) auto minmax(0, 1fr);
     align-items: center;
+    gap: 10px;
+  }
+
+  .admin-grid-row.admin-users-grid .user-cell::before {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .admin-grid-row.admin-users-grid .user-cell .avatar {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .admin-grid-row.admin-users-grid .user-cell strong {
+    grid-column: 3;
+    grid-row: 1;
   }
 
   .admin-grid-row.admin-users-grid .user-cell strong,
@@ -4635,12 +4806,80 @@ pre.citation-block {
   .admin-grid-row.admin-pages-grid .admin-action-list,
   .history-row .history-actions {
     display: flex;
+    flex-wrap: wrap;
+    grid-template-columns: none;
+    align-items: center;
+    gap: 8px;
     justify-content: flex-end;
+  }
+
+  .admin-grid-row.admin-pages-grid .admin-action-list {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-items: stretch;
+  }
+
+  .admin-grid-row.admin-users-grid .admin-action-list::before {
+    margin-right: auto;
+  }
+
+  .admin-grid-row.admin-pages-grid .admin-action-list::before {
+    grid-column: 1 / -1;
+    margin-right: 0;
+  }
+
+  .admin-grid-row.admin-pages-grid .admin-action-list .button,
+  .admin-grid-row.admin-pages-grid .admin-action-list button,
+  .admin-grid-row.admin-users-grid .admin-action-list .button,
+  .admin-grid-row.admin-users-grid .admin-action-list button,
+  .history-row .history-actions .button,
+  .history-row .history-actions button {
+    min-block-size: 34px;
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+
+  .admin-grid-row.admin-pages-grid .admin-action-list .button,
+  .admin-grid-row.admin-pages-grid .admin-action-list button,
+  .admin-grid-row.admin-pages-grid .admin-action-list .inline-form {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-grid-row.admin-users-grid .user-group-badges,
+  .admin-grid-row.admin-users-grid [data-label="角色"],
+  .admin-grid-row.admin-users-grid [data-label="Role"] {
+    justify-items: start;
+  }
+
+  .admin-grid-row.admin-users-grid .user-group-badges .badge,
+  .admin-grid-row.admin-users-grid .role-badge {
+    justify-self: start;
+    width: fit-content;
+    max-width: 100%;
   }
 
   .citation-meta > div {
     grid-template-columns: 1fr;
     gap: 5px;
+  }
+
+  .watchlist-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .watchlist-page-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .watchlist-page-row .inline-form {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .watchlist-page-copy strong {
+    white-space: normal;
   }
 
   .admin-pagination {
@@ -4820,6 +5059,82 @@ pre.citation-block {
   .home-action {
     min-height: 40px;
     padding: 10px 15px;
+  }
+
+  .activity-row {
+    grid-template-columns: 104px minmax(0, 1fr);
+    align-items: start;
+    gap: 7px 14px;
+    padding: 12px 14px;
+  }
+
+  .activity-row .audit-action {
+    inline-size: 104px;
+    min-width: 0;
+    margin-top: 1px;
+  }
+
+  .activity-main strong {
+    font-size: 13.8px;
+    line-height: 1.35;
+  }
+
+  .activity-meta {
+    grid-column: 2;
+    justify-content: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    white-space: normal;
+  }
+
+  .activity-meta .mono {
+    white-space: nowrap;
+  }
+
+  .timeline-row {
+    display: grid;
+    grid-template-columns: 104px minmax(0, 1fr);
+    align-items: start;
+    gap: 7px 14px;
+    padding: 12px 14px;
+  }
+
+  .timeline-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-footer > .muted {
+    grid-column: 1 / -1;
+  }
+
+  .timeline-action {
+    inline-size: 104px;
+    min-width: 0;
+    margin-top: 1px;
+  }
+
+  .timeline-title strong {
+    font-size: 13.8px;
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  .timeline-meta {
+    grid-column: 2;
+    justify-content: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    white-space: normal;
+  }
+
+  .timeline-meta .mono {
+    white-space: nowrap;
+  }
+
+  .timeline-row .timeline-pagination {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+    margin-left: 0;
   }
 
   .article h1 {

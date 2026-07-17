@@ -34,6 +34,7 @@ import { deleteMedia, uploadMedia } from "@/modules/media/service";
 import {
   archivePage,
   createPage,
+  getPageById,
   publishPage,
   renamePage,
   restorePage,
@@ -44,6 +45,7 @@ import {
 } from "@/modules/pages/service";
 import { completeSetup } from "@/modules/setup/service";
 import { normalizeAllowedMediaTypes, updateSiteSettings } from "@/modules/settings/service";
+import { unwatchPage, watchPage } from "@/modules/watchlist/service";
 import {
   assignUserToGroup,
   createGroup,
@@ -394,6 +396,36 @@ export async function setPageProtectionAction(
   } catch (error) {
     return actionError(error);
   }
+}
+
+export async function toggleWatchPageAction(formData: FormData) {
+  const session = await requireSession();
+  const site = await requireSite();
+  await requirePermission(session.user.id, site.site.id, "page.read");
+  const pageId = stringValue(formData, "pageId");
+  const pageSlug = stringValue(formData, "slug");
+  const intent = stringValue(formData, "intent");
+  const input = {
+    siteId: site.site.id,
+    userId: session.user.id,
+    pageId
+  };
+  const page = await getPageById(pageId);
+  if (page.siteId !== site.site.id) {
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    throw new AppError(messages.pageNotFound, "page_not_found", 404);
+  }
+  if (intent === "watch") {
+    await watchPage(input);
+  } else if (intent === "unwatch") {
+    await unwatchPage(input);
+  } else {
+    throw new AppError("The request is invalid.", "validation_error", 422);
+  }
+  revalidatePath(`/page/${pageSlug}`);
+  revalidatePath("/watchlist");
+  const returnTo = safeReturnPath(optionalString(formData, "returnTo")) ?? `/page/${pageSlug}`;
+  redirect(returnTo);
 }
 
 export async function updateSettingsAction(
@@ -765,6 +797,13 @@ function optionalPublicUrl(formData: FormData, key: string) {
     throw new AppError(`Invalid URL: ${key}`, "validation_error", 422);
   }
   throw new AppError(`Invalid URL: ${key}`, "validation_error", 422);
+}
+
+function safeReturnPath(value: string | undefined) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) {
+    return undefined;
+  }
+  return value;
 }
 
 function commaListValue(formData: FormData, key: string) {

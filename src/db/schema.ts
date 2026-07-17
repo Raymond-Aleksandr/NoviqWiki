@@ -494,6 +494,27 @@ export const pageLinks = pgTable(
   })
 );
 
+export const pageWatchlist = pgTable(
+  "page_watchlist",
+  {
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => sites.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    pageId: uuid("page_id")
+      .notNull()
+      .references(() => pages.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.userId, table.pageId] }),
+    siteUserIdx: index("page_watchlist_site_user_idx").on(table.siteId, table.userId),
+    pageIdx: index("page_watchlist_page_idx").on(table.pageId)
+  })
+);
+
 export const mediaAssets = pgTable(
   "media_assets",
   {
@@ -596,7 +617,8 @@ export const userRelations = relations(users, ({ many }) => ({
   sessions: many(sessions),
   groups: many(userGroups),
   revisions: many(pageRevisions),
-  media: many(mediaAssets)
+  media: many(mediaAssets),
+  watchedPages: many(pageWatchlist)
 }));
 
 export const pageRelations = relations(pages, ({ one, many }) => ({
@@ -605,12 +627,19 @@ export const pageRelations = relations(pages, ({ one, many }) => ({
   revisions: many(pageRevisions),
   drafts: many(pageDrafts),
   aliases: many(pageAliases),
-  categories: many(pageCategories)
+  categories: many(pageCategories),
+  watchers: many(pageWatchlist)
 }));
 
 export const revisionRelations = relations(pageRevisions, ({ one }) => ({
   page: one(pages, { fields: [pageRevisions.pageId], references: [pages.id] }),
   editor: one(users, { fields: [pageRevisions.editorId], references: [users.id] })
+}));
+
+export const pageWatchlistRelations = relations(pageWatchlist, ({ one }) => ({
+  site: one(sites, { fields: [pageWatchlist.siteId], references: [sites.id] }),
+  user: one(users, { fields: [pageWatchlist.userId], references: [users.id] }),
+  page: one(pages, { fields: [pageWatchlist.pageId], references: [pages.id] })
 }));
 
 export type Site = typeof sites.$inferSelect;
@@ -622,3 +651,4 @@ export type PageRevision = typeof pageRevisions.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type MediaAsset = typeof mediaAssets.$inferSelect;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type PageWatch = typeof pageWatchlist.$inferSelect;

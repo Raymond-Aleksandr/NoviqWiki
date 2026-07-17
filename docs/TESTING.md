@@ -77,9 +77,10 @@ It checks:
 
 - Chromium and WebKit at desktop and mobile widths.
 - Public homepage, search, recent changes, special pages, random page redirect, all pages, wanted pages, orphaned pages, dead-end pages, short pages, protected pages, uncategorized pages, redirect maintenance, category index/detail, media, auth, recovery, reset, verification, registration, article, backlinks, citation page, history, and the first discoverable diff route.
-- Authenticated editor and admin routes when credentials are provided.
+- Authenticated watchlist, editor, and admin routes when credentials are provided.
 - Light and dark theme design tokens for background, surface, muted surface, sunken surface, text, primary, border, radius, and font stacks.
 - Production source does not use native browser `alert`, `confirm`, `prompt`, or `beforeunload` dialogs.
+- Homepage activity and timeline text sizes stay within the design package's compact body/meta rhythm.
 - Horizontal overflow.
 - Sub-32px command targets.
 - Oversized visible filter/form controls or filter bars that drift away from the design package compact rhythm.
