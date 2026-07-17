@@ -360,33 +360,157 @@ export async function updateGroup(
 }
 
 export async function createRole(
-  input: { siteId: string; name: string; description?: string; permissionKeys?: PermissionKey[] },
-  database: Database = db
+  input: {
+    siteId: string;
+    name: string;
+    description?: string;
+    permissionKeys?: PermissionKey[];
+    actorId?: string;
+    actorDisplayName?: string;
+  },
+  database: RootDatabase = db
 ) {
-  const normalizedName = input.name.trim().toLowerCase();
-  const [role] = await database
-    .insert(roles)
-    .values({
-      siteId: input.siteId,
-      name: input.name.trim(),
-      normalizedName,
-      description: input.description ?? ""
-    })
-    .onConflictDoUpdate({
-      target: [roles.siteId, roles.normalizedName],
-      set: { description: input.description ?? "", updatedAt: new Date() }
-    })
-    .returning();
-  if (input.permissionKeys) {
-    await database.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
-    if (input.permissionKeys.length > 0) {
-      await database
+  return database.transaction(async (tx) => {
+    const normalizedName = input.name.trim().toLowerCase();
+    if (!normalizedName) {
+      throw new ConflictError("Role name is required.");
+    }
+    const [existing] = await tx
+      .select({ id: roles.id, builtIn: roles.builtIn })
+      .from(roles)
+      .where(and(eq(roles.siteId, input.siteId), eq(roles.normalizedName, normalizedName)))
+      .limit(1);
+    if (existing?.builtIn) {
+      throw new ForbiddenError("Built-in roles cannot be edited.");
+    }
+    if (existing) {
+      throw new ConflictError("A role with that name already exists.");
+    }
+
+    const [role] = await tx
+      .insert(roles)
+      .values({
+        siteId: input.siteId,
+        name: input.name.trim(),
+        normalizedName,
+        description: input.description ?? ""
+      })
+      .returning();
+    const selectedPermissions = Array.from(new Set(input.permissionKeys ?? []));
+    if (selectedPermissions.length > 0) {
+      await tx
         .insert(rolePermissions)
-        .values(input.permissionKeys.map((permissionKey) => ({ roleId: role.id, permissionKey })))
+        .values(selectedPermissions.map((permissionKey) => ({ roleId: role.id, permissionKey })))
         .onConflictDoNothing();
     }
-  }
-  return role;
+    if (input.actorId) {
+      await writeAuditLog(
+        {
+          siteId: input.siteId,
+          actorId: input.actorId,
+          actorDisplayName: input.actorDisplayName,
+          action: "role.updated",
+          targetType: "role",
+          targetId: role.id,
+          details: {
+            name: role.name,
+            created: true,
+            permissionKeys: selectedPermissions
+          }
+        },
+        tx
+      );
+    }
+    return role;
+  });
+}
+
+export async function updateRole(
+  input: {
+    siteId: string;
+    roleId: string;
+    name: string;
+    description?: string;
+    permissionKeys: PermissionKey[];
+    actorId?: string;
+    actorDisplayName?: string;
+  },
+  database: RootDatabase = db
+) {
+  return database.transaction(async (tx) => {
+    const [role] = await tx
+      .select()
+      .from(roles)
+      .where(and(eq(roles.id, input.roleId), eq(roles.siteId, input.siteId)))
+      .limit(1);
+    if (!role) {
+      throw new NotFoundError("Role not found.");
+    }
+    if (role.builtIn) {
+      throw new ForbiddenError("Built-in roles cannot be edited.");
+    }
+
+    const nextName = input.name.trim();
+    if (!nextName) {
+      throw new ConflictError("Role name is required.");
+    }
+    const normalizedName = nextName.toLowerCase();
+    if (normalizedName !== role.normalizedName) {
+      const [duplicate] = await tx
+        .select({ id: roles.id })
+        .from(roles)
+        .where(and(eq(roles.siteId, input.siteId), eq(roles.normalizedName, normalizedName)))
+        .limit(1);
+      if (duplicate && duplicate.id !== role.id) {
+        throw new ConflictError("A role with that name already exists.");
+      }
+    }
+
+    const selectedPermissions = Array.from(new Set(input.permissionKeys));
+    const [updated] = await tx
+      .update(roles)
+      .set({
+        name: nextName,
+        normalizedName,
+        description: input.description?.trim() ?? "",
+        updatedAt: new Date()
+      })
+      .where(eq(roles.id, role.id))
+      .returning();
+
+    await tx.delete(rolePermissions).where(eq(rolePermissions.roleId, role.id));
+    if (selectedPermissions.length > 0) {
+      await tx
+        .insert(rolePermissions)
+        .values(
+          selectedPermissions.map((permissionKey) => ({
+            roleId: role.id,
+            permissionKey
+          }))
+        )
+        .onConflictDoNothing();
+    }
+
+    if (input.actorId) {
+      await writeAuditLog(
+        {
+          siteId: input.siteId,
+          actorId: input.actorId,
+          actorDisplayName: input.actorDisplayName,
+          action: "role.updated",
+          targetType: "role",
+          targetId: role.id,
+          details: {
+            name: updated.name,
+            permissionKeys: selectedPermissions
+          }
+        },
+        tx
+      );
+    }
+
+    return updated;
+  });
 }
 
 export async function assignRoleToGroup(groupId: string, roleId: string, database: Database = db) {

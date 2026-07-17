@@ -278,6 +278,24 @@
             "description": "Roles"
           }
         }
+      },
+      "post": {
+        "summary": "Create role",
+        "responses": {
+          "201": {
+            "description": "Role"
+          }
+        }
+      }
+    },
+    "/admin/roles/{id}": {
+      "patch": {
+        "summary": "Update custom role",
+        "responses": {
+          "200": {
+            "description": "Role"
+          }
+        }
       }
     },
     "/admin/audit": {

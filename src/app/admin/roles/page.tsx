@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
-import { Check, Plus } from "lucide-react";
-import { createRoleAction } from "@/app/actions";
+import { Check, Plus, Save } from "lucide-react";
+import { createRoleAction, updateRoleAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
@@ -47,6 +47,66 @@ export default async function AdminRolesPage() {
           </button>
         </ActionForm>
       </section>
+      <div className="role-card-grid">
+        {rows.map((role) => (
+          <article className="role-card" key={role.id}>
+            <div className="role-card-header">
+              <div>
+                <h2>{role.name}</h2>
+                <p className="muted">{role.description || messages.noDescriptionProvided}</p>
+              </div>
+              <span className={`badge ${role.builtIn ? "warning" : "info"}`}>
+                {role.builtIn ? messages.protected : messages.editable}
+              </span>
+            </div>
+            {role.builtIn ? (
+              <div className="role-permission-summary">
+                {role.permissions.map((permission) => (
+                  <span className="badge success mono" key={`${role.id}-${permission}`}>
+                    {permission}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <ActionForm
+                action={updateRoleAction}
+                className="role-edit-form"
+                pendingLabel={messages.working}
+              >
+                <input type="hidden" name="roleId" value={role.id} />
+                <label>
+                  {messages.name}
+                  <input className="field" name="name" defaultValue={role.name} required />
+                </label>
+                <label>
+                  {messages.description}
+                  <input className="field" name="description" defaultValue={role.description} />
+                </label>
+                <fieldset>
+                  <legend>{messages.permissions}</legend>
+                  <div className="role-permission-checkboxes">
+                    {permissionKeys.map((permission) => (
+                      <label className="checkbox-row permission-checkbox" key={permission}>
+                        <input
+                          type="checkbox"
+                          name="permission"
+                          value={permission}
+                          defaultChecked={role.permissions.includes(permission)}
+                        />
+                        <span className="mono">{permission}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <button className="primary">
+                  <Save size={15} aria-hidden="true" />
+                  {messages.saveChanges}
+                </button>
+              </ActionForm>
+            )}
+          </article>
+        ))}
+      </div>
       <div className="data-panel permission-panel">
         <div className="permission-matrix" style={matrixStyle}>
           <div className="permission-row header">

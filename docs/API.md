@@ -116,10 +116,12 @@ GET /api/v1/admin/groups
 POST /api/v1/admin/groups
 PATCH /api/v1/admin/groups/{id}
 GET /api/v1/admin/roles
+POST /api/v1/admin/roles
+PATCH /api/v1/admin/roles/{id}
 GET /api/v1/admin/audit
 ```
 
-Admin endpoints require the corresponding server-side permission. Group creation and role assignment are available through both JSON API routes and the server-rendered admin UI; other administrative mutation workflows remain server-action backed in v0.1.0.
+Admin endpoints require the corresponding server-side permission. Group creation, role assignment, custom role creation, and custom role permission updates are available through both JSON API routes and the server-rendered admin UI; other administrative mutation workflows remain server-action backed in v0.1.0.
 
 ## Operational Endpoints
 

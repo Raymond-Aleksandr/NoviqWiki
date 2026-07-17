@@ -49,7 +49,8 @@ import {
   createGroup,
   createRole,
   permissionKeys,
-  updateGroup
+  updateGroup,
+  updateRole
 } from "@/modules/authorization/permissions";
 import { createUser, setUserStatus } from "@/modules/users/service";
 
@@ -637,21 +638,45 @@ export async function createRoleAction(
     const session = await requireSession();
     const site = await requireSite();
     await requirePermission(session.user.id, site.site.id, "role.manage");
-    const selected = formData
-      .getAll("permission")
-      .filter((value): value is string => typeof value === "string")
-      .filter((value): value is (typeof permissionKeys)[number] =>
-        permissionKeys.includes(value as (typeof permissionKeys)[number])
-      );
+    const selected = permissionListValue(formData);
     await createRole({
       siteId: site.site.id,
       name: stringValue(formData, "name"),
       description: optionalString(formData, "description"),
-      permissionKeys: selected
+      permissionKeys: selected,
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
     });
     revalidatePath("/admin/roles");
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
     return { ok: true, message: messages.roleCreated };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function updateRoleAction(
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    const session = await requireSession();
+    const site = await requireSite();
+    await requirePermission(session.user.id, site.site.id, "role.manage");
+    const selected = permissionListValue(formData);
+    await updateRole({
+      siteId: site.site.id,
+      roleId: stringValue(formData, "roleId"),
+      name: stringValue(formData, "name"),
+      description: optionalString(formData, "description"),
+      permissionKeys: selected,
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
+    });
+    revalidatePath("/admin/roles");
+    revalidatePath("/admin/groups");
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.roleUpdated };
   } catch (error) {
     return actionError(error);
   }
@@ -743,6 +768,15 @@ function pageProtectionLevelValue(formData: FormData, key: string): "none" | "pr
     return value;
   }
   throw new AppError(`Invalid page protection level: ${value}`, "validation_error", 422);
+}
+
+function permissionListValue(formData: FormData) {
+  return formData
+    .getAll("permission")
+    .filter((value): value is string => typeof value === "string")
+    .filter((value): value is (typeof permissionKeys)[number] =>
+      permissionKeys.includes(value as (typeof permissionKeys)[number])
+    );
 }
 
 async function actionError(error: unknown): Promise<ActionState> {

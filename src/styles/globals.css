@@ -1240,22 +1240,28 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
+  box-sizing: border-box;
+  min-block-size: var(--control-height);
   margin-bottom: 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--control-radius);
   background: var(--surface);
   color: var(--text-faint);
-  font-size: 13.5px;
-  padding: 9px 13px;
+  font-size: var(--control-font-size);
+  line-height: 1.2;
+  padding: 0 var(--control-pad-x);
 }
 
 .media-search input {
   width: 100%;
   min-width: 0;
+  min-block-size: calc(var(--control-height) - 2px);
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--text);
+  font: inherit;
+  line-height: 1.2;
   padding: 0;
 }
 
@@ -1409,23 +1415,29 @@ textarea {
   align-items: center;
   flex: 1;
   gap: 9px;
+  box-sizing: border-box;
   min-width: 0;
+  min-block-size: var(--control-height);
   border: 1px solid var(--border-strong);
-  border-radius: 9px;
+  border-radius: var(--control-radius);
   background: var(--surface);
   color: var(--text-faint);
-  font-size: 13.5px;
-  padding: 9px 13px;
+  font-size: var(--control-font-size);
+  line-height: 1.2;
+  padding: 0 var(--control-pad-x);
   box-shadow: var(--sh-sm);
 }
 
 .modal-search input {
   min-width: 0;
   width: 100%;
+  min-block-size: calc(var(--control-height) - 2px);
   border: 0;
   outline: 0;
   background: transparent;
   color: var(--text);
+  font: inherit;
+  line-height: 1.2;
   padding: 0;
 }
 
@@ -2716,6 +2728,7 @@ textarea {
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
+  min-width: 0;
   block-size: var(--control-height);
   min-block-size: var(--control-height);
   max-block-size: var(--control-height);
@@ -2761,6 +2774,7 @@ textarea {
 
 .admin-filter-select {
   flex: 0 0 auto;
+  min-width: 0;
 }
 
 .admin-filter-select select {
@@ -3046,6 +3060,78 @@ textarea {
 
 .permission-checkbox .mono {
   overflow-wrap: anywhere;
+}
+
+.role-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.role-card {
+  display: grid;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--sh-sm);
+  padding: 18px 20px;
+}
+
+.role-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.role-card-header h2 {
+  margin: 0 0 4px;
+  font-size: 17px;
+}
+
+.role-card-header p {
+  margin: 0;
+}
+
+.role-permission-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.role-edit-form {
+  display: grid;
+  gap: 12px;
+}
+
+.role-edit-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.role-edit-form fieldset {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 12px;
+}
+
+.role-edit-form legend {
+  padding: 0 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.role-permission-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 10px;
 }
 
 .status-card-grid .status-card {
@@ -3903,6 +3989,11 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .role-card-grid,
+  .role-permission-checkboxes {
+    grid-template-columns: 1fr;
+  }
+
   .media-picker-body {
     grid-template-columns: 1fr;
   }
@@ -3987,28 +4078,33 @@ textarea {
   }
 
   .admin-filter-bar {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    gap: 10px;
+    justify-content: stretch;
+    gap: 8px;
+    padding: 9px 12px;
   }
 
   .admin-filter-control {
-    --control-height: 34px;
+    --control-height: 32px;
     --control-font-size: 13px;
   }
 
   .admin-filter-search {
-    flex: 1 1 100%;
+    grid-column: 1;
+    grid-row: 1;
     width: 100%;
+    min-width: 0;
     max-width: none;
   }
 
   .admin-filter-select {
-    flex: 1 1 136px;
+    grid-column: 1;
+    grid-row: 2;
     min-width: 0;
-    width: auto;
-    max-width: 190px;
+    width: 100%;
+    max-width: none;
   }
 
   .admin-filter-select select {
@@ -4017,12 +4113,26 @@ textarea {
 
   .admin-filter-bar > .button,
   .admin-filter-bar > button {
-    --control-height: 34px;
+    --control-height: 32px;
     --control-font-size: 13px;
+    width: max-content;
+    white-space: nowrap;
+  }
+
+  .admin-filter-bar > button {
+    grid-column: 2;
+    grid-row: 1;
   }
 
   .admin-filter-bar > .button.primary {
-    justify-self: start;
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+  }
+
+  .admin-filter-bar > .button.compact:not(.primary) {
+    grid-column: 2;
+    justify-self: end;
   }
 
   .admin-filter-spacer {
@@ -4188,6 +4298,14 @@ textarea {
   .brand-mark {
     width: 36px;
     height: 36px;
+  }
+
+  .nav-list {
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
   }
 
   .nav-list a {

@@ -100,7 +100,11 @@ const spec = {
       patch: { summary: "Update group", responses: { "200": { description: "Group" } } }
     },
     "/admin/roles": {
-      get: { summary: "List roles", responses: { "200": { description: "Roles" } } }
+      get: { summary: "List roles", responses: { "200": { description: "Roles" } } },
+      post: { summary: "Create role", responses: { "201": { description: "Role" } } }
+    },
+    "/admin/roles/{id}": {
+      patch: { summary: "Update custom role", responses: { "200": { description: "Role" } } }
     },
     "/admin/audit": {
       get: { summary: "List audit logs", responses: { "200": { description: "Audit logs" } } }
