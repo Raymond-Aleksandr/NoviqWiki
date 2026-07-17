@@ -89,6 +89,7 @@ type RouteMetrics = {
   commandButtonSizeMismatches: ElementSummary[];
   badgeRhythmMismatches: ElementSummary[];
   navigationRhythmMismatches: ElementSummary[];
+  siteFooterRhythmMismatches: ElementSummary[];
   filterNavigationRhythmMismatches: ElementSummary[];
   oversizedText: ElementSummary[];
   overlappingActivityRows: ElementSummary[];
@@ -1555,6 +1556,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     route
   );
   recordElementFailures(
+    "site_footer_rhythm_mismatch",
+    metrics.siteFooterRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
     "filter_navigation_rhythm_mismatch",
     metrics.filterNavigationRhythmMismatches,
     browserName,
@@ -2191,6 +2199,105 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           !icon ||
           !iconSized
         );
+      })
+      .map(summarize)
+      .slice(0, 12);
+    const siteFooterRhythmMismatches = visibleMatches(
+      ".site-footer, .site-footer-inner, .site-footer-copy, .site-footer-links, .site-footer-meta"
+    )
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        const isMobile = document.documentElement.clientWidth <= 560;
+        const viewportMismatch =
+          isMobile && (rect.left < -1 || rect.right > document.documentElement.clientWidth + 1);
+        const childOverflow = [...element.children].filter(visible).some((child) => {
+          const childRect = child.getBoundingClientRect();
+          return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+        });
+
+        if (element.matches(".site-footer")) {
+          return (
+            Number.parseFloat(style.borderTopWidth) < 1 ||
+            (style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+              style.backgroundImage === "none") ||
+            viewportMismatch ||
+            childOverflow
+          );
+        }
+
+        if (element.matches(".site-footer-inner")) {
+          const rowGap = Number.parseFloat(style.rowGap);
+          const columnGap = Number.parseFloat(style.columnGap);
+          const paddingTop = Number.parseFloat(style.paddingTop);
+          const paddingInline = Number.parseFloat(style.paddingLeft);
+          const fontSize = Number.parseFloat(style.fontSize);
+          const lineHeight =
+            style.lineHeight === "normal" ? fontSize * 1.35 : Number.parseFloat(style.lineHeight);
+          return (
+            style.display !== "grid" ||
+            !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+            !Number.isFinite(fontSize) ||
+            fontSize < 12.5 ||
+            fontSize > 13.5 ||
+            !Number.isFinite(lineHeight) ||
+            lineHeight < 17 ||
+            lineHeight > 20 ||
+            !Number.isFinite(rowGap) ||
+            rowGap < 10 ||
+            rowGap > 16 ||
+            !Number.isFinite(columnGap) ||
+            columnGap < 10 ||
+            columnGap > 28 ||
+            !Number.isFinite(paddingTop) ||
+            paddingTop < 14 ||
+            paddingTop > 22 ||
+            !Number.isFinite(paddingInline) ||
+            paddingInline < (isMobile ? 12 : 22) ||
+            paddingInline > (isMobile ? 18 : 30) ||
+            viewportMismatch ||
+            childOverflow
+          );
+        }
+
+        if (element.matches(".site-footer-copy")) {
+          const rowGap = Number.parseFloat(style.rowGap);
+          return (
+            style.display !== "grid" ||
+            !Number.isFinite(rowGap) ||
+            rowGap < 4 ||
+            rowGap > 7 ||
+            viewportMismatch ||
+            childOverflow
+          );
+        }
+
+        if (element.matches(".site-footer-links, .site-footer-meta")) {
+          const rowGap = Number.parseFloat(style.rowGap);
+          const columnGap = Number.parseFloat(style.columnGap);
+          const fontSize = Number.parseFloat(style.fontSize);
+          const usesExpectedFont = element.matches(".site-footer-meta")
+            ? /JetBrains Mono|SFMono|Menlo|monospace/i.test(style.fontFamily)
+            : /Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily);
+          return (
+            style.display !== "flex" ||
+            style.flexWrap !== "wrap" ||
+            !usesExpectedFont ||
+            !Number.isFinite(fontSize) ||
+            fontSize < (element.matches(".site-footer-meta") ? 10.5 : 12.5) ||
+            fontSize > (element.matches(".site-footer-meta") ? 11.5 : 13.5) ||
+            !Number.isFinite(rowGap) ||
+            rowGap < 6 ||
+            rowGap > 10 ||
+            !Number.isFinite(columnGap) ||
+            columnGap < 10 ||
+            columnGap > 16 ||
+            viewportMismatch ||
+            childOverflow
+          );
+        }
+
+        return false;
       })
       .map(summarize)
       .slice(0, 12);
@@ -4427,6 +4534,7 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       commandButtonSizeMismatches,
       badgeRhythmMismatches,
       navigationRhythmMismatches,
+      siteFooterRhythmMismatches,
       filterNavigationRhythmMismatches,
       oversizedText,
       overlappingActivityRows: visibleMatches(".activity-row, .timeline-row:not(.timeline-footer)")

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { BookOpen, LogIn, LogOut, Rocket, UserRound } from "lucide-react";
+import packageJson from "../../package.json";
 import "@/styles/globals.css";
 import { SiteNav } from "@/components/layout/site-nav";
 import { TopbarSettingsLink } from "@/components/layout/topbar-settings-link";
@@ -42,6 +43,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         : "light";
   const messages = getMessages(locale);
   const siteName = site?.site.name ?? messages.brand;
+  const footerContent =
+    site?.settings?.footerContent.trim() ||
+    site?.settings?.tagline ||
+    messages.footerDefaultContent;
+  const footerLinks = [
+    { href: "/recent", label: messages.recentChanges },
+    { href: "/pages", label: messages.pages },
+    { href: "/categories", label: messages.categories },
+    { href: "/special", label: messages.specialPages }
+  ];
 
   return (
     <html lang={locale} data-theme={appearance}>
@@ -107,6 +118,29 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <main id="content" className="content">
                 {children}
               </main>
+              <footer className="site-footer" aria-label={messages.siteFooter}>
+                <div className="site-footer-inner">
+                  <div className="site-footer-copy">
+                    <strong>{siteName}</strong>
+                    <p>{footerContent}</p>
+                  </div>
+                  <nav className="site-footer-links" aria-label={messages.footerNavigation}>
+                    {footerLinks.map((link) => (
+                      <Link key={link.href} href={link.href}>
+                        {link.label}
+                      </Link>
+                    ))}
+                  </nav>
+                  <div className="site-footer-meta">
+                    <span>
+                      {messages.poweredBy} {messages.brand} {`v${packageJson.version}`}
+                    </span>
+                    <span>
+                      {messages.license} {packageJson.license}
+                    </span>
+                  </div>
+                </div>
+              </footer>
             </div>
           </div>
         </div>
