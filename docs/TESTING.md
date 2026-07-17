@@ -109,7 +109,7 @@ UI_AUDIT_ARTICLE_SLUG=e2e-article \
 pnpm test:ui
 ```
 
-If `UI_AUDIT_USERNAME` and `UI_AUDIT_PASSWORD` are omitted, authenticated admin/editor routes are skipped. This command is separate from `pnpm test:e2e`, which intentionally resets the database first.
+If `UI_AUDIT_USERNAME` and `UI_AUDIT_PASSWORD` are omitted, authenticated admin/editor routes are skipped. This command is separate from `pnpm test:e2e`, which intentionally resets a disposable e2e database first.
 
 ## End-to-End Tests
 
@@ -136,6 +136,10 @@ Run:
 ```bash
 pnpm test:e2e
 ```
+
+`pnpm test:e2e` is safe to run while a live local review server is open. It defaults to `NEXTWIKI_E2E_DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki_e2e`, `PLAYWRIGHT_PORT=3101`, `NEXTWIKI_E2E_MEDIA_ROOT=test-results/e2e-media`, and a production `next build` plus `next start` server on the e2e port.
+
+If `NEXTWIKI_E2E_DATABASE_URL` is not set but `DATABASE_URL` already points at a database whose name contains `test`, `e2e`, or `ci`, that database is used. Ordinary app databases such as `nextwiki` are never reset by the e2e reset script. Create the disposable database manually if the local PostgreSQL user cannot create databases automatically.
 
 ## Build Verification
 

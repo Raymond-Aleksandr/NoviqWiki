@@ -33,11 +33,14 @@ Use the Compose service host `db` when the application runs inside Docker Compos
 
 ## Development-Only Variables
 
-| Variable                       | Example      | Description                                                                                             |
-| ------------------------------ | ------------ | ------------------------------------------------------------------------------------------------------- |
-| `NEXTWIKI_ALLOWED_DEV_ORIGINS` | `10.0.0.180` | Comma-separated hosts appended to Next.js `allowedDevOrigins` for LAN/mobile checks against `pnpm dev`. |
+| Variable                       | Example                                                    | Description                                                                                                         |
+| ------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `NEXTWIKI_ALLOWED_DEV_ORIGINS` | `10.0.0.180`                                               | Comma-separated hosts appended to Next.js `allowedDevOrigins` for LAN/mobile checks against `pnpm dev`.             |
+| `NEXTWIKI_E2E_DATABASE_URL`    | `postgres://nextwiki:nextwiki@localhost:5432/nextwiki_e2e` | Disposable PostgreSQL database used only by `pnpm test:e2e`. Its database name must contain `test`, `e2e`, or `ci`. |
+| `NEXTWIKI_E2E_MEDIA_ROOT`      | `test-results/e2e-media`                                   | Local media directory used only by `pnpm test:e2e`.                                                                 |
+| `PLAYWRIGHT_PORT`              | `3101`                                                     | Local port used by the e2e Next.js server.                                                                          |
 
-This setting is only for local development. Production deployments should expose NoviqWiki through the configured `NEXTWIKI_BASE_URL` and reverse proxy instead.
+These settings are only for local development. Production deployments should expose NoviqWiki through the configured `NEXTWIKI_BASE_URL` and reverse proxy instead.
 
 ## Media Storage
 

@@ -147,3 +147,5 @@ docker compose build
 ```
 
 If a command cannot run in the current environment, record the reason in the handoff.
+
+`pnpm test:e2e` resets only a disposable e2e database and runs a production `next build` plus `next start` browser server on port `3101` by default, so it can run while the live review app remains available on port `3100`. Set `NEXTWIKI_E2E_DATABASE_URL` when local PostgreSQL credentials differ from the default `postgres://nextwiki:nextwiki@localhost:5432/nextwiki_e2e`.

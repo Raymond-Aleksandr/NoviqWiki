@@ -61,6 +61,9 @@ type RouteMetrics = {
   overlappingActivityRows: ElementSummary[];
   duplicateTimelineActions: ElementSummary[];
   unevenAdminPageActions: ElementSummary[];
+  unevenHistoryActions: ElementSummary[];
+  misalignedHistoryRows: ElementSummary[];
+  stackedHistoryCurrentBadges: ElementSummary[];
   adminSettingsLinks: ElementSummary[];
   adminTabsWithoutIcons: ElementSummary[];
   createAnchors: ElementSummary[];
@@ -747,6 +750,27 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     route
   );
   recordElementFailures(
+    "uneven_history_actions",
+    metrics.unevenHistoryActions,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "misaligned_history_rows",
+    metrics.misalignedHistoryRows,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "stacked_history_current_badges",
+    metrics.stackedHistoryCurrentBadges,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
     "admin_tabs_without_icons",
     metrics.adminTabsWithoutIcons,
     browserName,
@@ -855,7 +879,13 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       ...visibleMatches(".activity-main strong, .timeline-title strong")
         .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) > 15.5),
       ...visibleMatches(".activity-meta, .timeline-meta")
-        .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) > 13)
+        .filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) > 13),
+      ...visibleMatches(
+        ".settings-card label:not(.checkbox-row), .homepage-section-toggles .checkbox-row span"
+      ).filter((element) => Number.parseFloat(getComputedStyle(element).fontSize) > 14.5),
+      ...visibleMatches(".settings-card textarea").filter(
+        (element) => Number.parseFloat(getComputedStyle(element).fontSize) > 14.5
+      )
     ]
       .map(summarize)
       .slice(0, 12);
@@ -936,13 +966,16 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         .map(summarize)
         .slice(0, 12),
       oversizedFormControls: visibleMatches(
-        ".admin-filter-control, .admin-filter-bar > button, .admin-filter-bar > .button, .field, select"
+        ".admin-filter-control, .admin-filter-bar > button, .admin-filter-bar > .button, .editor-footer > button, .editor-footer > .button, .field, select"
       )
         .filter((element) => {
           if (element.tagName === "TEXTAREA" || element.matches("input[type='file']")) {
             return false;
           }
           const rect = element.getBoundingClientRect();
+          if (element.closest(".editor-footer")) {
+            return rect.height > 44;
+          }
           const compactFilter = Boolean(
             element.closest(".admin-filter-bar") ||
               element.classList.contains("admin-filter-control")
@@ -998,6 +1031,40 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           if (actions.length < 2) return false;
           const widths = actions.map((item) => item.getBoundingClientRect().width);
           return Math.max(...widths) - Math.min(...widths) > 4;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      unevenHistoryActions: visibleMatches(".history-row .history-actions")
+        .filter((element) => {
+          if (document.documentElement.clientWidth > 560) return false;
+          const actions = [...element.querySelectorAll(".button, button")].filter(visible);
+          if (actions.length < 2) return false;
+          const widths = actions.map((item) => item.getBoundingClientRect().width);
+          return Math.max(...widths) - Math.min(...widths) > 4;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      misalignedHistoryRows: visibleMatches(".history-row:not(.header)")
+        .filter((element) => {
+          if (document.documentElement.clientWidth > 560) return false;
+          const summary = element.querySelector(".history-summary-text");
+          const revision = element.querySelector(".history-revision-value");
+          const actions = element.querySelector(".history-action-buttons");
+          if (!summary || !revision || !actions) return false;
+          const summaryX = summary.getBoundingClientRect().left;
+          return [revision, actions].some(
+            (item) => Math.abs(item.getBoundingClientRect().left - summaryX) > 4
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      stackedHistoryCurrentBadges: visibleMatches(".history-revision-value")
+        .filter((element) => {
+          if (document.documentElement.clientWidth > 560) return false;
+          const revision = element.querySelector(".history-revision-number");
+          const badge = element.querySelector(".history-current-badge");
+          if (!revision || !badge) return false;
+          return Math.abs(revision.getBoundingClientRect().top - badge.getBoundingClientRect().top) > 4;
         })
         .map(summarize)
         .slice(0, 12),

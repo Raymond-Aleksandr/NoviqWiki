@@ -54,7 +54,7 @@ export function RevisionCompareForm({
           ))}
         </select>
       </label>
-      <button className="primary compact">
+      <button className="primary compact" type="submit">
         <GitCompare size={14} aria-hidden="true" />
         {messages.compare}
       </button>

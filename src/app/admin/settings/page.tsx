@@ -164,12 +164,8 @@ export default async function AdminSettingsPage() {
           <div className="settings-kicker">{messages.accessAndAppearance}</div>
           <div className="switch-row">
             <div>
-              <div style={{ fontSize: "14px", fontWeight: 500 }}>
-                {messages.allowAnonymousReading}
-              </div>
-              <div className="muted" style={{ fontSize: "12px" }}>
-                {messages.anonymousReadingHelp}
-              </div>
+              <div className="settings-switch-title">{messages.allowAnonymousReading}</div>
+              <div className="settings-switch-help">{messages.anonymousReadingHelp}</div>
             </div>
             <label className="checkbox-row switch-control">
               <input type="checkbox" name="publicMode" defaultChecked={settings.publicMode} />

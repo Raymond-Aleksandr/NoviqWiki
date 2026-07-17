@@ -112,6 +112,8 @@ docker compose config
 docker compose build
 ```
 
+The e2e command uses a disposable database named `nextwiki_e2e`, builds the app, and serves it on port `3101` by default. Override `NEXTWIKI_E2E_DATABASE_URL` if your local PostgreSQL setup uses different credentials.
+
 Do not record these commands as passing unless they were run in the current checkout.
 
 ## Common Local Issues

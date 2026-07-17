@@ -58,10 +58,12 @@ export default async function HistoryPage({ params }: Props) {
         {revisions.map((revision, index) => (
           <article className="history-row" key={revision.id}>
             <div className="history-revision-cell mono" data-label={messages.revisionShort}>
-              r{revision.revisionNumber}
-              {resolved.page.currentRevisionId === revision.id ? (
-                <span className="badge success history-current-badge">{messages.current}</span>
-              ) : null}
+              <span className="history-revision-value">
+                <span className="history-revision-number">r{revision.revisionNumber}</span>
+                {resolved.page.currentRevisionId === revision.id ? (
+                  <span className="badge success history-current-badge">{messages.current}</span>
+                ) : null}
+              </span>
             </div>
             <div className="history-summary-cell" data-label={messages.summary}>
               <div className="history-summary-text">
@@ -75,45 +77,47 @@ export default async function HistoryPage({ params }: Props) {
               {revision.editorDisplayName}
             </div>
             <div className="history-actions" data-label={messages.actions}>
-              <Link
-                className="button compact"
-                href={`/page/${resolved.page.slug}?revision=${revision.revisionNumber}&redirect=no`}
-              >
-                <Eye size={14} aria-hidden="true" />
-                {messages.view}
-              </Link>
-              {revisions[index + 1] ? (
+              <div className="history-action-buttons">
                 <Link
                   className="button compact"
-                  href={`/diff/${revisions[index + 1].id}/${revision.id}`}
+                  href={`/page/${resolved.page.slug}?revision=${revision.revisionNumber}&redirect=no`}
                 >
-                  <GitCompare size={14} aria-hidden="true" />
-                  {messages.compare}
+                  <Eye size={14} aria-hidden="true" />
+                  {messages.view}
                 </Link>
-              ) : null}
-              {canRollback && resolved.page.currentRevisionId !== revision.id ? (
-                <ConfirmActionForm
-                  action={rollbackAction}
-                  hiddenFields={[
-                    { name: "pageId", value: resolved.page.id },
-                    { name: "slug", value: resolved.page.slug },
-                    { name: "targetRevisionId", value: revision.id },
-                    {
-                      name: "reason",
-                      value: rollbackSummary(messages, revision.revisionNumber)
-                    }
-                  ]}
-                  triggerLabel={messages.rollback}
-                  triggerClassName="button compact"
-                  icon="rollback"
-                  title={`${messages.rollback} · r${revision.revisionNumber}`}
-                  body={messages.rollbackConfirmBody}
-                  warning={messages.destructiveActionWarning}
-                  confirmLabel={messages.rollback}
-                  cancelLabel={messages.cancel}
-                  pendingLabel={messages.working}
-                />
-              ) : null}
+                {revisions[index + 1] ? (
+                  <Link
+                    className="button compact"
+                    href={`/diff/${revisions[index + 1].id}/${revision.id}`}
+                  >
+                    <GitCompare size={14} aria-hidden="true" />
+                    {messages.compare}
+                  </Link>
+                ) : null}
+                {canRollback && resolved.page.currentRevisionId !== revision.id ? (
+                  <ConfirmActionForm
+                    action={rollbackAction}
+                    hiddenFields={[
+                      { name: "pageId", value: resolved.page.id },
+                      { name: "slug", value: resolved.page.slug },
+                      { name: "targetRevisionId", value: revision.id },
+                      {
+                        name: "reason",
+                        value: rollbackSummary(messages, revision.revisionNumber)
+                      }
+                    ]}
+                    triggerLabel={messages.rollback}
+                    triggerClassName="button compact"
+                    icon="rollback"
+                    title={`${messages.rollback} · r${revision.revisionNumber}`}
+                    body={messages.rollbackConfirmBody}
+                    warning={messages.destructiveActionWarning}
+                    confirmLabel={messages.rollback}
+                    cancelLabel={messages.cancel}
+                    pendingLabel={messages.working}
+                  />
+                ) : null}
+              </div>
             </div>
           </article>
         ))}

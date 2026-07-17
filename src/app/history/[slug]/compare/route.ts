@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { redirectWithinRequestHost } from "@/lib/request-url";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { getCurrentSession } from "@/modules/auth/session";
 import { getRevisionById } from "@/modules/pages/service";
@@ -13,11 +14,11 @@ export async function GET(request: Request, { params }: Props) {
   const site = await getPrimarySiteWithSettings();
   const url = new URL(request.url);
   if (!site) {
-    return NextResponse.redirect(new URL("/setup", url));
+    return redirectWithinRequestHost(request, "/setup");
   }
   const session = await getCurrentSession();
   if (!(await hasPermission(session?.user.id, site.site.id, "page.read"))) {
-    return NextResponse.redirect(new URL("/login", url));
+    return redirectWithinRequestHost(request, "/login");
   }
 
   const parsedParams = await params;
@@ -34,7 +35,7 @@ export async function GET(request: Request, { params }: Props) {
     return new NextResponse("Not found", { status: 404 });
   }
   if (!from || !to || from === to) {
-    return NextResponse.redirect(new URL(`/history/${encodeURIComponent(slug)}`, url));
+    return redirectWithinRequestHost(request, `/history/${encodeURIComponent(slug)}`);
   }
 
   const resolved = await resolvePageBySlug({
@@ -59,5 +60,5 @@ export async function GET(request: Request, { params }: Props) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  return NextResponse.redirect(new URL(`/diff/${from}/${to}`, url));
+  return redirectWithinRequestHost(request, `/diff/${from}/${to}`);
 }

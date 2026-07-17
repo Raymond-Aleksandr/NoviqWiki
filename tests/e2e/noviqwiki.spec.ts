@@ -55,6 +55,9 @@ test("fresh setup and core wiki workflow", async ({ page }) => {
 
   await page.goto("/history/e2e-article");
   await page.getByRole("button", { name: "Rollback" }).last().click();
+  const rollbackDialog = page.getByRole("dialog", { name: "Rollback · r1" });
+  await expect(rollbackDialog).toBeVisible();
+  await rollbackDialog.getByRole("button", { name: "Rollback" }).click();
   await expect(page.locator(".article-body")).toContainText("Initial searchable body.");
 
   await page.goto("/search?q=Initial");
