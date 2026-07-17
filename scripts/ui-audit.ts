@@ -55,6 +55,7 @@ type RouteMetrics = {
   oversizedFormControls: ElementSummary[];
   controlTypographyMismatches: ElementSummary[];
   formLabelTypographyMismatches: ElementSummary[];
+  headingTypographyMismatches: ElementSummary[];
   oversizedFilterBars: ElementSummary[];
   segmentedControlMismatches: ElementSummary[];
   badFileInputs: ElementSummary[];
@@ -970,7 +971,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge rhythm drift, control or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge rhythm drift, control, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1289,6 +1290,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "form_label_typography_mismatch",
     metrics.formLabelTypographyMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "heading_typography_mismatch",
+    metrics.headingTypographyMismatches,
     browserName,
     sizeName,
     route
@@ -2140,6 +2148,55 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         .filter((element) => {
           const rect = element.getBoundingClientRect();
           return rect.height > 66;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      headingTypographyMismatches: visibleMatches(
+        [
+          "main h1",
+          ".page-title",
+          ".admin-title",
+          ".article-title",
+          ".home-hero h1",
+          ".setup-hero h1",
+          ".auth-card h1",
+          ".setup-card h1"
+        ].join(",")
+      )
+        .filter((element) => {
+          if (element.closest(".article-body, .editor-preview, .cm-editor")) {
+            return false;
+          }
+          const label = labelOf(element);
+          if (!label) {
+            return false;
+          }
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const fontSize = Number.parseFloat(style.fontSize);
+          const computedLineHeight = Number.parseFloat(style.lineHeight);
+          const lineHeight = Number.isFinite(computedLineHeight)
+            ? computedLineHeight
+            : fontSize * 1.2;
+          const lineHeightRatio = lineHeight / fontSize;
+          const mobileViewport = document.documentElement.clientWidth <= 560;
+          const maxFontSize = mobileViewport ? 38 : 64;
+          const usesDesignFont =
+            /Source Serif 4|Noto Serif SC|Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily);
+          const fitsViewport =
+            rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1;
+          const compactEnough = rect.height <= lineHeight * 3 + 2;
+          return (
+            !usesDesignFont ||
+            !Number.isFinite(fontSize) ||
+            fontSize < 24 ||
+            fontSize > maxFontSize ||
+            !Number.isFinite(lineHeightRatio) ||
+            lineHeightRatio < 1 ||
+            lineHeightRatio > 1.7 ||
+            !compactEnough ||
+            !fitsViewport
+          );
         })
         .map(summarize)
         .slice(0, 12),
