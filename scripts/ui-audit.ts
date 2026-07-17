@@ -54,6 +54,7 @@ type RouteMetrics = {
   tinyFormControls: ElementSummary[];
   oversizedFormControls: ElementSummary[];
   oversizedFilterBars: ElementSummary[];
+  segmentedControlMismatches: ElementSummary[];
   badFileInputs: ElementSummary[];
   controlTextOverflow: ElementSummary[];
   textContentOverflow: ElementSummary[];
@@ -962,7 +963,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1274,6 +1275,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "oversized_filter_bars",
     metrics.oversizedFilterBars,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "segmented_control_mismatch",
+    metrics.segmentedControlMismatches,
     browserName,
     sizeName,
     route
@@ -1883,6 +1891,20 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         .filter((element) => {
           const rect = element.getBoundingClientRect();
           return rect.height > 66;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      segmentedControlMismatches: visibleMatches(".segmented-control")
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const buttons = [...element.querySelectorAll("button")].filter(visible);
+          if (buttons.length === 0) {
+            return false;
+          }
+          const heights = buttons.map((button) => button.getBoundingClientRect().height);
+          const tallest = Math.max(...heights);
+          const shortest = Math.min(...heights);
+          return rect.height > 42 || shortest < 30 || tallest > 36 || tallest - shortest > 2;
         })
         .map(summarize)
         .slice(0, 12),
