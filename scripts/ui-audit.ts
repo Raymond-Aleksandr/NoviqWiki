@@ -904,11 +904,23 @@ async function auditActiveState(page: Page, browserName: string, sizeName: strin
     return;
   }
   await page.mouse.move(rect.x + rect.width / 2, rect.y + rect.height / 2);
-  await page.mouse.down();
-  const transform = await targetElement.evaluate((element) => getComputedStyle(element).transform);
-  await page.mouse.move(0, 0);
-  await page.mouse.up();
-  await targetHandle.dispose();
+  let transform: string;
+  try {
+    await page.mouse.down();
+    transform = await targetElement.evaluate((element) => getComputedStyle(element).transform);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      /Execution context was destroyed|Target closed|Frame was detached/.test(error.message)
+    ) {
+      return;
+    }
+    throw error;
+  } finally {
+    await page.mouse.move(0, 0).catch(() => undefined);
+    await page.mouse.up().catch(() => undefined);
+    await targetHandle.dispose().catch(() => undefined);
+  }
   if (transform && transform !== "none") {
     addFailure({
       kind: "active_state_transform",

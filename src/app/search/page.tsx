@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Search } from "lucide-react";
+import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { listCategories } from "@/modules/categories/service";
@@ -17,6 +18,7 @@ export default async function SearchPage({ searchParams }: Props) {
   if (!site) {
     redirect("/setup");
   }
+  await requirePageReadAccess(site.site.id);
   const { q = "", category } = await searchParams;
   const results = q
     ? await searchPages({ siteId: site.site.id, query: q, category })

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, Clock3, Plus, Puzzle, Search, Tags } from "lucide-react";
+import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
@@ -15,6 +16,7 @@ export default async function HomePage() {
   if (!site) {
     redirect("/setup");
   }
+  await requirePageReadAccess(site.site.id);
   const settings = site.settings;
   const homepageSections = normalizeHomepageSections(settings?.homepageSections);
   const [recentPages, configuredPages, categories, changes] = await Promise.all([

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ok, empty, apiError } from "@/modules/api/responses";
 import { requireApiContext } from "@/modules/api/auth";
 import {
+  assertPageVisibleForRead,
   getPageWithCurrentRevision,
   publishPage,
   renamePage,
@@ -27,7 +28,9 @@ export async function GET(_request: Request, { params }: Props) {
   try {
     await requireApiContext("page.read");
     const { id } = await params;
-    return ok(await getPageWithCurrentRevision(id));
+    const page = await getPageWithCurrentRevision(id);
+    assertPageVisibleForRead(page.page);
+    return ok(page);
   } catch (error) {
     return apiError(error);
   }

@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { mediaAssets } from "@/db/schema";
 import { getEnv } from "@/lib/env";
+import { getCurrentSession } from "@/modules/auth/session";
+import { hasPermission } from "@/modules/authorization/permissions";
 import { LocalStorageAdapter, getStorageAdapter } from "@/modules/media/storage";
 
 type Props = {
@@ -28,6 +30,10 @@ export async function GET(_request: Request, { params }: Props) {
     .where(eq(mediaAssets.storageKey, storageKey))
     .limit(1);
   if (!asset || asset.deletedAt) {
+    return new NextResponse("Not found", { status: 404 });
+  }
+  const session = await getCurrentSession();
+  if (!(await hasPermission(session?.user.id, asset.siteId, "media.read"))) {
     return new NextResponse("Not found", { status: 404 });
   }
   if (getEnv().NEXTWIKI_MEDIA_DRIVER === "s3") {

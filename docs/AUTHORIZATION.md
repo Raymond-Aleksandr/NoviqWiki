@@ -23,7 +23,7 @@ Default product roles:
 | `Contributor`   | Can create pages, save drafts, edit allowed pages, and upload media.                                    |
 | `Reader`        | Can read content allowed by site and page permissions.                                                  |
 
-Deployments may allow anonymous reads for public wikis. Anonymous users have no write permissions.
+Deployments may allow anonymous reads for public wikis. Anonymous users have no write permissions. When `publicMode` is disabled, anonymous users cannot read pages, search results, category listings, revision data, media listings, or direct media files.
 
 ## Permission Matrix
 
@@ -35,7 +35,8 @@ Deployments may allow anonymous reads for public wikis. Anonymous users have no 
 | Publish pages                   | No                  | No     | No          | Yes    | Yes       | Yes           | Yes   |
 | Edit pages                      | No                  | No     | Yes         | Yes    | Yes       | Yes           | Yes   |
 | Upload media                    | No                  | No     | Yes         | Yes    | Yes       | Yes           | Yes   |
-| View revision history           | No                  | Yes    | Yes         | Yes    | Yes       | Yes           | Yes   |
+| View revision history           | Yes, if public wiki | Yes    | Yes         | Yes    | Yes       | Yes           | Yes   |
+| View media                      | Yes, if public wiki | Yes    | Yes         | Yes    | Yes       | Yes           | Yes   |
 | Roll back revisions             | No                  | No     | No          | Yes    | Yes       | Yes           | Yes   |
 | Delete or archive pages         | No                  | No     | No          | No     | Yes       | Yes           | Yes   |
 | Manage users, groups, and roles | No                  | No     | No          | No     | No        | Yes           | Yes   |
@@ -49,14 +50,15 @@ Deployments may allow anonymous reads for public wikis. Anonymous users have no 
 - React components must not query the database directly and must not bypass domain services.
 - Privileged operations must fail closed when the actor is missing, inactive, or has an unknown role.
 - Admin-only operations must be checked on the server even when the UI hides controls.
+- Public/private wiki mode is enforced server-side for public pages, search, categories, recent changes, history, diff, backlinks, media library, direct media file URLs, and `/api/v1` read endpoints.
 
 ## Page Protection
 
-Page-level restrictions can narrow access beyond the global role. A protected page may require editor or admin access for edits, or explicit membership for reads. Protection must be evaluated before returning page content, revision content, rendered HTML, or search excerpts.
+Page-level restrictions narrow write access beyond the global role. A protected page requires `page.protect` before an actor can save drafts, publish, rename, delete, restore, or roll back that page. Protection is enforced in the page service layer, so server actions and JSON API routes share the same checks. v0.1.0 page protection does not create per-page read ACLs; private wiki mode controls anonymous read access globally.
 
 ## Revision Access
 
-Revisions are immutable records. Users who can read a page may read the published revision. Users need editor or admin access to inspect full revision history, compare drafts, or restore a previous revision.
+Revisions are immutable records. Users who can read a page may read the published revision, inspect revision history, and compare stored revisions. Users need rollback permissions to restore a previous revision.
 
 When a revision contains content that is later restricted, access to the revision must follow the current page restriction unless a stricter historical restriction applies.
 

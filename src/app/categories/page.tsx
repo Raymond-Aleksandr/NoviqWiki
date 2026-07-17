@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight } from "lucide-react";
+import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { listCategories } from "@/modules/categories/service";
@@ -10,6 +11,7 @@ export default async function CategoriesPage() {
   if (!site) {
     redirect("/setup");
   }
+  await requirePageReadAccess(site.site.id);
   const [categories, i18n] = await Promise.all([
     listCategories(site.site.id),
     getRequestI18n(site.settings?.defaultLocale)

@@ -1,9 +1,9 @@
 import { notFound, redirect } from "next/navigation";
+import { requirePageReadAccess } from "@/app/access";
 import { ArticleView } from "@/components/article/article-view";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { slugifyTitle } from "@/lib/normalize";
-import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
 import {
   getRevisionById,
@@ -24,6 +24,7 @@ export default async function ArticlePage({ params, searchParams }: Props) {
   if (!site) {
     redirect("/setup");
   }
+  const session = await requirePageReadAccess(site.site.id);
   const { slug } = await params;
   const { revision: revisionParam } = await searchParams;
   const resolved = await resolvePageBySlug({ siteId: site.site.id, slug }).catch(() => null);
@@ -39,7 +40,6 @@ export default async function ArticlePage({ params, searchParams }: Props) {
   if (!currentRevision) {
     notFound();
   }
-  const session = await getCurrentSession();
   const [canEdit, outboundLinks, backlinks, revisions, i18n] = await Promise.all([
     hasPermission(session?.user.id, site.site.id, "page.edit"),
     listPageOutboundLinks({ siteId: site.site.id, pageId: resolved.page.id }),

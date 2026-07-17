@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, History, Link2 } from "lucide-react";
+import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { listPageBacklinks } from "@/modules/pages/service";
@@ -15,6 +16,7 @@ export default async function PageBacklinks({ params }: Props) {
   if (!site) {
     redirect("/setup");
   }
+  await requirePageReadAccess(site.site.id);
   const { slug } = await params;
   const resolved = await resolvePageBySlug({ siteId: site.site.id, slug }).catch(() => null);
   if (!resolved || resolved.page.status === "deleted") {

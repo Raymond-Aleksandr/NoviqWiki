@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
+import { requireMediaReadAccess } from "@/app/access";
 import { deleteMediaAction, uploadMediaAction } from "@/app/actions";
 import { MediaLibrary, type MediaLibraryItem } from "@/components/media-library";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
-import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { listMedia } from "@/modules/media/service";
 
@@ -12,7 +12,7 @@ export default async function MediaPage() {
   if (!site) {
     redirect("/setup");
   }
-  const session = await getCurrentSession();
+  const session = await requireMediaReadAccess(site.site.id);
   const [canUpload, canDelete, assets, i18n] = await Promise.all([
     hasPermission(session?.user.id, site.site.id, "media.upload"),
     hasPermission(session?.user.id, site.site.id, "media.delete"),

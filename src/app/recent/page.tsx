@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
@@ -9,6 +10,7 @@ export default async function RecentChangesPage() {
   if (!site) {
     redirect("/setup");
   }
+  await requirePageReadAccess(site.site.id);
   const [changes, i18n] = await Promise.all([
     listRecentChanges({ siteId: site.site.id, limit: 100, publicOnly: true }),
     getRequestI18n(site.settings?.defaultLocale)

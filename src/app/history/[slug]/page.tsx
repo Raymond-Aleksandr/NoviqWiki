@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { Eye, GitCompare } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
+import { requirePageReadAccess } from "@/app/access";
 import { rollbackAction } from "@/app/actions";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
-import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { listRevisions } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
@@ -19,13 +19,13 @@ export default async function HistoryPage({ params }: Props) {
   if (!site) {
     redirect("/setup");
   }
+  const session = await requirePageReadAccess(site.site.id);
   const { slug } = await params;
   const resolved = await resolvePageBySlug({ siteId: site.site.id, slug }).catch(() => null);
   if (!resolved || resolved.page.status === "deleted") {
     notFound();
   }
   const revisions = await listRevisions(resolved.page.id);
-  const session = await getCurrentSession();
   const [canRollback, i18n] = await Promise.all([
     hasPermission(session?.user.id, site.site.id, "page.rollback"),
     getRequestI18n(site.settings?.defaultLocale)

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChevronRight, FileText } from "lucide-react";
+import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { getCategoryWithPages } from "@/modules/categories/service";
@@ -14,6 +15,7 @@ export default async function CategoryPage({ params }: Props) {
   if (!site) {
     redirect("/setup");
   }
+  await requirePageReadAccess(site.site.id);
   const { slug } = await params;
   const [result, i18n] = await Promise.all([
     getCategoryWithPages({ siteId: site.site.id, slug }),

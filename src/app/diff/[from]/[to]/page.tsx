@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { requirePageReadAccess } from "@/app/access";
 import { rollbackAction } from "@/app/actions";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getRequestI18n } from "@/i18n/server";
-import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
-import { compareRevisions, getPageById } from "@/modules/pages/service";
+import { compareRevisionsForRead } from "@/modules/pages/service";
 
 type Props = {
   params: Promise<{ from: string; to: string }>;
@@ -13,9 +13,11 @@ type Props = {
 
 export default async function DiffPage({ params }: Props) {
   const { from, to } = await params;
-  const diff = await compareRevisions({ fromRevisionId: from, toRevisionId: to });
-  const page = await getPageById(diff.to.pageId);
-  const session = await getCurrentSession();
+  const { page, ...diff } = await compareRevisionsForRead({
+    fromRevisionId: from,
+    toRevisionId: to
+  });
+  const session = await requirePageReadAccess(page.siteId);
   const [canRollback, i18n] = await Promise.all([
     hasPermission(session?.user.id, page.siteId, "page.rollback"),
     getRequestI18n()

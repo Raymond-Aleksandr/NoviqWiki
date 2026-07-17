@@ -11,9 +11,12 @@ import { completeSetup } from "@/modules/setup/service";
 import { createUser } from "@/modules/users/service";
 import {
   createPage,
+  compareRevisionsForRead,
+  getRevisionForRead,
   listPageBacklinks,
   listPageOutboundLinks,
   listRevisions,
+  listRevisionsForRead,
   publishPage,
   renamePage,
   restorePage,
@@ -167,6 +170,16 @@ describe("page lifecycle integration", () => {
       test.executor
     );
     expect(deletedSearch.rows).not.toContainEqual(expect.objectContaining({ pageId: page.id }));
+    await expect(getRevisionForRead(firstRevision.id, test.executor)).rejects.toThrow(
+      "Page not found."
+    );
+    await expect(listRevisionsForRead(page.id, test.executor)).rejects.toThrow("Page not found.");
+    await expect(
+      compareRevisionsForRead(
+        { fromRevisionId: firstRevision.id, toRevisionId: rollback.id },
+        test.db
+      )
+    ).rejects.toThrow("Page not found.");
 
     const restored = await restorePage(
       {

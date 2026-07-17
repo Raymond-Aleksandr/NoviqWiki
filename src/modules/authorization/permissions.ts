@@ -6,6 +6,7 @@ import {
   permissions,
   rolePermissions,
   roles,
+  siteSettings,
   userGroups,
   users
 } from "@/db/schema";
@@ -38,6 +39,13 @@ export const permissionKeys = [
 ] as const;
 
 export type PermissionKey = (typeof permissionKeys)[number];
+
+const anonymousReadPermissions = new Set<PermissionKey>([
+  "site.view",
+  "page.read",
+  "revision.read",
+  "media.read"
+]);
 
 export const defaultRolePermissions: Record<string, PermissionKey[]> = {
   reader: ["site.view", "page.read", "revision.read", "media.read"],
@@ -280,9 +288,10 @@ export async function hasPermission(
   database: Database = db
 ) {
   if (!userId) {
-    return (
-      permission === "site.view" || permission === "page.read" || permission === "revision.read"
-    );
+    if (!anonymousReadPermissions.has(permission)) {
+      return false;
+    }
+    return isPublicReadEnabled(siteId, database);
   }
   const userPermissions = await getUserPermissions(userId, siteId, database);
   return userPermissions.has(permission);
@@ -297,6 +306,15 @@ export async function requirePermission(
   if (!(await hasPermission(userId, siteId, permission, database))) {
     throw new ForbiddenError();
   }
+}
+
+async function isPublicReadEnabled(siteId: string, database: Database) {
+  const [settings] = await database
+    .select({ publicMode: siteSettings.publicMode })
+    .from(siteSettings)
+    .where(eq(siteSettings.siteId, siteId))
+    .limit(1);
+  return settings?.publicMode ?? true;
 }
 
 export async function getRoleSummaries(siteId: string, database: Database = db) {

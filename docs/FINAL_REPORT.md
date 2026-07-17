@@ -55,7 +55,7 @@ Domain logic lives in `src/modules/**`. Route handlers and server actions delega
 
 ## Security Controls
 
-NoviqWiki includes server-side authorization, Zod boundary validation, Argon2id password hashing, HMAC-protected session and recovery tokens, HttpOnly session cookies, SameSite cookies, CSRF checks for non-server-action writes, generic login/reset messages, authentication rate limiting, CSP and security headers, sanitized Markdown rendering with raw HTML disabled, upload MIME/size validation, randomized storage keys, path traversal protection, secret redaction helpers, and audit events for sensitive actions.
+NoviqWiki includes server-side authorization, private/public wiki read enforcement, page protection enforcement, Zod boundary validation, Argon2id password hashing, HMAC-protected session and recovery tokens, HttpOnly session cookies, SameSite cookies, CSRF checks for non-server-action writes, generic login/reset messages, authentication rate limiting, CSP and security headers, sanitized Markdown rendering with raw HTML disabled, upload MIME/size validation, randomized storage keys, path traversal protection, secret redaction helpers, and audit events for sensitive actions.
 
 ## Known Non-Critical Limitations
 
@@ -70,4 +70,4 @@ NoviqWiki includes server-side authorization, Zod boundary validation, Argon2id 
 - More complete OpenAPI schemas
 - Optional background job queue for thumbnail generation and email retries
 - Expanded visual regression coverage
-- More granular private wiki visibility tests
+- Per-page read ACLs beyond the global public/private wiki mode

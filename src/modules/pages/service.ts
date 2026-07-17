@@ -364,6 +364,19 @@ export async function listRevisions(pageId: string, database: Database = db) {
     .orderBy(desc(pageRevisions.revisionNumber));
 }
 
+export async function listRevisionsForRead(pageId: string, database: Database = db) {
+  const page = await getPageById(pageId, database);
+  assertPageVisibleForRead(page);
+  return listRevisions(pageId, database);
+}
+
+export async function getRevisionForRead(revisionId: string, database: Database = db) {
+  const revision = await getRevisionById(revisionId, database);
+  const page = await getPageById(revision.pageId, database);
+  assertPageVisibleForRead(page);
+  return { page, revision };
+}
+
 export type PageBacklink = {
   pageId: string;
   title: string;
@@ -379,6 +392,7 @@ export async function listPageBacklinks(
   if (page.siteId !== input.siteId) {
     throw new NotFoundError("Page not found.");
   }
+  assertPageVisibleForRead(page);
   const rows = await database
     .select({
       pageId: pages.id,
@@ -482,6 +496,16 @@ export async function compareRevisions(
     unified,
     lines: parseUnifiedDiff(unified)
   };
+}
+
+export async function compareRevisionsForRead(
+  input: { fromRevisionId: string; toRevisionId: string },
+  database: RootDatabase = db
+) {
+  const diff = await compareRevisions(input, database);
+  const page = await getPageById(diff.to.pageId, database);
+  assertPageVisibleForRead(page);
+  return { ...diff, page };
 }
 
 export async function rollbackPage(
@@ -791,6 +815,12 @@ async function getNextRevisionNumber(pageId: string, database: Database) {
 
 function normalizeProtectionLevel(value: string | null | undefined): PageProtectionLevel {
   return value === "protected" ? "protected" : "none";
+}
+
+export function assertPageVisibleForRead(page: Pick<Page, "status" | "deletedAt">) {
+  if (page.status === "deleted" || page.deletedAt) {
+    throw new NotFoundError("Page not found.");
+  }
 }
 
 async function assertProtectedWriteAllowed(page: Page, actorId: string, database: Database) {
