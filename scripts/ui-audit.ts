@@ -65,6 +65,7 @@ type RouteMetrics = {
   surfaceRhythmMismatches: ElementSummary[];
   emptyStateRhythmMismatches: ElementSummary[];
   formLayoutRhythmMismatches: ElementSummary[];
+  pageHeaderRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
   articleMediaWrapperOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
@@ -986,7 +987,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, or form-layout rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, form-layout, or page-header rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1369,6 +1370,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "form_layout_rhythm_mismatch",
     metrics.formLayoutRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "page_header_rhythm_mismatch",
+    metrics.pageHeaderRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -2633,6 +2641,83 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             settingsPaddingMismatch ||
             togglePaddingMismatch ||
             compactFilterHeightMismatch
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      pageHeaderRhythmMismatches: visibleMatches(
+        ".page-header, .editor-header, .diff-page-header"
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const isStack = element.classList.contains("stack");
+          const isMobile = document.documentElement.clientWidth <= 560;
+          const displayMismatch = isStack
+            ? style.display !== "block"
+            : style.display !== "flex";
+          const flexDirectionMismatch =
+            !isStack &&
+            ((isMobile && style.flexDirection !== "column") ||
+              (!isMobile && style.flexDirection !== "row"));
+          const alignMismatch =
+            !isStack &&
+            (isMobile
+              ? style.alignItems !== "flex-start"
+              : !["flex-start", "flex-end", "center"].includes(style.alignItems));
+          const gap = Number.parseFloat(style.gap || style.columnGap);
+          const gapMismatch =
+            !isStack && (!Number.isFinite(gap) || gap < 12 || gap > 18);
+          const marginBottom = Number.parseFloat(style.marginBottom);
+          const marginMismatch =
+            !Number.isFinite(marginBottom) || marginBottom < 14 || marginBottom > 24;
+          const title = element.querySelector("h1, .page-title");
+          const description = element.querySelector(".page-description, .meta");
+          const titleMissing = title === null;
+          const titleOverflow = title
+            ? (() => {
+                const titleRect = title.getBoundingClientRect();
+                return titleRect.left < rect.left - 1 || titleRect.right > rect.right + 1;
+              })()
+            : false;
+          const descriptionMismatch = description
+            ? (() => {
+                const descriptionRect = description.getBoundingClientRect();
+                const descriptionStyle = getComputedStyle(description);
+                const fontSize = Number.parseFloat(descriptionStyle.fontSize);
+                const lineHeight =
+                  descriptionStyle.lineHeight === "normal"
+                    ? fontSize * 1.35
+                    : Number.parseFloat(descriptionStyle.lineHeight);
+                return (
+                  descriptionRect.left < rect.left - 1 ||
+                  descriptionRect.right > rect.right + 1 ||
+                  !/Hanken Grotesk|Noto Sans SC/i.test(descriptionStyle.fontFamily) ||
+                  !Number.isFinite(fontSize) ||
+                  fontSize < 12 ||
+                  fontSize > 15.2 ||
+                  (Number.isFinite(lineHeight) && lineHeight > 23)
+                );
+              })()
+            : false;
+          const viewportMismatch =
+            isMobile &&
+            (rect.left < -1 || rect.right > document.documentElement.clientWidth + 1);
+          const childOverflow = [...element.children].filter(visible).some((child) => {
+            const childRect = child.getBoundingClientRect();
+            return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+          });
+          return (
+            displayMismatch ||
+            flexDirectionMismatch ||
+            alignMismatch ||
+            gapMismatch ||
+            marginMismatch ||
+            titleMissing ||
+            titleOverflow ||
+            descriptionMismatch ||
+            viewportMismatch ||
+            childOverflow
           );
         })
         .map(summarize)
