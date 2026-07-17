@@ -52,6 +52,7 @@ type RouteMetrics = {
   overflowElements: ElementSummary[];
   smallTargets: ElementSummary[];
   tinyFormControls: ElementSummary[];
+  oversizedFormControls: ElementSummary[];
   badFileInputs: ElementSummary[];
   visibleDialogs: ElementSummary[];
   commandButtonsWithoutIcons: ElementSummary[];
@@ -169,6 +170,7 @@ const publicRoutes = [
   "/",
   "/search?q=E2E",
   "/recent",
+  "/pages",
   "/wanted",
   "/orphaned",
   "/categories",
@@ -389,7 +391,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, design token drift, overflow, duplicate admin controls, stray dialogs, tiny controls, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, design token drift, overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -629,6 +631,23 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   const response = await page
     .goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" })
     .catch((error: unknown) => {
+      if (
+        error instanceof Error &&
+        error.message.includes("is interrupted by another navigation")
+      ) {
+        return page
+          .goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" })
+          .catch((retryError: unknown) => {
+            addFailure({
+              kind: "navigation_error",
+              browserName,
+              sizeName,
+              route,
+              detail: retryError instanceof Error ? retryError.message : String(retryError)
+            });
+            return null;
+          });
+      }
       addFailure({
         kind: "navigation_error",
         browserName,
@@ -664,6 +683,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "tiny_form_controls",
     metrics.tinyFormControls,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "oversized_form_controls",
+    metrics.oversizedFormControls,
     browserName,
     sizeName,
     route
@@ -791,7 +817,10 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           !parent ||
           !visible(parent) ||
           parent.closest(".permission-panel") ||
-          parent.closest(".permission-checkbox")
+          parent.closest(".permission-checkbox") ||
+          parent.closest(".role-card") ||
+          parent.closest(".role-permission-checkboxes") ||
+          parent.closest(".role-permission-summary")
         ) {
           return NodeFilter.FILTER_REJECT;
         }
@@ -854,6 +883,22 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         })
         .map(summarize)
         .slice(0, 12),
+      oversizedFormControls: visibleMatches(
+        ".admin-filter-control, .admin-filter-bar > button, .admin-filter-bar > .button, .field, select"
+      )
+        .filter((element) => {
+          if (element.tagName === "TEXTAREA" || element.matches("input[type='file']")) {
+            return false;
+          }
+          const rect = element.getBoundingClientRect();
+          const compactFilter = Boolean(
+            element.closest(".admin-filter-bar") ||
+              element.classList.contains("admin-filter-control")
+          );
+          return compactFilter ? rect.height > 36 : rect.height > 44;
+        })
+        .map(summarize)
+        .slice(0, 12),
       badFileInputs: visibleMatches("input[type='file']")
         .filter((element) => element.getBoundingClientRect().height < 40)
         .map(summarize)
@@ -875,7 +920,18 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
 }
 
 async function auditActiveState(page: Page, browserName: string, sizeName: string) {
-  await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  const response = await page
+    .goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" })
+    .catch(() => page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" }).catch(() => null));
+  if (!response) {
+    addFailure({
+      kind: "active_state_navigation_error",
+      browserName,
+      sizeName,
+      route: "/"
+    });
+    return;
+  }
   const targetHandle = await page.evaluateHandle(`(() => {
     const visible = (element) => {
       const rect = element.getBoundingClientRect();
@@ -946,12 +1002,14 @@ async function auditMediaPicker(
   if (response?.status() === 404) {
     return;
   }
+  await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
   const buttons = page.locator(".editor-toolbar .editor-tool-button");
   const count = await buttons.count();
   if (count === 0) {
     return;
   }
   await buttons.nth(count - 1).click();
+  await waitForModal(page, ".media-picker-dialog[role='dialog']");
   const modal = await readModalMetrics(page, ".media-picker-dialog[role='dialog']");
   if (!modal.hasBackdrop || !modal.hasDialog || modal.radius !== "14px" || modal.overflow) {
     addFailure({
@@ -1002,11 +1060,13 @@ async function auditMobileShell(page: Page, browserName: string, sizeName: strin
 
 async function auditPageDeleteDialog(page: Page, browserName: string, sizeName: string) {
   await page.goto(`${baseUrl}/admin/pages`, { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
   const deleteButtons = page.locator("button.button.danger");
   if ((await deleteButtons.count()) === 0) {
     return;
   }
   await deleteButtons.nth(0).click();
+  await waitForModal(page, ".confirm-dialog[role='dialog']");
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
   if (
     !modal.hasBackdrop ||
@@ -1033,6 +1093,7 @@ async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName:
     return;
   }
   await deleteButtons.nth(0).click();
+  await waitForModal(page, ".confirm-dialog[role='dialog']");
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
   if (
     !modal.hasBackdrop ||
@@ -1053,11 +1114,13 @@ async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName:
 
 async function auditUserResetDialog(page: Page, browserName: string, sizeName: string) {
   await page.goto(`${baseUrl}/admin/users`, { waitUntil: "domcontentloaded" });
+  await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
   const resetButtons = page.locator(".admin-action-list button.icon-button[aria-label]");
   if ((await resetButtons.count()) === 0) {
     return;
   }
   await resetButtons.nth(0).click();
+  await waitForModal(page, ".confirm-dialog[role='dialog']");
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
   if (
     !modal.hasBackdrop ||
@@ -1076,20 +1139,47 @@ async function auditUserResetDialog(page: Page, browserName: string, sizeName: s
   }
 }
 
+async function waitForModal(page: Page, dialogSelector: string) {
+  await page
+    .locator(dialogSelector)
+    .waitFor({ state: "visible", timeout: 4000 })
+    .catch(() => null);
+}
+
 async function readModalMetrics(page: Page, dialogSelector: string): Promise<ModalMetrics> {
-  return page.evaluate(`(() => {
-    const selector = ${JSON.stringify(dialogSelector)};
-    const dialog = document.querySelector(selector);
-    const backdrop = document.querySelector(".modal-backdrop");
-    const warning = dialog?.querySelector(".confirm-warning");
-    return {
-      hasDialog: Boolean(dialog),
-      hasBackdrop: Boolean(backdrop),
-      radius: dialog ? getComputedStyle(dialog).borderRadius : null,
-      overflow: document.body.scrollWidth > document.documentElement.clientWidth + 2,
-      warningTextAlign: warning ? getComputedStyle(warning).textAlign : null
-    };
-  })()`) as Promise<ModalMetrics>;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return (await page.evaluate(`(() => {
+        const selector = ${JSON.stringify(dialogSelector)};
+        const dialog = document.querySelector(selector);
+        const backdrop = document.querySelector(".modal-backdrop");
+        const warning = dialog?.querySelector(".confirm-warning");
+        return {
+          hasDialog: Boolean(dialog),
+          hasBackdrop: Boolean(backdrop),
+          radius: dialog ? getComputedStyle(dialog).borderRadius : null,
+          overflow: document.body.scrollWidth > document.documentElement.clientWidth + 2,
+          warningTextAlign: warning ? getComputedStyle(warning).textAlign : null
+        };
+      })()`)) as ModalMetrics;
+    } catch (error) {
+      if (!(
+        error instanceof Error &&
+        /Execution context was destroyed|Target closed|Frame was detached/.test(error.message)
+      )) {
+        throw error;
+      }
+      await page.waitForLoadState("domcontentloaded", { timeout: 4000 }).catch(() => null);
+      await waitForModal(page, dialogSelector);
+    }
+  }
+  return {
+    hasDialog: false,
+    hasBackdrop: false,
+    radius: null,
+    overflow: false,
+    warningTextAlign: null
+  };
 }
 
 void main();

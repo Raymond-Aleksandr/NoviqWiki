@@ -496,6 +496,13 @@ export type OrphanedPage = {
   updatedAt: Date;
 };
 
+export type PublishedPageIndexEntry = {
+  pageId: string;
+  title: string;
+  slug: string;
+  updatedAt: Date;
+};
+
 export async function listPageOutboundLinks(
   input: { siteId: string; pageId: string },
   database: Database = db
@@ -615,6 +622,32 @@ export async function listOrphanedPages(
     .orderBy(desc(pages.updatedAt), asc(pages.title))
     .limit(input.limit ?? 100)
     .offset(input.offset ?? 0);
+}
+
+export async function listPublishedPageIndex(
+  input: { siteId: string; query?: string; prefix?: string; limit?: number; offset?: number },
+  database: Database = db
+): Promise<{ rows: PublishedPageIndexEntry[]; count: number }> {
+  const where = publishedPageIndexWhere(input);
+  const [rows, [{ count }]] = await Promise.all([
+    database
+      .select({
+        pageId: pages.id,
+        title: pages.title,
+        slug: pages.slug,
+        updatedAt: pages.updatedAt
+      })
+      .from(pages)
+      .where(where)
+      .orderBy(asc(pages.title), asc(pages.slug))
+      .limit(input.limit ?? 100)
+      .offset(input.offset ?? 0),
+    database
+      .select({ count: sql<number>`count(*)::int` })
+      .from(pages)
+      .where(where)
+  ]);
+  return { rows, count };
 }
 
 export async function compareRevisions(
@@ -1109,6 +1142,18 @@ async function updateRelationships(
         set: { targetPageId: targetPage?.id ?? null, label: target }
       });
   }
+}
+
+function publishedPageIndexWhere(input: { siteId: string; query?: string; prefix?: string }) {
+  const query = input.query?.trim();
+  const prefix = input.prefix?.trim().slice(0, 1);
+  return and(
+    eq(pages.siteId, input.siteId),
+    eq(pages.status, "published"),
+    isNull(pages.deletedAt),
+    query ? or(ilike(pages.title, `%${query}%`), ilike(pages.slug, `%${query}%`)) : undefined,
+    prefix ? ilike(pages.title, `${prefix}%`) : undefined
+  );
 }
 
 function uniqueRows<T>(rows: T[], keyFn: (row: T) => string) {

@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Clock3, ImageIcon, ShieldCheck, Tags } from "lucide-react";
+import { BookOpen, Clock3, FileText, ImageIcon, ShieldCheck, Tags } from "lucide-react";
 
 type Messages = {
   read: string;
   recentChanges: string;
+  pages: string;
   categories: string;
   media: string;
   admin: string;
@@ -26,6 +27,12 @@ export function SiteNav({ messages, showAdmin }: { messages: Messages; showAdmin
       label: messages.recentChanges,
       icon: Clock3,
       active: pathname.startsWith("/recent")
+    },
+    {
+      href: "/pages",
+      label: messages.pages,
+      icon: FileText,
+      active: pathname.startsWith("/pages")
     },
     {
       href: "/categories",

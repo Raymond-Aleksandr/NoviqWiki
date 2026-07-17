@@ -30,8 +30,8 @@ Last updated: 2026-07-16
 | `pnpm format`                  | Passed                                              |
 | `pnpm lint`                    | Passed                                              |
 | `pnpm typecheck`               | Passed                                              |
-| `pnpm test`                    | Passed, 9 unit files / 19 tests                     |
-| `pnpm test:integration`        | Passed, 3 integration files / 5 tests               |
+| `pnpm test`                    | Passed, 13 unit files / 33 tests                    |
+| `pnpm test:integration`        | Passed, 9 integration files / 15 tests              |
 | `pnpm test:ui`                 | Passed, non-reset Chromium/WebKit UI release audit  |
 | `pnpm build`                   | Passed                                              |
 | `pnpm test:e2e`                | Passed, 2 Playwright tests                          |
@@ -103,7 +103,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Completed broken wiki-link surfacing. Stored revision HTML remains sanitized and immutable, while article rendering decorates unresolved `[[Page]]` links with a distinct missing-link state and sends users with `page.create` to `/edit/new?title=...`; the new-page form pre-fills the requested title and first heading.
 - 2026-07-16: Tightened mobile history typography after live Safari review. History summary rows now use a dedicated label/summary/date grid so edit summaries such as `Rollback to revision 1` stay readable instead of being squeezed into centered multi-line text; browser verification at `439x734` showed no horizontal overflow.
 - 2026-07-16: Made `/admin/pages` filtering functional. The design-package filter bar now submits `q` and `status` query parameters, supports title/slug search, draft/published/archived/deleted filtering, clear-filter navigation, empty-state rendering, and integration coverage for the underlying page listing filters.
-- 2026-07-16: Re-normalized `/admin/pages` filter control sizing after mobile review against the design package. The search field, status select, search button, clear-filter action, and create-page action now share the same compact 34px/13px control rhythm on desktop and mobile instead of using an enlarged mobile-only variant; global fields and revision compare controls were tightened to the same design-token family.
+- 2026-07-16: Re-normalized `/admin/pages` filter control sizing after mobile review against the design package. The search field, status select, search button, clear-filter action, and create-page action now share the same compact 34px/13.5px control rhythm on desktop and mobile instead of using an enlarged mobile-only variant; global fields and revision compare controls were tightened to the same design-token family.
 - 2026-07-16: Completed group editing and role assignment as a real wiki administration workflow. `/admin/groups` now shows current role badges and lets administrators update group names/descriptions and assigned roles, while `POST /api/v1/admin/groups` and `PATCH /api/v1/admin/groups/{id}` expose the same service-layer behavior. Group role replacement is transactional and refuses changes that would remove the final active Owner.
 - 2026-07-16: Completed safe custom role editing. `/admin/roles` now exposes editable permission forms for custom roles, `POST /api/v1/admin/roles` and `PATCH /api/v1/admin/roles/{id}` expose the same JSON workflows, and the authorization service now rejects attempts to create/update built-in roles such as Owner so default role permissions cannot be overwritten through upsert behavior.
 - 2026-07-16: Completed user group membership administration. `/admin/users` now shows assigned groups, exposes editable group membership forms, `PATCH /api/v1/admin/users/{id}` updates group IDs through the same authorization service, and membership replacement refuses changes that would remove the final active Owner.
@@ -115,6 +115,8 @@ Last updated: 2026-07-16
 - 2026-07-16: Made recent changes navigable as a real wiki activity surface. Page and media activity rows now resolve same-site targets through the activity service, link to readable pages or live media files, and intentionally suppress links for deleted page/media targets while preserving labels for audit clarity.
 - 2026-07-16: Added a `/wanted` content-maintenance page for missing internal wiki-link targets. The list is computed from published visible source pages, ignores draft/archived/deleted sources, removes entries automatically once a target page is published, and offers authorized users a pre-filled page-creation action.
 - 2026-07-16: Added an `/orphaned` content-maintenance page for published pages that currently have no inbound links from other published pages. The query uses the same resolved-link semantics as backlinks, so links created before the target page existed are counted once the target is published.
+- 2026-07-16: Added a public `/pages` index for browsing all published pages after the duplicated global nav search was removed. The index supports title/slug search, prefix filters, pagination, and excludes draft, archived, and deleted pages.
+- 2026-07-16: Tightened the design-package compact control system across filters, ordinary fields, selects, and compact buttons. Chromium/WebKit mobile measurement at `439x734` now shows filter controls and admin form controls at `34px` tall with `13.5px` text, and `pnpm test:ui` now fails if visible filter/form controls regress into oversized variants.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes
