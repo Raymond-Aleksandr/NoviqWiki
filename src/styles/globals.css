@@ -608,6 +608,13 @@ select {
   text-align: left;
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
+  font-family: var(--nw-font-body);
+  opacity: 1;
+}
+
 input.field:not([type="file"]),
 select {
   height: var(--control-height);
@@ -2161,6 +2168,13 @@ pre.citation-block {
   outline: 0;
   background: transparent;
   color: var(--text);
+  font-family: var(--nw-font-body);
+  font-size: var(--control-font-size);
+  line-height: 1.2;
+}
+
+.search-input-main input::placeholder {
+  color: var(--text-faint);
 }
 
 .search-form-main button {
