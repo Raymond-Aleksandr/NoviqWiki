@@ -32,7 +32,7 @@ export default async function VerifyEmailPage({ searchParams }: Props) {
             {messages.verificationTokenMissing}
           </p>
         )}
-        <p style={{ marginTop: "14px", marginBottom: 0 }}>
+        <p className="auth-secondary-link">
           <Link href="/login">
             <ArrowLeft size={14} aria-hidden="true" />
             {messages.returnToLogin}

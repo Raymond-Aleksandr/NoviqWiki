@@ -50,7 +50,7 @@ export default async function AdminDashboard() {
                 <span className="admin-event-name">
                   {auditActionLabel(change.action, messages)}
                 </span>
-                <span className="mono muted" style={{ marginLeft: "auto", fontSize: "11px" }}>
+                <span className="mono muted admin-panel-meta">
                   {change.actorDisplayName ?? messages.system} ·{" "}
                   {change.createdAt.toLocaleString(locale)}
                 </span>

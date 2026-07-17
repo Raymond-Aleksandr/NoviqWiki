@@ -1616,6 +1616,11 @@ pre.citation-block {
   padding: 15px 18px;
 }
 
+.category-selection-hint {
+  margin: 0;
+  padding: 14px 18px;
+}
+
 .page-list-row {
   display: flex;
   align-items: center;
@@ -2826,6 +2831,10 @@ pre.citation-block {
   min-block-size: 36px;
 }
 
+.auth-secondary-link {
+  margin: 14px 0 0;
+}
+
 .auth-art {
   position: relative;
   min-height: 390px;
@@ -3193,6 +3202,12 @@ pre.citation-block {
   border-bottom: 0;
 }
 
+.admin-panel-meta {
+  margin-left: auto;
+  font-size: 11px;
+  text-align: right;
+}
+
 .admin-status-row {
   display: grid;
   grid-template-columns: minmax(90px, 1fr) minmax(0, auto);
@@ -3361,6 +3376,10 @@ pre.citation-block {
   font-weight: 600;
 }
 
+.admin-grid-header-actions {
+  text-align: right;
+}
+
 .admin-grid-row {
   border-bottom: 1px solid var(--border);
   font-size: 13px;
@@ -3446,6 +3465,19 @@ pre.citation-block {
   border-radius: 9px;
   background: var(--surface-muted);
   color: var(--text-muted);
+}
+
+.group-card-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.group-card-kind {
+  font-size: 12px;
+}
+
+.group-card-description {
+  margin: 0 0 14px;
 }
 
 .group-role-badges {
@@ -3764,6 +3796,10 @@ pre.citation-block {
   grid-template-columns: repeat(4, 1fr);
   gap: 18px;
   padding: 20px 22px;
+}
+
+.system-label {
+  font-size: 11px;
 }
 
 .auth-compact {
@@ -4188,6 +4224,10 @@ pre.citation-block {
 .diff-count.remove {
   background: var(--diff-del-bg);
   color: var(--diff-del-text);
+}
+
+.diff-return-link {
+  margin-left: auto;
 }
 
 .diff-section {

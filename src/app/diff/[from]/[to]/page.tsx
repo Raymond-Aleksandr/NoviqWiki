@@ -118,7 +118,7 @@ export default async function DiffPage({ params }: Props) {
         <span className="diff-count remove">
           -{removed} {messages.removed}
         </span>
-        <Link className="button compact" href={`/page/${page.slug}`} style={{ marginLeft: "auto" }}>
+        <Link className="button compact diff-return-link" href={`/page/${page.slug}`}>
           <ArrowLeft size={14} aria-hidden="true" />
           {messages.returnToPage}
         </Link>

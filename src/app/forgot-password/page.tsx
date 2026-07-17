@@ -23,7 +23,7 @@ export default async function ForgotPasswordPage() {
             {messages.requestResetLink}
           </button>
         </ActionForm>
-        <p style={{ marginTop: "14px", marginBottom: 0 }}>
+        <p className="auth-secondary-link">
           <Link href="/login">
             <ArrowLeft size={14} aria-hidden="true" />
             {messages.returnToLogin}

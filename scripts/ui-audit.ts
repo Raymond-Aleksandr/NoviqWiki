@@ -240,6 +240,20 @@ async function auditSourceForActiveTransforms() {
   });
 }
 
+async function auditSourceForInlineStyles() {
+  const matches = [
+    ...(await findUnexpectedInlineStyleMatches(path.join(process.cwd(), "src/app"))),
+    ...(await findUnexpectedInlineStyleMatches(path.join(process.cwd(), "src/components")))
+  ];
+  if (matches.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "unexpected_inline_style",
+    detail: matches.slice(0, 20)
+  });
+}
+
 async function findNativeDialogMatches(directory: string): Promise<SourceMatch[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const matches: SourceMatch[] = [];
@@ -270,6 +284,47 @@ async function findNativeDialogMatches(directory: string): Promise<SourceMatch[]
   }
 
   return matches;
+}
+
+async function findUnexpectedInlineStyleMatches(directory: string): Promise<SourceMatch[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const matches: SourceMatch[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      matches.push(...(await findUnexpectedInlineStyleMatches(entryPath)));
+      continue;
+    }
+    if (!entry.isFile() || path.extname(entry.name) !== ".tsx") {
+      continue;
+    }
+    const source = await readFile(entryPath, "utf8");
+    const relativePath = path.relative(process.cwd(), entryPath);
+    const lines = source.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      if (!line.includes("style={{") || isAllowedInlineStyle(relativePath, line)) {
+        return;
+      }
+      matches.push({
+        file: relativePath,
+        line: index + 1,
+        pattern: "inline style",
+        text: line.trim().slice(0, 160)
+      });
+    });
+  }
+
+  return matches;
+}
+
+function isAllowedInlineStyle(relativePath: string, line: string) {
+  return (
+    (relativePath === "src/components/setup/setup-wizard.tsx" &&
+      line.includes("style={{ inlineSize:")) ||
+    (relativePath === "src/components/article/article-view.tsx" &&
+      line.includes("style={{ paddingLeft:"))
+  );
 }
 
 async function findActiveTransformMatches(directory: string): Promise<SourceMatch[]> {
@@ -339,6 +394,7 @@ function escapeRegExp(value: string) {
 async function main() {
   await auditSourceForNativeDialogs();
   await auditSourceForActiveTransforms();
+  await auditSourceForInlineStyles();
   const storageState = credentials ? await createAuthState(credentials) : undefined;
   const articleSlug =
     process.env.UI_AUDIT_ARTICLE_SLUG ?? (await discoverArticleSlug(storageState));
@@ -409,7 +465,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 

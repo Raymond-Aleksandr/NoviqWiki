@@ -63,7 +63,7 @@ export default async function RegisterPage() {
             {messages.createAccount}
           </button>
         </ActionForm>
-        <p className="muted" style={{ marginTop: "14px", marginBottom: 0 }}>
+        <p className="muted auth-secondary-link">
           {messages.alreadyHaveAccount} <Link href="/login">{messages.login}</Link>
         </p>
       </div>

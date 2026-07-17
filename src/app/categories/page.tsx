@@ -51,9 +51,7 @@ export default async function CategoriesPage() {
           <span className="badge info">{messages.all}</span>
           <h2>{messages.pagesInThisCategory}</h2>
         </header>
-        <p className="muted" style={{ padding: "14px 18px", margin: 0 }}>
-          {messages.selectCategoryHint}
-        </p>
+        <p className="muted category-selection-hint">{messages.selectCategoryHint}</p>
       </section>
     </section>
   );

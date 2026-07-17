@@ -115,7 +115,7 @@ export default async function AdminUsersPage({ searchParams }: Props) {
           <div>{messages.role}</div>
           <div>{messages.status}</div>
           <div>{messages.lastLogin}</div>
-          <div style={{ textAlign: "right" }}>{messages.actions}</div>
+          <div className="admin-grid-header-actions">{messages.actions}</div>
         </div>
         {rows.length === 0 ? <div className="admin-empty-state">{messages.noResults}</div> : null}
         {rows.map((user) => (

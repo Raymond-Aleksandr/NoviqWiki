@@ -55,13 +55,13 @@ export default async function AdminGroupsPage() {
                 <Users size={17} aria-hidden="true" />
               </span>
               <div>
-                <div style={{ fontSize: "15px", fontWeight: 600 }}>{group.name}</div>
-                <div className="muted" style={{ fontSize: "12px" }}>
+                <div className="group-card-name">{group.name}</div>
+                <div className="muted group-card-kind">
                   {group.builtIn ? messages.builtInGroup : messages.customGroup}
                 </div>
               </div>
             </div>
-            <p className="muted" style={{ margin: "0 0 14px" }}>
+            <p className="muted group-card-description">
               {group.description || messages.noDescriptionProvided}
             </p>
             <div className="group-role-badges">
