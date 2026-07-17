@@ -57,6 +57,7 @@ type RouteMetrics = {
   badFileInputs: ElementSummary[];
   controlTextOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
+  articleMediaTooTall: ElementSummary[];
   visibleDialogs: ElementSummary[];
   commandButtonsWithoutIcons: ElementSummary[];
   oversizedText: ElementSummary[];
@@ -468,7 +469,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -790,6 +791,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "article_media_overflow",
     metrics.articleMediaOverflow,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "article_media_too_tall",
+    metrics.articleMediaTooTall,
     browserName,
     sizeName,
     route
@@ -1200,6 +1208,16 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           const rect = element.getBoundingClientRect();
           const bodyRect = articleBody.getBoundingClientRect();
           return rect.left < bodyRect.left - 1 || rect.right > bodyRect.right + 1 || rect.width > bodyRect.width + 1;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      articleMediaTooTall: visibleMatches(
+        ".article-body img, .article-body video, .article-body iframe, .article-body svg"
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const maxAllowedHeight = Math.min(window.innerHeight * 0.72, 560);
+          return rect.height > maxAllowedHeight + 2;
         })
         .map(summarize)
         .slice(0, 12),

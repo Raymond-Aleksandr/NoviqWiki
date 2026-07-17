@@ -2393,6 +2393,9 @@ pre.citation-block {
   font-family: var(--nw-font-serif);
   font-size: 18px;
   line-height: 1.72;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
 }
 
 .article-body h1,
@@ -2426,7 +2429,10 @@ pre.citation-block {
 }
 
 .article-body table {
+  display: block;
   width: auto;
+  max-inline-size: 100%;
+  overflow-x: auto;
   border-collapse: collapse;
   font-family: var(--nw-font-body);
   font-size: 14px;
@@ -2443,6 +2449,7 @@ pre.citation-block {
 }
 
 .article-body pre {
+  max-inline-size: 100%;
   overflow: auto;
   border-radius: 10px;
   background: var(--code-bg);
@@ -2456,19 +2463,32 @@ pre.citation-block {
 .article-body iframe,
 .article-body svg {
   display: block;
+  inline-size: auto;
   max-inline-size: 100%;
+  max-width: 100%;
+  max-block-size: min(72vh, 560px);
+  max-height: min(72vh, 560px);
   block-size: auto;
+  height: auto;
+  object-fit: contain;
 }
 
 .article-body img,
 .article-body video {
+  margin-inline: auto;
   border-radius: 10px;
   box-shadow: var(--sh-sm);
+}
+
+.article-body iframe {
+  inline-size: 100%;
+  aspect-ratio: 16 / 9;
 }
 
 .article-body p > img:only-child,
 .article-body p > video:only-child {
   margin-block: 18px;
+  margin-inline: auto;
 }
 
 .article-body code {
