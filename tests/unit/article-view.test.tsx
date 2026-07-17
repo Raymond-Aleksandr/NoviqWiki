@@ -35,6 +35,33 @@ describe("ArticleView", () => {
     expect(html).toContain("You are viewing an old revision of this page.");
     expect(html).toContain("/page/moved-topic");
   });
+
+  it("renders missing wiki links as page creation links for authorized users", () => {
+    const html = renderToStaticMarkup(
+      <ArticleView
+        page={page}
+        revision={{
+          ...revision,
+          html: '<p><a href="/page/missing-topic" title="wiki-link:Missing Topic">missing</a></p>'
+        }}
+        canCreatePage
+        outboundLinks={[
+          {
+            targetTitle: "Missing Topic",
+            label: "missing",
+            targetPageId: null,
+            targetSlug: null,
+            exists: false
+          }
+        ]}
+        locale="en"
+        messages={en}
+      />
+    );
+
+    expect(html).toContain("/edit/new?title=Missing%20Topic");
+    expect(html).toContain("wiki-link-missing");
+  });
 });
 
 const now = new Date("2026-07-16T12:00:00Z");

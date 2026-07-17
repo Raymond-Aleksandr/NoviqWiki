@@ -10,7 +10,11 @@ import { getCurrentSession } from "@/modules/auth/session";
 import { requirePermission } from "@/modules/authorization/permissions";
 import { listMedia } from "@/modules/media/service";
 
-export default async function NewPage() {
+type Props = {
+  searchParams: Promise<{ title?: string }>;
+};
+
+export default async function NewPage({ searchParams }: Props) {
   const site = await getPrimarySiteWithSettings();
   if (!site) {
     redirect("/setup");
@@ -25,6 +29,9 @@ export default async function NewPage() {
     getRequestI18n(site.settings?.defaultLocale)
   ]);
   const { messages } = i18n;
+  const { title } = await searchParams;
+  const requestedTitle = normalizeRequestedTitle(title);
+  const initialMarkdown = requestedTitle ? `# ${requestedTitle}\n\n` : messages.newPageTemplate;
   return (
     <section className="page-frame editor-page">
       <header className="editor-header">
@@ -39,7 +46,7 @@ export default async function NewPage() {
           <div className="editor-title-grid">
             <label>
               {messages.pageTitle}
-              <input className="field" name="title" required />
+              <input className="field" name="title" defaultValue={requestedTitle} required />
             </label>
             <label>
               {messages.slug}
@@ -48,7 +55,7 @@ export default async function NewPage() {
           </div>
         </section>
         <MarkdownEditor
-          initialValue={messages.newPageTemplate}
+          initialValue={initialMarkdown}
           messages={messages}
           mediaItems={serializeEditorMedia(mediaItems)}
           footer={
@@ -97,4 +104,9 @@ function serializeEditorMedia(
     mimeType: item.mimeType,
     altText: item.altText
   }));
+}
+
+function normalizeRequestedTitle(value: string | undefined) {
+  const title = value?.trim();
+  return title ? title.slice(0, 220) : "";
 }

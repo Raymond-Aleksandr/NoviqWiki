@@ -44,8 +44,9 @@ export default async function ArticlePage({ params, searchParams }: Props) {
   if (!currentRevision) {
     notFound();
   }
-  const [canEdit, outboundLinks, backlinks, revisions, i18n] = await Promise.all([
+  const [canEdit, canCreatePage, outboundLinks, backlinks, revisions, i18n] = await Promise.all([
     hasPermission(session?.user.id, site.site.id, "page.edit"),
+    hasPermission(session?.user.id, site.site.id, "page.create"),
     listPageOutboundLinks({ siteId: site.site.id, pageId: resolved.page.id }),
     listPageBacklinks({ siteId: site.site.id, pageId: resolved.page.id, limit: 1000 }),
     listRevisions(resolved.page.id),
@@ -56,6 +57,7 @@ export default async function ArticlePage({ params, searchParams }: Props) {
       page={resolved.page}
       revision={currentRevision}
       canEdit={canEdit}
+      canCreatePage={canCreatePage}
       redirectedFrom={resolved.redirectedFrom}
       categories={currentRevision.categories.map((name) => ({ name, slug: slugifyTitle(name) }))}
       outboundLinks={outboundLinks}

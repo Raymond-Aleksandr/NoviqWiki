@@ -62,6 +62,10 @@ html[data-theme="light"] {
   --nw-font-body: "Hanken Grotesk", "Noto Sans SC", system-ui, sans-serif;
   --nw-font-serif: "Source Serif 4", "Noto Serif SC", Georgia, serif;
   --nw-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --control-height: 36px;
+  --control-radius: 8px;
+  --control-font-size: 13px;
+  --control-pad-x: 12px;
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-ink: var(--text);
@@ -122,6 +126,11 @@ body {
   min-height: 100%;
   margin: 0;
   padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -2024,6 +2033,27 @@ textarea {
   padding: 0.1em 0.25em;
 }
 
+.article-body a.wiki-link {
+  font-weight: 700;
+}
+
+.article-body a.wiki-link-missing {
+  color: var(--warning);
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.article-body a.wiki-link-missing::after {
+  content: "?";
+  margin-left: 2px;
+  font-family: var(--nw-font-mono);
+  font-size: 0.75em;
+  font-weight: 700;
+  vertical-align: super;
+}
+
 .article-categories {
   display: flex;
   flex-wrap: wrap;
@@ -2686,14 +2716,16 @@ textarea {
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
-  block-size: 42px;
+  block-size: var(--control-height);
+  min-block-size: var(--control-height);
+  max-block-size: var(--control-height);
   border: 1px solid var(--border-strong);
-  border-radius: 8px;
+  border-radius: var(--control-radius);
   background: var(--bg);
   color: var(--text-faint);
-  font-size: 13px;
+  font-size: var(--control-font-size);
   line-height: 1.2;
-  padding: 0 12px;
+  padding: 0 var(--control-pad-x);
 }
 
 .admin-filter-search {
@@ -2703,10 +2735,12 @@ textarea {
 
 .admin-filter-search input,
 .admin-filter-select select {
+  display: block;
   min-width: 0;
   width: 100%;
-  block-size: 100%;
-  min-block-size: 0;
+  block-size: calc(var(--control-height) - 2px);
+  min-block-size: calc(var(--control-height) - 2px);
+  max-block-size: calc(var(--control-height) - 2px);
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -2717,6 +2751,8 @@ textarea {
   line-height: 1.2;
   outline: 0;
   padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .admin-filter-search input::placeholder {
@@ -2729,7 +2765,6 @@ textarea {
 
 .admin-filter-select select {
   min-width: 128px;
-  appearance: none;
 }
 
 .admin-filter-select svg {
@@ -2738,10 +2773,11 @@ textarea {
 
 .admin-filter-bar > .button,
 .admin-filter-bar > button {
-  block-size: 42px;
-  min-block-size: 42px;
-  border-radius: 8px;
-  font-size: 13px;
+  block-size: var(--control-height);
+  min-block-size: var(--control-height);
+  max-block-size: var(--control-height);
+  border-radius: var(--control-radius);
+  font-size: var(--control-font-size);
   line-height: 1.2;
   padding-block: 0;
 }
@@ -3556,6 +3592,12 @@ textarea {
 }
 
 @media (max-width: 900px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
   .design-utility {
     position: static;
     flex-wrap: wrap;
@@ -3738,6 +3780,48 @@ textarea {
   .admin-form-grid,
   .editor-title-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-filter-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .admin-filter-control {
+    --control-height: 40px;
+    --control-font-size: 16px;
+  }
+
+  .admin-filter-search {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none;
+  }
+
+  .admin-filter-select {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .admin-filter-select select {
+    min-width: 0;
+  }
+
+  .admin-filter-bar > .button,
+  .admin-filter-bar > button {
+    --control-height: 40px;
+    --control-font-size: 16px;
+  }
+
+  .admin-filter-bar > .button.primary {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .admin-filter-spacer {
+    display: none;
   }
 
   .admin-table {

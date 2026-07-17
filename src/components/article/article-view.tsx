@@ -3,11 +3,13 @@ import { BookOpen, Edit3, History, Info, Link2, ListTree } from "lucide-react";
 import type { Page, PageRevision } from "@/db/schema";
 import type { Messages } from "@/i18n";
 import type { PageOutboundLink } from "@/modules/pages/service";
+import { decorateWikiLinkHtml } from "./wiki-link-html";
 
 export function ArticleView({
   page,
   revision,
   canEdit = false,
+  canCreatePage = false,
   redirectedFrom = null,
   categories = [],
   outboundLinks = [],
@@ -20,6 +22,7 @@ export function ArticleView({
   page: Page;
   revision: PageRevision;
   canEdit?: boolean;
+  canCreatePage?: boolean;
   redirectedFrom?: string | null;
   categories?: Array<{ name: string; slug: string }>;
   outboundLinks?: PageOutboundLink[];
@@ -30,6 +33,7 @@ export function ArticleView({
   messages: Messages;
 }) {
   const isHistoricalRevision = revision.revisionNumber !== currentRevisionNumber;
+  const articleHtml = decorateWikiLinkHtml(revision.html, outboundLinks, canCreatePage);
   const displayedDate = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short"
@@ -93,7 +97,7 @@ export function ArticleView({
             {messages.revisionLabel} {revision.revisionNumber} {messages.by}{" "}
             {revision.editorDisplayName} {messages.on} {displayedDate}
           </p>
-          <div className="article-body" dangerouslySetInnerHTML={{ __html: revision.html }} />
+          <div className="article-body" dangerouslySetInnerHTML={{ __html: articleHtml }} />
           {categories.length > 0 ? (
             <footer className="article-categories" aria-label={messages.pageCategories}>
               <span>{messages.categoriesLabel}</span>
