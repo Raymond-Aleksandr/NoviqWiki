@@ -138,7 +138,9 @@ html[data-theme="dark"] {
 html,
 body {
   min-height: 100%;
+  max-width: 100%;
   margin: 0;
+  overflow-x: hidden;
   padding: 0;
 }
 
@@ -286,11 +288,21 @@ input[type="radio"]:disabled {
 
 .nw-app {
   min-height: 100vh;
+  max-width: 100%;
+  overflow-x: hidden;
   background: var(--surface-sunken);
   color: var(--text);
   transition:
     background 0.2s,
     color 0.2s;
+}
+
+@supports (overflow: clip) {
+  html,
+  body,
+  .nw-app {
+    overflow-x: clip;
+  }
 }
 
 .design-utility {
@@ -1496,6 +1508,11 @@ textarea {
   border-top: 1px solid var(--border);
   margin: 0;
   padding: 13px 18px;
+  color: var(--text-muted);
+  font-family: var(--nw-font-body);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .citation-list {
@@ -1518,10 +1535,12 @@ textarea {
 }
 
 pre.citation-block {
-  overflow-x: auto;
+  overflow-x: hidden;
   font-family: var(--nw-font-mono);
   font-size: 12.5px;
-  white-space: pre;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .timeline-meta {
@@ -4494,11 +4513,14 @@ pre.citation-block {
 .history-revision-value {
   display: inline-flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 8px;
   min-width: 0;
+  white-space: nowrap;
 }
 
 .history-current-badge {
+  flex: 0 0 auto;
   width: fit-content;
 }
 
@@ -5404,16 +5426,25 @@ pre.citation-block {
   .history-action-buttons {
     display: grid;
     grid-column: 2;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
     gap: 8px;
+    min-width: 0;
+    max-width: 100%;
     width: 100%;
   }
 
   .history-row .history-actions .button,
   .history-row .history-actions button,
   .history-row .history-actions .inline-form {
+    box-sizing: border-box;
+    min-width: 0;
     width: 100%;
     justify-content: center;
+  }
+
+  .history-action-buttons > * {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .admin-grid-row.admin-pages-grid .admin-action-list {
@@ -5438,14 +5469,16 @@ pre.citation-block {
   .history-row .history-actions .button,
   .history-row .history-actions button {
     min-width: 0;
+    min-inline-size: 0;
     min-block-size: 34px;
     block-size: auto;
     max-block-size: none;
     padding: 7px 10px;
     font-size: 13px;
     line-height: 1.15;
-    white-space: normal;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    overflow-wrap: normal;
   }
 
   .admin-grid-row.admin-pages-grid .admin-action-list .button,

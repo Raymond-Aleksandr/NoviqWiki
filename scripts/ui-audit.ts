@@ -68,6 +68,7 @@ type RouteMetrics = {
   pageHeaderRhythmMismatches: ElementSummary[];
   contentRowRhythmMismatches: ElementSummary[];
   keyValueRhythmMismatches: ElementSummary[];
+  citationRhythmMismatches: ElementSummary[];
   permissionMatrixRhythmMismatches: ElementSummary[];
   adminSummaryRhythmMismatches: ElementSummary[];
   diffRhythmMismatches: ElementSummary[];
@@ -998,7 +999,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, permission-matrix, admin-summary, diff, article-prose, editor-toolbar, media-picker, or history-action rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, citation, permission-matrix, admin-summary, diff, article-prose, editor-toolbar, media-picker, or history-action rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1405,6 +1406,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "key_value_rhythm_mismatch",
     metrics.keyValueRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "citation_rhythm_mismatch",
+    metrics.citationRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -2604,6 +2612,9 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           const rect = element.getBoundingClientRect();
           const label = labelOf(element);
           if (!label) return false;
+          if (element.classList.contains("icon-button") && !visibleTextOf(element)) {
+            return false;
+          }
           const horizontalOverflow =
             element.scrollWidth > element.clientWidth + 2 ||
             [...element.children].some((child) => child.getBoundingClientRect().right > rect.right + 1);
@@ -3146,6 +3157,134 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             childOverflow ||
             viewportMismatch
           );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      citationRhythmMismatches: visibleMatches(
+        [
+          ".citation-overview",
+          ".citation-list",
+          ".citation-card",
+          ".citation-block",
+          "pre.citation-block",
+          ".citation-note",
+          ".citation-meta a"
+        ].join(",")
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const isMobile = document.documentElement.clientWidth <= 560;
+          const fitsViewport =
+            !isMobile ||
+            (rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1);
+          const scrollOverflow = element.scrollWidth > element.clientWidth + 2;
+          const childOverflow = [...element.children].filter(visible).some((child) => {
+            const childRect = child.getBoundingClientRect();
+            return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+          });
+
+          if (element.matches(".citation-overview, .citation-card")) {
+            const radius = Number.parseFloat(style.borderTopLeftRadius);
+            const borderWidth = Number.parseFloat(style.borderTopWidth);
+            return (
+              borderWidth < 1 ||
+              style.borderTopStyle === "none" ||
+              !Number.isFinite(radius) ||
+              radius < 8 ||
+              radius > 16 ||
+              style.backgroundColor === "rgba(0, 0, 0, 0)" ||
+              !fitsViewport ||
+              childOverflow
+            );
+          }
+
+          if (element.matches(".citation-list")) {
+            const rowGap = Number.parseFloat(style.rowGap);
+            return (
+              style.display !== "grid" ||
+              !Number.isFinite(rowGap) ||
+              rowGap < 10 ||
+              rowGap > 18 ||
+              !fitsViewport ||
+              childOverflow
+            );
+          }
+
+          if (element.matches("pre.citation-block")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const lineHeight = Number.parseFloat(style.lineHeight);
+            const paddingTop = Number.parseFloat(style.paddingTop);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            return (
+              !/JetBrains Mono|SFMono|Menlo|monospace/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12 ||
+              fontSize > 13.2 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight < 18 ||
+              lineHeight > 22 ||
+              !Number.isFinite(paddingTop) ||
+              paddingTop < 12 ||
+              paddingTop > 18 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 14 ||
+              paddingInline > 20 ||
+              !["hidden", "clip"].includes(style.overflowX) ||
+              style.whiteSpace !== "pre-wrap" ||
+              !["anywhere", "break-word"].includes(style.overflowWrap) ||
+              style.wordBreak !== "break-word" ||
+              !fitsViewport ||
+              scrollOverflow
+            );
+          }
+
+          if (element.matches(".citation-block, .citation-note")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const lineHeight = Number.parseFloat(style.lineHeight);
+            const paddingTop = Number.parseFloat(style.paddingTop);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            return (
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 13 ||
+              fontSize > 14.5 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight < 20 ||
+              lineHeight > 24 ||
+              !Number.isFinite(paddingTop) ||
+              paddingTop < 12 ||
+              paddingTop > 18 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 14 ||
+              paddingInline > 20 ||
+              style.overflowWrap !== "anywhere" ||
+              !fitsViewport ||
+              scrollOverflow
+            );
+          }
+
+          if (element.matches(".citation-meta a")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const gap = Number.parseFloat(style.gap || style.columnGap);
+            return (
+              !["flex", "inline-flex"].includes(style.display) ||
+              style.alignItems !== "center" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12.5 ||
+              fontSize > 14.2 ||
+              !Number.isFinite(gap) ||
+              gap < 5 ||
+              gap > 9 ||
+              style.overflowWrap !== "anywhere" ||
+              !fitsViewport ||
+              scrollOverflow ||
+              childOverflow
+            );
+          }
+
+          return false;
         })
         .map(summarize)
         .slice(0, 12),
@@ -4196,18 +4335,47 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         .map(summarize)
         .slice(0, 12),
       historyActionButtonOverflow: visibleMatches(
-        ".history-row .history-action-buttons .button, .history-row .history-action-buttons button"
+        ".history-row .history-action-buttons, .history-row .history-action-buttons .button, .history-row .history-action-buttons button"
       )
         .filter((element) => {
           if (document.documentElement.clientWidth > 560) return false;
           const buttonRect = element.getBoundingClientRect();
+          const row = element.closest(".history-row");
+          const rowRect = row?.getBoundingClientRect();
+          if (element.classList.contains("history-action-buttons")) {
+            const buttons = [...element.querySelectorAll(".button, button")].filter(visible);
+            const childRects = buttons.map((button) => button.getBoundingClientRect());
+            const childOverflowsGroup = childRects.some(
+              (rect) =>
+                rect.left < buttonRect.left - 1 ||
+                rect.right > buttonRect.right + 1 ||
+                rect.top < buttonRect.top - 1 ||
+                rect.bottom > buttonRect.bottom + 1 ||
+                (rowRect ? rect.right > rowRect.right + 1 : false)
+            );
+            if (childOverflowsGroup) return true;
+            if (element.scrollWidth > element.clientWidth + 1) return true;
+            if (document.documentElement.clientWidth <= 480) {
+              const rowCounts = new Map();
+              for (const rect of childRects) {
+                const rowTop = Math.round(rect.top);
+                rowCounts.set(rowTop, (rowCounts.get(rowTop) ?? 0) + 1);
+              }
+              if ([...rowCounts.values()].some((count) => count > 2)) return true;
+            }
+            return childRects.some((rect) => rect.width < 108);
+          }
           const grid = element.closest(".history-action-buttons");
           const gridTracks = grid
             ? getComputedStyle(grid)
                 .gridTemplateColumns.split(" ")
                 .filter((track) => track.trim().length > 0)
             : [];
-          if (gridTracks.length > 2) return true;
+          if (
+            document.documentElement.clientWidth <= 480 &&
+            gridTracks.length > 2
+          )
+            return true;
           if (element.scrollWidth > element.clientWidth + 1) return true;
           if (element.scrollHeight > element.clientHeight + 1) return true;
 
