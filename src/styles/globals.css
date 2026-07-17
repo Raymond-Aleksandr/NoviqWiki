@@ -2673,12 +2673,15 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
+  box-sizing: border-box;
+  block-size: 42px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--bg);
   color: var(--text-faint);
   font-size: 13px;
-  padding: 8px 12px;
+  line-height: 1.2;
+  padding: 0 12px;
 }
 
 .admin-filter-search {
@@ -2690,13 +2693,17 @@ textarea {
 .admin-filter-select select {
   min-width: 0;
   width: 100%;
-  height: auto;
+  block-size: 100%;
+  min-block-size: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
+  background-image: none;
   box-shadow: none;
   color: var(--text);
   font: inherit;
+  line-height: 1.2;
+  outline: 0;
   padding: 0;
 }
 
@@ -2715,6 +2722,16 @@ textarea {
 
 .admin-filter-select svg {
   pointer-events: none;
+}
+
+.admin-filter-bar > .button,
+.admin-filter-bar > button {
+  block-size: 42px;
+  min-block-size: 42px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.2;
+  padding-block: 0;
 }
 
 .admin-filter-spacer {
