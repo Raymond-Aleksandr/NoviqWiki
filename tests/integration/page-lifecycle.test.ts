@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { roles } from "@/db/schema";
+import { roles, sites } from "@/db/schema";
 import {
   assignRoleToGroup,
   assignUserToGroup,
@@ -56,6 +56,43 @@ describe("page lifecycle integration", () => {
     );
     const site = await getPrimarySiteWithSettings(test.executor);
     expect(site?.site.id).toBe(setup.site.id);
+
+    const [otherSite] = await test.executor
+      .insert(sites)
+      .values({ name: "Other Wiki", slug: "other-wiki", setupComplete: true })
+      .returning();
+    const otherSharedSlug = await createPage(
+      {
+        siteId: otherSite.id,
+        title: "Shared Slug",
+        slug: "shared-slug",
+        markdown: "# Other shared slug\n\nOther site content.",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Other site page"
+      },
+      test.db
+    );
+    const currentSharedSlug = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Shared Slug",
+        slug: "shared-slug",
+        markdown: "# Current shared slug\n\nCurrent site content.",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Current site page"
+      },
+      test.db
+    );
+    const resolvedSharedSlug = await resolvePageBySlug(
+      { siteId: setup.site.id, slug: "shared-slug" },
+      test.executor
+    );
+    expect(resolvedSharedSlug.page.id).toBe(currentSharedSlug.page.id);
+    expect(resolvedSharedSlug.page.id).not.toBe(otherSharedSlug.page.id);
 
     const first = await createPage(
       {
