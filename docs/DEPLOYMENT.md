@@ -103,8 +103,8 @@ Set `NEXTWIKI_BASE_URL` to the externally visible HTTPS URL. Production cookies 
 At minimum, verify the application can serve `GET /` and connect to the database after deployment. Use the v0.1.0 health and readiness endpoints for load balancer checks when enabled:
 
 ```text
-GET /api/v1/health
-GET /api/v1/readiness
+GET /api/health
+GET /api/ready
 ```
 
 Example manual check:

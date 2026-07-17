@@ -66,12 +66,13 @@ pnpm restore
 - [Deployment](docs/DEPLOYMENT.md)
 - [Backup and restore](docs/BACKUP_RESTORE.md)
 - [API](docs/API.md)
+- [Development](docs/DEVELOPMENT.md)
 - [Testing](docs/TESTING.md)
-- [Final report](docs/FINAL_REPORT.md)
+- [Upgrading](docs/UPGRADING.md)
 
 ## Project Status
 
-Version target: `0.1.0`. See [docs/STATUS.md](docs/STATUS.md) and [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for implementation and verification evidence.
+Current repository version: `0.1.0`. NoviqWiki is pre-1.0 self-hosted software; review [SECURITY.md](SECURITY.md), set production secrets, and run the verification commands in [Testing](docs/TESTING.md) before operating an internet-facing instance.
 
 ## License
 

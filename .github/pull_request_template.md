@@ -21,4 +21,4 @@
 - [ ] Inputs are validated with Zod at route handler or server action boundaries.
 - [ ] Markdown remains canonical page source; rendered HTML and search text are derived from immutable revisions.
 - [ ] No MediaWiki compatibility, migration, extension, or API behavior was added.
-- [ ] `docs/STATUS.md` and `docs/TEST_MATRIX.md` were updated if milestone status or verification results changed.
+- [ ] User-facing documentation was updated when commands, configuration, deployment, API behavior, or security guidance changed.

@@ -69,10 +69,10 @@ pnpm dev
 For LAN/mobile review, bind the dev server to all interfaces and allow the workstation IP:
 
 ```bash
-NEXTWIKI_ALLOWED_DEV_ORIGINS=10.0.0.180 pnpm exec next dev -H 0.0.0.0 -p 3100
+NEXTWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
 ```
 
-Replace `10.0.0.180` with the host IP shown by your operating system. Phones and tablets must be on the same network.
+Replace `192.168.1.20` with the host IP shown by your operating system. Phones and tablets must be on the same network.
 
 ## Workflow
 

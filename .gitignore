@@ -11,3 +11,11 @@ dist
 /backups
 *.log
 *.tsbuildinfo
+
+# Local implementation notes and AI/task-state records.
+AGENTS.md
+docs/DECISIONS.md
+docs/FINAL_REPORT.md
+docs/IMPLEMENTATION_PLAN.md
+docs/STATUS.md
+docs/TEST_MATRIX.md
