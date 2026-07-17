@@ -55,6 +55,8 @@ type RouteMetrics = {
   oversizedFormControls: ElementSummary[];
   oversizedFilterBars: ElementSummary[];
   badFileInputs: ElementSummary[];
+  controlTextOverflow: ElementSummary[];
+  articleMediaOverflow: ElementSummary[];
   visibleDialogs: ElementSummary[];
   commandButtonsWithoutIcons: ElementSummary[];
   oversizedText: ElementSummary[];
@@ -407,7 +409,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, design token drift, overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -719,6 +721,20 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     route
   );
   recordElementFailures("bad_file_inputs", metrics.badFileInputs, browserName, sizeName, route);
+  recordElementFailures(
+    "control_text_overflow",
+    metrics.controlTextOverflow,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "article_media_overflow",
+    metrics.articleMediaOverflow,
+    browserName,
+    sizeName,
+    route
+  );
   recordElementFailures("stray_dialogs", metrics.visibleDialogs, browserName, sizeName, route);
   recordElementFailures(
     "command_buttons_without_icons",
@@ -943,6 +959,18 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       ".backlink-row",
       ".feature-card"
     ].join(",");
+    const controlOverflowSelectors = [
+      "button:not(.sr-only)",
+      "a.button",
+      ".nav-list a",
+      ".admin-tabs a",
+      ".article-tabs a",
+      ".article-tabs button",
+      ".filter-pill",
+      ".search-filter-link",
+      ".aside-actions a",
+      ".aside-action-form button"
+    ].join(",");
 
     return {
       bodyScrollWidth: document.body.scrollWidth,
@@ -993,6 +1021,45 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         .slice(0, 12),
       badFileInputs: visibleMatches("input[type='file']")
         .filter((element) => element.getBoundingClientRect().height < 40)
+        .map(summarize)
+        .slice(0, 12),
+      controlTextOverflow: visibleMatches(controlOverflowSelectors)
+        .filter((element) => {
+          if (
+            element.closest(".setup-stepper") ||
+            element.closest(".home-hero-search") ||
+            element.closest(".media-grid") ||
+            element.closest(".media-picker-grid") ||
+            element.closest(".cm-editor") ||
+            element.classList.contains("editor-tool-button")
+          ) {
+            return false;
+          }
+          const rect = element.getBoundingClientRect();
+          const label = labelOf(element);
+          if (!label) return false;
+          const horizontalOverflow =
+            element.scrollWidth > element.clientWidth + 2 ||
+            [...element.children].some((child) => child.getBoundingClientRect().right > rect.right + 1);
+          const wrappedCompactControl =
+            rect.height > 46 &&
+            (element.matches(".button, button, .filter-pill, .search-filter-link") ||
+              element.closest(".admin-tabs") ||
+              element.closest(".article-tabs"));
+          return horizontalOverflow || wrappedCompactControl;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      articleMediaOverflow: visibleMatches(
+        ".article-body img, .article-body video, .article-body iframe, .article-body svg"
+      )
+        .filter((element) => {
+          const articleBody = element.closest(".article-body");
+          if (!articleBody) return false;
+          const rect = element.getBoundingClientRect();
+          const bodyRect = articleBody.getBoundingClientRect();
+          return rect.left < bodyRect.left - 1 || rect.right > bodyRect.right + 1 || rect.width > bodyRect.width + 1;
+        })
         .map(summarize)
         .slice(0, 12),
       visibleDialogs: visibleMatches("[role='dialog'], .modal-backdrop, [popover]")

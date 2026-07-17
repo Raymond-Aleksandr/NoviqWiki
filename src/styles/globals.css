@@ -2092,6 +2092,7 @@ pre.citation-block {
 
 .search-form-main {
   display: flex;
+  align-items: center;
   gap: 10px;
   max-width: 640px;
   margin-bottom: 22px;
@@ -2106,7 +2107,8 @@ pre.citation-block {
   border-radius: 10px;
   background: var(--surface);
   box-shadow: var(--sh-sm);
-  padding: 11px 14px;
+  min-block-size: var(--control-height);
+  padding: 0 var(--control-pad-x);
 }
 
 .search-input-main input {
@@ -2116,6 +2118,12 @@ pre.citation-block {
   outline: 0;
   background: transparent;
   color: var(--text);
+}
+
+.search-form-main button {
+  block-size: var(--control-height);
+  min-block-size: var(--control-height);
+  padding-block: 0;
 }
 
 .search-layout {
