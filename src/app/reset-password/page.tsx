@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, KeyRound } from "lucide-react";
 import { resetPasswordAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
+import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 
 type Props = {
@@ -10,7 +11,8 @@ type Props = {
 
 export default async function ResetPasswordPage({ searchParams }: Props) {
   const { token = "" } = await searchParams;
-  const { messages } = await getRequestI18n();
+  const site = await getPrimarySiteWithSettings();
+  const { messages } = await getRequestI18n(site?.settings?.defaultLocale);
   return (
     <section className="auth-compact auth-shell">
       <div className="auth-compact-card">

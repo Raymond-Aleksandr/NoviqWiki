@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AlertCircle, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { verifyEmailAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
+import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 
 type Props = {
@@ -10,7 +11,8 @@ type Props = {
 
 export default async function VerifyEmailPage({ searchParams }: Props) {
   const { token = "" } = await searchParams;
-  const { messages } = await getRequestI18n();
+  const site = await getPrimarySiteWithSettings();
+  const { messages } = await getRequestI18n(site?.settings?.defaultLocale);
   return (
     <section className="auth-compact auth-shell wide">
       <div className="auth-compact-card center">

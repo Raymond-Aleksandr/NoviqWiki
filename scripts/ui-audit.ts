@@ -74,6 +74,7 @@ type RouteMetrics = {
   unlocalizedRevisionSummaries: string[];
   unlocalizedAuthorizationLabels: ElementSummary[];
   unlocalizedFieldTerms: ElementSummary[];
+  unlocalizedProductText: ElementSummary[];
 };
 
 type ModalMetrics = {
@@ -200,6 +201,9 @@ const rawAuditActionPattern = new RegExp(
   `\\b(?:${rawAuditActionValues.map(escapeRegExp).join("|")})\\b`,
   "g"
 );
+
+const unlocalizedProductTextPattern =
+  /\b(?:Read|Recent changes|Categories|Media library|Special pages|Admin|Search|Create page|Clear filters|Previous page|Next page|Published|Draft|Archived|Deleted|Protected|Editable|Built-in|Custom|Media uploaded|Media deleted|Page published|Page edited|Page created|Page deleted|Page restored|Page rollback|Rollback|Setup complete|Auth login|Auth logout|Create account|Sign in|Log out|No role|No group|No assigned roles|Title|Slug|Status|Actions|Description|Name|Email|Role|Users|Groups|Roles|Audit log|Dashboard|Settings)\b/i;
 
 const publicRoutes = [
   "/",
@@ -767,7 +771,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1201,6 +1205,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     sizeName,
     route
   );
+  recordElementFailures(
+    "unlocalized_product_text",
+    metrics.unlocalizedProductText,
+    browserName,
+    sizeName,
+    route
+  );
 
   if (
     new URL(page.url()).pathname.startsWith("/admin") &&
@@ -1417,6 +1428,46 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
               labelOf(element)
             )
           )
+          .map(summarize)
+          .slice(0, 12)
+      : [];
+    const unlocalizedProductText = document.documentElement.lang.startsWith("zh")
+      ? visibleMatches(
+          [
+            "button:not(.editor-tool-button):not(.icon-button)",
+            "a.button",
+            ".nav-list a",
+            ".admin-tabs a",
+            ".page-description",
+            ".panel h2",
+            ".admin-panel-heading",
+            ".settings-kicker",
+            ".settings-switch-title",
+            ".settings-switch-help",
+            "label:not(.checkbox-row)",
+            "legend",
+            "option",
+            "input[placeholder]",
+            "textarea[placeholder]",
+            ".badge",
+            ".audit-action",
+            ".timeline-action",
+            ".filter-pill",
+            ".search-filter-link",
+            ".admin-grid-header > div",
+            ".media-detail-label",
+            ".editor-preview-kicker",
+            ".setup-step-title",
+            ".setup-step-description"
+          ].join(",")
+        )
+          .filter((element) => {
+            const label = labelOf(element);
+            if (/^[a-z]+(?:\\.[a-z_]+)+$/.test(label)) {
+              return false;
+            }
+            return ${unlocalizedProductTextPattern}.test(label);
+          })
           .map(summarize)
           .slice(0, 12)
       : [];
@@ -1648,7 +1699,8 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       rawAuditActions,
       unlocalizedRevisionSummaries,
       unlocalizedAuthorizationLabels,
-      unlocalizedFieldTerms
+      unlocalizedFieldTerms,
+      unlocalizedProductText
     };
   })()`) as Promise<RouteMetrics>;
 }
