@@ -67,6 +67,7 @@ type RouteMetrics = {
   formLayoutRhythmMismatches: ElementSummary[];
   pageHeaderRhythmMismatches: ElementSummary[];
   contentRowRhythmMismatches: ElementSummary[];
+  keyValueRhythmMismatches: ElementSummary[];
   editorToolbarRhythmMismatches: ElementSummary[];
   mediaPickerRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
@@ -992,7 +993,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, editor-toolbar, or media-picker rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, editor-toolbar, or media-picker rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1389,6 +1390,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "content_row_rhythm_mismatch",
     metrics.contentRowRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "key_value_rhythm_mismatch",
+    metrics.keyValueRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -2976,6 +2984,126 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         })
         .map(summarize)
         .slice(0, 12),
+      keyValueRhythmMismatches: visibleMatches(
+        [
+          ".article-facts > div",
+          ".citation-meta > div",
+          ".setup-review dl > div",
+          ".media-detail-name",
+          ".media-detail-meta",
+          ".status-card-grid .status-card"
+        ].join(",")
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const isMobile = document.documentElement.clientWidth <= 560;
+          const fontSize = Number.parseFloat(style.fontSize);
+          const lineHeight =
+            style.lineHeight === "normal" ? fontSize * 1.35 : Number.parseFloat(style.lineHeight);
+          const childOverflow = [...element.children].filter(visible).some((child) => {
+            const childRect = child.getBoundingClientRect();
+            return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+          });
+          const viewportMismatch =
+            isMobile && (rect.left < -1 || rect.right > document.documentElement.clientWidth + 1);
+          if (element.matches(".media-detail-name")) {
+            return (
+              !/JetBrains Mono/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12 ||
+              fontSize > 13.5 ||
+              (Number.isFinite(lineHeight) && lineHeight > 20) ||
+              rect.width > document.documentElement.clientWidth + 1 ||
+              element.scrollWidth > element.clientWidth + 2
+            );
+          }
+          if (element.matches(".media-detail-meta")) {
+            return (
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 11.5 ||
+              fontSize > 12.8 ||
+              (Number.isFinite(lineHeight) && lineHeight > 18) ||
+              rect.width > document.documentElement.clientWidth + 1 ||
+              element.scrollWidth > element.clientWidth + 2
+            );
+          }
+          if (element.matches(".status-card-grid .status-card")) {
+            const gap = Number.parseFloat(style.gap || style.columnGap);
+            const status = element.querySelector(".status-ok, .status-warning, .status-error");
+            const statusStyle = status ? getComputedStyle(status) : null;
+            const statusRect = status?.getBoundingClientRect();
+            return (
+              style.display !== "flex" ||
+              style.alignItems !== "center" ||
+              style.justifyContent !== "space-between" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12.5 ||
+              fontSize > 14.2 ||
+              !Number.isFinite(gap) ||
+              gap < 8 ||
+              gap > 16 ||
+              childOverflow ||
+              viewportMismatch ||
+              !status ||
+              !statusStyle ||
+              !["flex", "inline-flex"].includes(statusStyle.display) ||
+              statusStyle.alignItems !== "center" ||
+              !statusRect ||
+              statusRect.width > rect.width
+            );
+          }
+          const isArticleFact = element.matches(".article-facts > div");
+          const isCitationOrSetup = element.matches(".citation-meta > div, .setup-review dl > div");
+          const expectedDisplay = isArticleFact ? "flex" : "grid";
+          const gap = Number.parseFloat(style.gap || style.columnGap);
+          const paddingTop = Number.parseFloat(style.paddingTop);
+          const paddingInline = Number.parseFloat(style.paddingLeft);
+          const dt = element.querySelector("dt");
+          const dd = element.querySelector("dd");
+          const dtStyle = dt ? getComputedStyle(dt) : null;
+          const ddRect = dd?.getBoundingClientRect();
+          const dtRect = dt?.getBoundingClientRect();
+          const ddOverflow =
+            dd !== null &&
+            (dd.scrollWidth > dd.clientWidth + 2 ||
+              (ddRect !== undefined && ddRect.right > rect.right + 1));
+          const labelMismatch =
+            !dt ||
+            !dtStyle ||
+            !dtRect ||
+            dtStyle.color === getComputedStyle(element).color ||
+            (isArticleFact && (dtRect.width < 64 || dtRect.width > 100)) ||
+            (isCitationOrSetup &&
+              !isMobile &&
+              (dtRect.width < 110 || dtRect.width > 190));
+          return (
+            style.display !== expectedDisplay ||
+            !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+            !Number.isFinite(fontSize) ||
+            fontSize < 12 ||
+            fontSize > 14.2 ||
+            (Number.isFinite(lineHeight) && lineHeight > 20) ||
+            !Number.isFinite(gap) ||
+            gap < (isMobile && isCitationOrSetup ? 4 : 8) ||
+            gap > 14 ||
+            !Number.isFinite(paddingTop) ||
+            paddingTop < 5 ||
+            paddingTop > 14 ||
+            !Number.isFinite(paddingInline) ||
+            paddingInline < 10 ||
+            paddingInline > 20 ||
+            labelMismatch ||
+            !dd ||
+            ddOverflow ||
+            childOverflow ||
+            viewportMismatch
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
       editorToolbarRhythmMismatches: visibleMatches(
         ".editor-toolbar, .editor-toolbar .editor-tool-button"
       )
@@ -3292,7 +3420,7 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           const rect = element.getBoundingClientRect();
           const isMobile = document.documentElement.clientWidth <= 560;
           const maxAllowedHeight = isMobile
-            ? Math.min(window.innerHeight * 0.38, 260)
+            ? Math.min(window.innerHeight * 0.3, 220)
             : Math.min(window.innerHeight * 0.56, 460);
           return rect.height > maxAllowedHeight + 2;
         })
@@ -3338,10 +3466,13 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             (() => {
               const wrapperRect = wrapperElement.getBoundingClientRect();
               const wrapperStyle = getComputedStyle(wrapperElement);
+              const isMobile = document.documentElement.clientWidth <= 560;
               const overflowOk =
                 wrapperStyle.overflowX === "hidden" || wrapperStyle.overflowX === "clip";
+              const fillsArticleOnMobile = !isMobile || wrapperRect.width >= bodyRect.width - 1;
               return (
                 overflowOk &&
+                fillsArticleOnMobile &&
                 wrapperStyle.maxWidth !== "none" &&
                 wrapperRect.width <= bodyRect.width + 1 &&
                 wrapperRect.left >= bodyRect.left - 1 &&

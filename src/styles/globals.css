@@ -1822,14 +1822,20 @@ pre.citation-block {
 }
 
 .media-detail-name {
+  min-width: 0;
   font-size: 13px;
   font-weight: 500;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .media-detail-meta {
   color: var(--text-muted);
+  font-family: var(--nw-font-body);
   font-size: 12px;
+  line-height: 1.35;
   margin-bottom: 16px;
+  overflow-wrap: anywhere;
 }
 
 .media-actions {
@@ -2574,21 +2580,31 @@ pre.citation-block {
   display: block;
   flex: 0 1 auto;
   width: auto;
+  inline-size: auto;
   min-width: 0;
+  min-inline-size: 0;
   max-width: 100%;
+  max-inline-size: min(100%, var(--article-media-max-inline-size));
   max-height: 520px;
   max-height: var(--article-media-max-block-size);
+  max-block-size: var(--article-media-max-block-size);
   height: auto;
+  block-size: auto;
   object-fit: contain;
+  object-position: center;
 }
 
 .article-body :where(p, figure) > :where(img, video, iframe, svg),
 .article-body p > a > img,
 .article-body figure > a > img {
   width: auto;
+  inline-size: auto;
   max-width: 100%;
+  max-inline-size: min(100%, var(--article-media-max-inline-size));
   max-height: var(--article-media-max-block-size);
+  max-block-size: var(--article-media-max-block-size);
   height: auto;
+  block-size: auto;
 }
 
 .article-body :where(img, video) {
@@ -2608,8 +2624,14 @@ pre.citation-block {
   display: grid;
   place-items: center;
   width: 100%;
+  inline-size: min(
+    100%,
+    calc(var(--article-media-max-inline-size) + (var(--article-media-padding) * 2))
+  );
   max-width: calc(var(--article-media-max-inline-size) + (var(--article-media-padding) * 2));
+  max-inline-size: 100%;
   min-width: 0;
+  min-inline-size: 0;
   margin-inline: auto;
   padding: var(--article-media-padding);
   overflow: hidden;
@@ -2634,8 +2656,11 @@ pre.citation-block {
   > :where(img, video, iframe, svg),
 .article-body p:has(> a:only-child > img:only-child) > a > img {
   max-width: 100%;
+  max-inline-size: 100%;
+  max-block-size: var(--article-media-max-block-size);
   max-height: var(--article-media-max-block-size);
   height: auto;
+  block-size: auto;
 }
 
 .article-body p > img:only-child,
@@ -2751,10 +2776,13 @@ pre.citation-block {
 
 .article-facts div {
   display: flex;
+  align-items: flex-start;
   gap: 10px;
   border-bottom: 1px solid var(--border);
+  font-family: var(--nw-font-body);
   padding: 6px 14px;
   font-size: 12.5px;
+  line-height: 1.35;
 }
 
 .article-facts div:last-child {
@@ -3229,6 +3257,9 @@ pre.citation-block {
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr);
   gap: 12px;
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   padding: 11px 14px;
   border-bottom: 1px solid var(--border);
 }
@@ -3244,6 +3275,8 @@ pre.citation-block {
 
 .setup-review dd {
   margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .setup-actions {
@@ -3953,10 +3986,28 @@ pre.citation-block {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   padding: 18px 20px;
 }
 
+.status-card-grid .status-card > div {
+  min-width: 0;
+}
+
+.status-card-grid .status-card strong,
+.status-card-grid .status-card .muted {
+  overflow-wrap: anywhere;
+}
+
 .status-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
   color: var(--success);
 }
 
@@ -5480,7 +5531,8 @@ pre.citation-block {
   }
 
   .article-body {
-    --article-media-max-block-size: min(38vh, 260px);
+    --article-media-max-block-size: min(30vh, 220px);
+    --article-media-max-inline-size: 100%;
     --article-media-padding: 8px;
   }
 
