@@ -269,7 +269,7 @@ export async function publishPage(
         action: "page.published",
         targetType: "page",
         targetId: page.id,
-        details: { revisionId: revision.id }
+        details: { title: page.title, revisionId: revision.id }
       },
       tx
     );
@@ -600,7 +600,12 @@ export async function rollbackPage(
         action: "page.rollback",
         targetType: "page",
         targetId: page.id,
-        details: { targetRevisionId: target.id, newRevisionId: revision.id, reason: input.reason }
+        details: {
+          title: page.title,
+          targetRevisionId: target.id,
+          newRevisionId: revision.id,
+          reason: input.reason
+        }
       },
       tx
     );

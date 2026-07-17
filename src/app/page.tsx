@@ -7,7 +7,7 @@ import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
 import { listCategories } from "@/modules/categories/service";
 import { listPages, listPagesBySlugs } from "@/modules/pages/service";
-import { listRecentChanges } from "@/modules/activity/service";
+import { listRecentChangesWithTargets } from "@/modules/activity/service";
 import { collectHomepageContributions } from "@/modules/plugins/registry";
 import { normalizeHomepageSections, prioritizeCategories } from "@/modules/settings/homepage";
 
@@ -27,7 +27,7 @@ export default async function HomePage() {
       limit: 6
     }),
     listCategories(site.site.id),
-    listRecentChanges({ siteId: site.site.id, limit: 5, publicOnly: true })
+    listRecentChangesWithTargets({ siteId: site.site.id, limit: 5, publicOnly: true })
   ]);
   const { locale, messages } = await getRequestI18n(settings?.defaultLocale);
   const featuredPages = configuredPages.length > 0 ? configuredPages : recentPages.slice(0, 3);
@@ -125,7 +125,8 @@ export default async function HomePage() {
                     <span className={`badge audit-action ${badgeForAction(change.action)}`}>
                       {auditActionLabel(change.action, messages)}
                     </span>
-                    <span>{change.actorDisplayName}</span>
+                    <span>{change.targetLabel}</span>
+                    <span className="muted">{change.actorDisplayName ?? messages.system}</span>
                     <span className="muted">{change.createdAt.toLocaleString(locale)}</span>
                   </p>
                 ))}

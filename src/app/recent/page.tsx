@@ -6,7 +6,7 @@ import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
 import {
   actionsForRecentChangeFilter,
-  listRecentChanges,
+  listRecentChangesWithTargets,
   recentChangeFilterValue,
   type RecentChangeFilter
 } from "@/modules/activity/service";
@@ -33,7 +33,7 @@ export default async function RecentChangesPage({ searchParams }: Props) {
   const params = await searchParams;
   const activeFilter = recentChangeFilterValue(params.type);
   const [changes, i18n] = await Promise.all([
-    listRecentChanges({
+    listRecentChangesWithTargets({
       siteId: site.site.id,
       limit: 100,
       publicOnly: true,
@@ -73,10 +73,7 @@ export default async function RecentChangesPage({ searchParams }: Props) {
                 {auditActionLabel(change.action, messages)}
               </span>
               <span className="timeline-title">
-                <strong>
-                  {change.targetType}
-                  {change.targetId ? `:${change.targetId.slice(0, 8)}` : ""}
-                </strong>
+                <strong>{change.targetLabel}</strong>
                 <span className="muted">{auditActionLabel(change.action, messages)}</span>
               </span>
               <span className="timeline-meta">

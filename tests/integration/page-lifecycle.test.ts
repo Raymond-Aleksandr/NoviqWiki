@@ -9,7 +9,11 @@ import {
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { completeSetup } from "@/modules/setup/service";
 import { createUser } from "@/modules/users/service";
-import { actionsForRecentChangeFilter, listRecentChanges } from "@/modules/activity/service";
+import {
+  actionsForRecentChangeFilter,
+  listRecentChanges,
+  listRecentChangesWithTargets
+} from "@/modules/activity/service";
 import {
   archivePage,
   createPage,
@@ -103,6 +107,23 @@ describe("page lifecycle integration", () => {
       test.executor
     );
     expect(publishedChanges.map((change) => change.targetId)).toContain(page.id);
+    expect(publishedChanges).toContainEqual(
+      expect.objectContaining({
+        targetId: page.id,
+        details: expect.objectContaining({ title: "Lifecycle" })
+      })
+    );
+    const publishedChangesWithTargets = await listRecentChangesWithTargets(
+      {
+        siteId: setup.site.id,
+        actions: actionsForRecentChangeFilter("published"),
+        publicOnly: true
+      },
+      test.executor
+    );
+    expect(publishedChangesWithTargets).toContainEqual(
+      expect.objectContaining({ targetId: page.id, targetLabel: "Lifecycle" })
+    );
     const storedNewPageDraft = await getDraftForEditor(
       { pageId: draftOnly.page.id, editorId: setup.owner.id },
       test.executor
@@ -272,6 +293,23 @@ describe("page lifecycle integration", () => {
       test.executor
     );
     expect(rollbackChanges.map((change) => change.targetId)).toContain(page.id);
+    expect(rollbackChanges).toContainEqual(
+      expect.objectContaining({
+        targetId: page.id,
+        details: expect.objectContaining({ title: "Moved Topic" })
+      })
+    );
+    const rollbackChangesWithTargets = await listRecentChangesWithTargets(
+      {
+        siteId: setup.site.id,
+        actions: actionsForRecentChangeFilter("rollback"),
+        publicOnly: true
+      },
+      test.executor
+    );
+    expect(rollbackChangesWithTargets).toContainEqual(
+      expect.objectContaining({ targetId: page.id, targetLabel: "Moved Topic" })
+    );
     const revisions = await listRevisions(page.id, test.executor);
     expect(revisions).toHaveLength(3);
 
