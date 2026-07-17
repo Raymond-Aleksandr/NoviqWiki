@@ -329,6 +329,18 @@ export async function getPageWithCurrentRevision(pageId: string, database: Datab
   return { page, revision };
 }
 
+export async function getDraftForEditor(
+  input: { pageId: string; editorId: string },
+  database: Database = db
+) {
+  const [draft] = await database
+    .select()
+    .from(pageDrafts)
+    .where(and(eq(pageDrafts.pageId, input.pageId), eq(pageDrafts.editorId, input.editorId)))
+    .limit(1);
+  return draft ?? null;
+}
+
 export async function getRevisionById(revisionId: string, database: Database = db) {
   const [revision] = await database
     .select()

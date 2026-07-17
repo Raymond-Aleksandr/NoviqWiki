@@ -33,7 +33,7 @@ export default async function HistoryPage({ params }: Props) {
   const { locale, messages } = i18n;
   return (
     <section className="page-frame">
-      <h1 className="page-title admin-title">
+      <h1 className="page-title history-title">
         {messages.history} · {resolved.page.title}
       </h1>
       <div className="history-panel">
@@ -45,20 +45,17 @@ export default async function HistoryPage({ params }: Props) {
         </div>
         {revisions.map((revision, index) => (
           <article className="history-row" key={revision.id}>
-            <div className="mono" data-label={messages.revisionShort} style={{ fontWeight: 600 }}>
+            <div className="history-revision-cell mono" data-label={messages.revisionShort}>
               r{revision.revisionNumber}
               {resolved.page.currentRevisionId === revision.id ? (
-                <span
-                  className="badge success"
-                  style={{ display: "block", width: "fit-content", marginTop: 4 }}
-                >
-                  {messages.current}
-                </span>
+                <span className="badge success history-current-badge">{messages.current}</span>
               ) : null}
             </div>
-            <div data-label={messages.summary}>
-              <div>{revision.editSummary || messages.noEditSummary}</div>
-              <div className="mono muted" style={{ fontSize: "11px" }}>
+            <div className="history-summary-cell" data-label={messages.summary}>
+              <div className="history-summary-text">
+                {revision.editSummary || messages.noEditSummary}
+              </div>
+              <div className="history-summary-date mono muted">
                 {revision.createdAt.toLocaleString(locale)}
               </div>
             </div>

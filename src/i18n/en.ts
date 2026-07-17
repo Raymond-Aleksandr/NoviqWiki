@@ -285,6 +285,8 @@ export const en = {
   baseRevision: "Base revision",
   none: "none",
   outdatedBaseRejected: "Publishing from an outdated base revision is rejected.",
+  draftLoaded: "Draft loaded",
+  draftLoadedDescription: "Loaded your saved draft from",
   markdownFormatting: "Markdown formatting",
   bold: "Bold",
   italic: "Italic",

@@ -279,6 +279,8 @@ export const zhCN = {
   baseRevision: "基础修订",
   none: "无",
   outdatedBaseRejected: "如果基于过期修订发布，系统会拒绝以避免覆盖新内容。",
+  draftLoaded: "已载入草稿",
+  draftLoadedDescription: "已载入你保存的草稿，保存时间：",
   markdownFormatting: "Markdown 格式工具",
   bold: "加粗",
   italic: "斜体",

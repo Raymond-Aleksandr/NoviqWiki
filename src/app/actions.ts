@@ -161,7 +161,7 @@ export async function createPageAction(
       actorDisplayName: session.user.displayName
     });
     revalidatePath("/");
-    target = `/page/${result.page.slug}`;
+    target = publish ? `/page/${result.page.slug}` : `/edit/${result.page.slug}`;
   } catch (error) {
     return actionError(error);
   }

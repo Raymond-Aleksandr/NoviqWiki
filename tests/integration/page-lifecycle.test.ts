@@ -13,6 +13,7 @@ import {
   createPage,
   compareRevisionsForRead,
   getRevisionForRead,
+  getDraftForEditor,
   listPageBacklinks,
   listPageOutboundLinks,
   listRevisions,
@@ -67,6 +68,45 @@ describe("page lifecycle integration", () => {
     expect(firstRevision.revisionNumber).toBe(1);
 
     const page = first.page;
+    const draftOnly = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Draft Only",
+        markdown: "# Draft Only\n\nWork in progress.",
+        publish: false,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Start draft"
+      },
+      test.db
+    );
+    expect(draftOnly.page.status).toBe("draft");
+    const storedNewPageDraft = await getDraftForEditor(
+      { pageId: draftOnly.page.id, editorId: setup.owner.id },
+      test.executor
+    );
+    expect(storedNewPageDraft?.markdown).toContain("Work in progress.");
+    expect(storedNewPageDraft?.baseRevisionId).toBeNull();
+
+    const savedDraft = await saveDraft(
+      {
+        pageId: page.id,
+        baseRevisionId: firstRevision.id,
+        markdown: "# Lifecycle\n\nDraft body [[Category:Testing]]",
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Saved draft"
+      },
+      test.db
+    );
+    const restoredDraft = await getDraftForEditor(
+      { pageId: page.id, editorId: setup.owner.id },
+      test.executor
+    );
+    expect(restoredDraft?.id).toBe(savedDraft.id);
+    expect(restoredDraft?.baseRevisionId).toBe(firstRevision.id);
+    expect(restoredDraft?.editSummary).toBe("Saved draft");
+
     const source = await createPage(
       {
         siteId: setup.site.id,
@@ -105,6 +145,11 @@ describe("page lifecycle integration", () => {
       test.db
     );
     expect(second.revisionNumber).toBe(2);
+    const draftAfterPublish = await getDraftForEditor(
+      { pageId: page.id, editorId: setup.owner.id },
+      test.executor
+    );
+    expect(draftAfterPublish).toBeNull();
 
     const search = await searchPages({ siteId: setup.site.id, query: "searchable" }, test.executor);
     expect(search.rows[0]?.title).toBe("Lifecycle");

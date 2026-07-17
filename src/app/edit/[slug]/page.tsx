@@ -9,7 +9,7 @@ import { getRequestI18n } from "@/i18n/server";
 import { getCurrentSession } from "@/modules/auth/session";
 import { requirePermission } from "@/modules/authorization/permissions";
 import { listMedia } from "@/modules/media/service";
-import { getRevisionById } from "@/modules/pages/service";
+import { getDraftForEditor, getRevisionById } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
 
 type Props = {
@@ -34,11 +34,14 @@ export default async function EditPage({ params }: Props) {
   const revision = resolved.page.currentRevisionId
     ? await getRevisionById(resolved.page.currentRevisionId)
     : null;
-  const [mediaItems, i18n] = await Promise.all([
+  const [draft, mediaItems, i18n] = await Promise.all([
+    getDraftForEditor({ pageId: resolved.page.id, editorId: session.user.id }),
     listMedia({ siteId: site.site.id, limit: 40 }),
     getRequestI18n(site.settings?.defaultLocale)
   ]);
   const { messages } = i18n;
+  const editorMarkdown = draft?.markdown ?? revision?.markdown ?? "";
+  const baseRevisionId = draft?.baseRevisionId ?? resolved.page.currentRevisionId ?? "";
   return (
     <section className="page-frame editor-page">
       <header className="editor-header">
@@ -50,15 +53,23 @@ export default async function EditPage({ params }: Props) {
             {messages.baseRevision} {revision?.revisionNumber ?? messages.none}.{" "}
             {messages.outdatedBaseRejected}
           </p>
+          {draft ? (
+            <div className="draft-resume-notice">
+              <span className="badge warning">{messages.draftLoaded}</span>
+              <span>
+                {messages.draftLoadedDescription} {draft.updatedAt.toLocaleString(i18n.locale)}
+              </span>
+            </div>
+          ) : null}
         </div>
         <div className="unsaved-badge">{messages.unsavedChanges}</div>
       </header>
       <ActionForm action={editPageAction} className="editor-form" pendingLabel={messages.working}>
         <input type="hidden" name="pageId" value={resolved.page.id} />
         <input type="hidden" name="slug" value={resolved.page.slug} />
-        <input type="hidden" name="baseRevisionId" value={resolved.page.currentRevisionId ?? ""} />
+        <input type="hidden" name="baseRevisionId" value={baseRevisionId} />
         <MarkdownEditor
-          initialValue={revision?.markdown ?? ""}
+          initialValue={editorMarkdown}
           messages={messages}
           mediaItems={serializeEditorMedia(mediaItems)}
           footer={
@@ -68,6 +79,7 @@ export default async function EditPage({ params }: Props) {
                 <input
                   className="field"
                   name="editSummary"
+                  defaultValue={draft?.editSummary ?? ""}
                   placeholder={messages.editSummaryPlaceholder}
                 />
               </label>
