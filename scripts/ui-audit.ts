@@ -67,6 +67,8 @@ type RouteMetrics = {
   formLayoutRhythmMismatches: ElementSummary[];
   pageHeaderRhythmMismatches: ElementSummary[];
   contentRowRhythmMismatches: ElementSummary[];
+  editorToolbarRhythmMismatches: ElementSummary[];
+  mediaPickerRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
   articleMediaWrapperOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
@@ -989,7 +991,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, form-layout, page-header, or content-row rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, form-layout, page-header, content-row, editor-toolbar, or media-picker rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1386,6 +1388,20 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "content_row_rhythm_mismatch",
     metrics.contentRowRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "editor_toolbar_rhythm_mismatch",
+    metrics.editorToolbarRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "media_picker_rhythm_mismatch",
+    metrics.mediaPickerRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -2815,6 +2831,244 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         })
         .map(summarize)
         .slice(0, 12),
+      editorToolbarRhythmMismatches: visibleMatches(
+        ".editor-toolbar, .editor-toolbar .editor-tool-button"
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          if (element.matches(".editor-toolbar")) {
+            const rowGap = Number.parseFloat(style.rowGap);
+            const columnGap = Number.parseFloat(style.columnGap);
+            const paddingBlock = Number.parseFloat(style.paddingTop);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            const childOverflow = [...element.children].filter(visible).some((child) => {
+              const childRect = child.getBoundingClientRect();
+              return (
+                childRect.left < rect.left - 1 ||
+                childRect.right > rect.right + 1 ||
+                childRect.top < rect.top - 1 ||
+                childRect.bottom > rect.bottom + 1
+              );
+            });
+            const viewportMismatch =
+              document.documentElement.clientWidth <= 560 &&
+              (rect.left < -1 || rect.right > document.documentElement.clientWidth + 1);
+            return (
+              style.display !== "flex" ||
+              style.flexWrap !== "wrap" ||
+              style.alignItems !== "center" ||
+              !Number.isFinite(rowGap) ||
+              rowGap < 4 ||
+              rowGap > 10 ||
+              !Number.isFinite(columnGap) ||
+              columnGap < 4 ||
+              columnGap > 10 ||
+              !Number.isFinite(paddingBlock) ||
+              paddingBlock < 7 ||
+              paddingBlock > 12 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 10 ||
+              paddingInline > 18 ||
+              Number.parseFloat(style.borderBottomWidth) < 1 ||
+              (style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+                style.backgroundImage === "none") ||
+              viewportMismatch ||
+              childOverflow
+            );
+          }
+          const svg = element.querySelector("svg");
+          const svgRect = svg?.getBoundingClientRect();
+          const fontSize = Number.parseFloat(style.fontSize);
+          const width = rect.width;
+          const height = rect.height;
+          return (
+            !["flex", "inline-flex"].includes(style.display) ||
+            style.alignItems !== "center" ||
+            style.justifyContent !== "center" ||
+            Math.abs(width - height) > 1 ||
+            width < 34 ||
+            width > 38 ||
+            height < 34 ||
+            height > 38 ||
+            Number.parseFloat(style.paddingTop) > 1 ||
+            Number.parseFloat(style.paddingLeft) > 1 ||
+            !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+            !Number.isFinite(fontSize) ||
+            fontSize < 12 ||
+            fontSize > 15 ||
+            !svg ||
+            !svgRect ||
+            svgRect.width < 14 ||
+            svgRect.width > 18 ||
+            svgRect.height < 14 ||
+            svgRect.height > 18
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      mediaPickerRhythmMismatches: visibleMatches(
+        [
+          ".media-picker-dialog",
+          ".media-picker-body",
+          ".media-picker-grid",
+          ".modal-search-row",
+          ".media-picker-item",
+          ".media-picker-thumb",
+          ".media-picker-name",
+          ".media-picker-detail",
+          ".media-picker-detail label"
+        ].join(",")
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const viewportWidth = document.documentElement.clientWidth;
+          const isMobile = viewportWidth <= 560;
+          const viewportMismatch = isMobile && (rect.left < -1 || rect.right > viewportWidth + 1);
+          const childOverflow = [...element.children].filter(visible).some((child) => {
+            const childRect = child.getBoundingClientRect();
+            return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+          });
+          if (element.matches(".media-picker-dialog")) {
+            return (
+              style.display !== "flex" ||
+              style.flexDirection !== "column" ||
+              Number.parseFloat(style.borderTopWidth) < 1 ||
+              Number.parseFloat(style.borderRadius) < 12 ||
+              Number.parseFloat(style.borderRadius) > 16 ||
+              (style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+                style.backgroundImage === "none") ||
+              rect.width > viewportWidth + 1 ||
+              rect.height > window.innerHeight - (isMobile ? 18 : 0)
+            );
+          }
+          if (element.matches(".media-picker-body")) {
+            const rowGap = Number.parseFloat(style.rowGap);
+            const columnGap = Number.parseFloat(style.columnGap);
+            const paddingTop = Number.parseFloat(style.paddingTop);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            const tracks = style.gridTemplateColumns
+              .split(" ")
+              .map((track) => Number.parseFloat(track))
+              .filter((track) => Number.isFinite(track));
+            return (
+              style.display !== "grid" ||
+              tracks.length < (isMobile ? 1 : 2) ||
+              !Number.isFinite(rowGap) ||
+              rowGap < 10 ||
+              rowGap > 20 ||
+              !Number.isFinite(columnGap) ||
+              columnGap < 10 ||
+              columnGap > 20 ||
+              !Number.isFinite(paddingTop) ||
+              paddingTop < 14 ||
+              paddingTop > 22 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 14 ||
+              paddingInline > 22 ||
+              viewportMismatch ||
+              childOverflow
+            );
+          }
+          if (element.matches(".media-picker-grid")) {
+            const rowGap = Number.parseFloat(style.rowGap);
+            const columnGap = Number.parseFloat(style.columnGap);
+            return (
+              style.display !== "grid" ||
+              !Number.isFinite(rowGap) ||
+              rowGap < 8 ||
+              rowGap > 14 ||
+              !Number.isFinite(columnGap) ||
+              columnGap < 8 ||
+              columnGap > 14 ||
+              viewportMismatch ||
+              childOverflow
+            );
+          }
+          if (element.matches(".modal-search-row")) {
+            const gap = Number.parseFloat(style.gap || style.rowGap);
+            return (
+              style.display !== "flex" ||
+              (isMobile ? style.flexDirection !== "column" : style.flexDirection !== "row") ||
+              !Number.isFinite(gap) ||
+              gap < 8 ||
+              gap > 12 ||
+              Number.parseFloat(style.paddingTop) < 14 ||
+              Number.parseFloat(style.paddingTop) > 18 ||
+              viewportMismatch ||
+              childOverflow
+            );
+          }
+          if (element.matches(".media-picker-item")) {
+            return (
+              style.display !== "grid" ||
+              style.overflow !== "hidden" ||
+              Number.parseFloat(style.borderTopWidth) < 1 ||
+              Number.parseFloat(style.borderRadius) < 8 ||
+              Number.parseFloat(style.borderRadius) > 12 ||
+              (style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+                style.backgroundImage === "none") ||
+              rect.width < 92 ||
+              childOverflow
+            );
+          }
+          if (element.matches(".media-picker-thumb")) {
+            return (
+              !["flex", "inline-flex"].includes(style.display) ||
+              style.alignItems !== "center" ||
+              style.justifyContent !== "center" ||
+              Math.abs(rect.width - rect.height) > 1 ||
+              (style.backgroundColor === "rgba(0, 0, 0, 0)" &&
+                style.backgroundImage === "none") ||
+              childOverflow
+            );
+          }
+          if (element.matches(".media-picker-name")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            return (
+              style.overflow !== "hidden" ||
+              style.textOverflow !== "ellipsis" ||
+              style.whiteSpace !== "nowrap" ||
+              !/JetBrains Mono/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 10 ||
+              fontSize > 12.5
+            );
+          }
+          if (element.matches(".media-picker-detail")) {
+            const gap = Number.parseFloat(style.gap || style.rowGap);
+            return (
+              style.display !== "grid" ||
+              !Number.isFinite(gap) ||
+              gap < 10 ||
+              gap > 14 ||
+              viewportMismatch ||
+              childOverflow
+            );
+          }
+          if (element.matches(".media-picker-detail label")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const gap = Number.parseFloat(style.gap || style.rowGap);
+            const lineHeight =
+              style.lineHeight === "normal" ? fontSize * 1.35 : Number.parseFloat(style.lineHeight);
+            return (
+              style.display !== "grid" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12 ||
+              fontSize > 13.2 ||
+              !Number.isFinite(gap) ||
+              gap < 4 ||
+              gap > 8 ||
+              (Number.isFinite(lineHeight) && lineHeight > 19) ||
+              childOverflow
+            );
+          }
+          return false;
+        })
+        .map(summarize)
+        .slice(0, 12),
       articleContainerOverflow: visibleMatches(
         ".article-page, .article-layout, .article, .article-body"
       )
@@ -3262,6 +3516,20 @@ async function auditMediaPicker(
     recordElementFailures(
       "form_label_typography_mismatch",
       metrics.formLabelTypographyMismatches,
+      browserName,
+      sizeName,
+      route
+    );
+    recordElementFailures(
+      "editor_toolbar_rhythm_mismatch",
+      metrics.editorToolbarRhythmMismatches,
+      browserName,
+      sizeName,
+      route
+    );
+    recordElementFailures(
+      "media_picker_rhythm_mismatch",
+      metrics.mediaPickerRhythmMismatches,
       browserName,
       sizeName,
       route

@@ -4122,15 +4122,24 @@ pre.citation-block {
 
 .editor-toolbar {
   display: flex;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
   padding: 9px 14px;
   border-bottom: 1px solid var(--border);
   background: var(--surface-muted);
 }
 
 .editor-tool-button {
-  width: 32px;
-  height: 32px;
+  flex: 0 0 auto;
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  max-height: 36px;
+  min-block-size: 36px;
+  max-block-size: 36px;
   border-radius: 7px;
   padding: 0;
 }
