@@ -1576,6 +1576,9 @@ pre.citation-block {
 
 .mono {
   font-family: var(--nw-font-mono);
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .category-card-grid {
@@ -3480,6 +3483,11 @@ pre.citation-block {
 .admin-grid-row {
   border-bottom: 1px solid var(--border);
   font-size: 13px;
+}
+
+.admin-grid-header > *,
+.admin-grid-row > * {
+  min-width: 0;
 }
 
 .admin-grid-row:last-child {

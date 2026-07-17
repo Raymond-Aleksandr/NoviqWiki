@@ -56,6 +56,7 @@ type RouteMetrics = {
   oversizedFilterBars: ElementSummary[];
   badFileInputs: ElementSummary[];
   controlTextOverflow: ElementSummary[];
+  textContentOverflow: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
   articleMediaTooTall: ElementSummary[];
@@ -899,7 +900,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1219,6 +1220,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "control_text_overflow",
     metrics.controlTextOverflow,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "text_content_overflow",
+    metrics.textContentOverflow,
     browserName,
     sizeName,
     route
@@ -1665,6 +1673,45 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       ".aside-actions a",
       ".aside-action-form button"
     ].join(",");
+    const textOverflowSelectors = [
+      ".activity-main",
+      ".activity-main strong",
+      ".activity-meta",
+      ".timeline-title",
+      ".timeline-title strong",
+      ".timeline-meta",
+      ".audit-action",
+      ".timeline-action",
+      ".badge",
+      ".status-badge",
+      ".role-badge",
+      ".user-group-badges",
+      ".admin-grid-row > *",
+      ".admin-grid-row .mono",
+      ".admin-grid-row .user-cell",
+      ".admin-grid-row .user-cell strong",
+      ".admin-grid-row .admin-action-list",
+      ".history-revision-cell",
+      ".history-revision-value",
+      ".history-summary-cell",
+      ".history-summary-text",
+      ".history-summary-date",
+      ".history-actions",
+      ".page-list-row",
+      ".search-result",
+      ".category-list a",
+      ".article-facts dd",
+      ".settings-switch-title",
+      ".settings-switch-help",
+      ".media-filename",
+      ".media-detail-name",
+      ".media-reference-list li",
+      ".group-card-name",
+      ".group-role-badges",
+      ".role-card-header h2",
+      ".role-permission-summary",
+      ".mono"
+    ].join(",");
 
     return {
       bodyScrollWidth: document.body.scrollWidth,
@@ -1741,6 +1788,38 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
               element.closest(".admin-tabs") ||
               element.closest(".article-tabs"));
           return horizontalOverflow || wrappedCompactControl;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      textContentOverflow: visibleMatches(textOverflowSelectors)
+        .filter((element) => {
+          if (
+            element.closest(".cm-editor") ||
+            element.closest(".editor-preview") ||
+            element.closest(".article-body pre") ||
+            element.closest(".media-code") ||
+            element.closest(".permission-panel") ||
+            element.closest(".permission-checkbox") ||
+            element.closest(".role-permission-checkboxes")
+          ) {
+            return false;
+          }
+          const label = labelOf(element);
+          if (!label || label.length < 2) return false;
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          if (style.overflowX === "auto" || style.overflowX === "scroll") {
+            return false;
+          }
+          const contentWidth = element.clientWidth || rect.width;
+          const scrollOverflow = element.scrollWidth > contentWidth + 2;
+          const childOverflow = [...element.children]
+            .filter(visible)
+            .some((child) => {
+              const childRect = child.getBoundingClientRect();
+              return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+            });
+          return scrollOverflow || childOverflow;
         })
         .map(summarize)
         .slice(0, 12),
@@ -2013,12 +2092,14 @@ async function auditMobileShell(page: Page, browserName: string, sizeName: strin
 async function auditPageDeleteDialog(page: Page, browserName: string, sizeName: string) {
   await page.goto(`${baseUrl}/admin/pages`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
-  const deleteButtons = page.locator('button[data-confirm-action="trash"]');
-  if ((await deleteButtons.count()) === 0) {
+  const opened = await openFirstDialogButton(
+    page,
+    'button[data-confirm-action="trash"]',
+    ".confirm-dialog[role='dialog']"
+  );
+  if (!opened) {
     return;
   }
-  await deleteButtons.nth(0).click();
-  await waitForModal(page, ".confirm-dialog[role='dialog']");
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
   if (
     !modal.hasBackdrop ||
@@ -2040,12 +2121,14 @@ async function auditPageDeleteDialog(page: Page, browserName: string, sizeName: 
 async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName: string) {
   await page.goto(`${baseUrl}/media`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
-  const deleteButtons = page.locator(".media-delete-form button.danger");
-  if ((await deleteButtons.count()) === 0) {
+  const opened = await openFirstDialogButton(
+    page,
+    ".media-delete-form button.danger",
+    ".confirm-dialog[role='dialog']"
+  );
+  if (!opened) {
     return;
   }
-  await deleteButtons.nth(0).click();
-  await waitForModal(page, ".confirm-dialog[role='dialog']");
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
   if (
     !modal.hasBackdrop ||
@@ -2067,12 +2150,14 @@ async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName:
 async function auditUserResetDialog(page: Page, browserName: string, sizeName: string) {
   await page.goto(`${baseUrl}/admin/users`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
-  const resetButtons = page.locator('button[data-confirm-action="reset"]');
-  if ((await resetButtons.count()) === 0) {
+  const opened = await openFirstDialogButton(
+    page,
+    'button[data-confirm-action="reset"]',
+    ".confirm-dialog[role='dialog']"
+  );
+  if (!opened) {
     return;
   }
-  await resetButtons.nth(0).click();
-  await waitForModal(page, ".confirm-dialog[role='dialog']");
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
   if (
     !modal.hasBackdrop ||
@@ -2089,6 +2174,28 @@ async function auditUserResetDialog(page: Page, browserName: string, sizeName: s
       detail: modal
     });
   }
+}
+
+async function openFirstDialogButton(page: Page, buttonSelector: string, dialogSelector: string) {
+  const buttons = page.locator(buttonSelector);
+  if ((await buttons.count()) === 0) {
+    return false;
+  }
+  const button = buttons.first();
+  await button.waitFor({ state: "visible", timeout: 4000 }).catch(() => null);
+  await button.scrollIntoViewIfNeeded({ timeout: 4000 }).catch(() => null);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await button.click({ timeout: 5000 });
+    await page
+      .locator(dialogSelector)
+      .waitFor({ state: "visible", timeout: attempt === 0 ? 1200 : 4000 })
+      .catch(() => null);
+    if ((await page.locator(dialogSelector).count()) > 0) {
+      return true;
+    }
+    await page.waitForTimeout(250);
+  }
+  return false;
 }
 
 async function waitForModal(page: Page, dialogSelector: string) {
