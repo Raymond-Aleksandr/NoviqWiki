@@ -5120,6 +5120,15 @@ pre.citation-block {
     text-decoration: none;
   }
 
+  .admin-grid-row.admin-pages-grid > a[data-label] {
+    display: grid;
+    grid-template-columns: minmax(72px, max-content) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 14px;
+    justify-content: stretch;
+    text-align: left;
+  }
+
   .admin-grid-row.admin-users-grid .user-cell {
     grid-template-columns: minmax(72px, max-content) auto minmax(0, 1fr);
     align-items: center;

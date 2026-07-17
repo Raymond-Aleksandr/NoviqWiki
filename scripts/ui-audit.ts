@@ -73,6 +73,7 @@ type RouteMetrics = {
   oversizedText: ElementSummary[];
   overlappingActivityRows: ElementSummary[];
   duplicateTimelineActions: ElementSummary[];
+  mobileAdminGridLabelMismatches: ElementSummary[];
   unevenAdminPageActions: ElementSummary[];
   unevenHistoryActions: ElementSummary[];
   misalignedHistoryRows: ElementSummary[];
@@ -968,7 +969,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, control or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, control or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1395,6 +1396,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "duplicate_timeline_actions",
     metrics.duplicateTimelineActions,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "mobile_admin_grid_label_mismatch",
+    metrics.mobileAdminGridLabelMismatches,
     browserName,
     sizeName,
     route
@@ -2265,6 +2273,71 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
               title &&
               labelOf(badge) &&
               labelOf(title).trim() === labelOf(badge).trim()
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      mobileAdminGridLabelMismatches: visibleMatches(
+        [
+          ".admin-grid-row.admin-users-grid > div",
+          ".admin-grid-row.admin-pages-grid > *",
+          ".admin-grid-row.admin-audit-grid > *"
+        ].join(",")
+      )
+        .filter((element) => {
+          if (document.documentElement.clientWidth > 560) return false;
+          if (element.closest(".admin-grid-header")) return false;
+          const dataLabel = element.getAttribute("data-label");
+          if (!dataLabel || dataLabel.trim().length === 0) {
+            return true;
+          }
+          const before = getComputedStyle(element, "::before");
+          const beforeContent = before.content;
+          const beforeFontSize = Number.parseFloat(before.fontSize);
+          const beforeVisible =
+            beforeContent !== "none" &&
+            beforeContent !== '""' &&
+            beforeContent !== "normal" &&
+            before.display !== "none" &&
+            before.visibility !== "hidden";
+          if (
+            !beforeVisible ||
+            !/Hanken Grotesk|Noto Sans SC/i.test(before.fontFamily) ||
+            beforeFontSize > 13.5
+          ) {
+            return true;
+          }
+          const style = getComputedStyle(element);
+          if (element.classList.contains("admin-action-list")) {
+            const actionTracks = style.gridTemplateColumns
+              .split(" ")
+              .map((track) => Number.parseFloat(track))
+              .filter((track) => Number.isFinite(track));
+            const actionGap = Number.parseFloat(style.columnGap);
+            const isWrappingFlex = style.display === "flex" && style.flexWrap === "wrap";
+            const isButtonGrid =
+              style.display === "grid" &&
+              actionTracks.length >= 2 &&
+              Number.isFinite(actionGap) &&
+              actionGap >= 6 &&
+              actionGap <= 12;
+            return !isWrappingFlex && !isButtonGrid;
+          }
+          const tracks = style.gridTemplateColumns
+            .split(" ")
+            .map((track) => Number.parseFloat(track))
+            .filter((track) => Number.isFinite(track));
+          const firstTrack = tracks[0] ?? 0;
+          const columnGap = Number.parseFloat(style.columnGap);
+          const expectedTrackCount = element.classList.contains("user-cell") ? 3 : 2;
+          return (
+            style.display !== "grid" ||
+            tracks.length < expectedTrackCount ||
+            firstTrack < 70 ||
+            firstTrack > 130 ||
+            !Number.isFinite(columnGap) ||
+            columnGap < 8 ||
+            columnGap > 18
           );
         })
         .map(summarize)
