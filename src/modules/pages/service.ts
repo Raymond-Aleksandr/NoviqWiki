@@ -482,6 +482,13 @@ export type PageOutboundLink = {
   exists: boolean;
 };
 
+export type WantedPage = {
+  targetTitle: string;
+  targetNormalizedTitle: string;
+  sourceCount: number;
+  updatedAt: Date;
+};
+
 export async function listPageOutboundLinks(
   input: { siteId: string; pageId: string },
   database: Database = db
@@ -526,6 +533,43 @@ export async function listPageOutboundLinks(
       exists
     };
   });
+}
+
+export async function listWantedPages(
+  input: { siteId: string; limit?: number; offset?: number },
+  database: Database = db
+): Promise<WantedPage[]> {
+  return database
+    .select({
+      targetTitle: sql<string>`min(${pageLinks.targetTitle})`,
+      targetNormalizedTitle: pageLinks.targetNormalizedTitle,
+      sourceCount: sql<number>`count(distinct ${pageLinks.sourcePageId})::int`,
+      updatedAt: sql<Date>`max(${pages.updatedAt})`
+    })
+    .from(pageLinks)
+    .innerJoin(pages, eq(pages.id, pageLinks.sourcePageId))
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt),
+        sql`not exists (
+          select 1
+          from ${pages} as wanted_target
+          where wanted_target.site_id = ${input.siteId}
+            and wanted_target.normalized_title = ${pageLinks.targetNormalizedTitle}
+            and wanted_target.status = 'published'
+            and wanted_target.deleted_at is null
+        )`
+      )
+    )
+    .groupBy(pageLinks.targetNormalizedTitle)
+    .orderBy(
+      desc(sql<number>`count(distinct ${pageLinks.sourcePageId})::int`),
+      asc(sql<string>`min(${pageLinks.targetTitle})`)
+    )
+    .limit(input.limit ?? 100)
+    .offset(input.offset ?? 0);
 }
 
 export async function compareRevisions(

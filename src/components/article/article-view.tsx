@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, Edit3, History, Info, Link2, ListTree } from "lucide-react";
+import { BookOpen, Edit3, FileQuestion, History, Info, Link2, ListTree } from "lucide-react";
 import type { Page, PageRevision } from "@/db/schema";
 import type { Messages } from "@/i18n";
 import type { PageOutboundLink } from "@/modules/pages/service";
@@ -151,6 +151,10 @@ export function ArticleView({
             <Link href="/recent">
               <ListTree size={15} aria-hidden="true" />
               {messages.recentChanges}
+            </Link>
+            <Link href="/wanted">
+              <FileQuestion size={15} aria-hidden="true" />
+              {messages.wantedPages}
             </Link>
             <Link href={`/page/${page.slug}?revision=${revision.revisionNumber}`}>
               <Link2 size={15} aria-hidden="true" />

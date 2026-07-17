@@ -169,6 +169,7 @@ const publicRoutes = [
   "/",
   "/search?q=E2E",
   "/recent",
+  "/wanted",
   "/categories",
   "/media",
   "/login",

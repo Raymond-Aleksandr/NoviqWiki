@@ -2280,6 +2280,23 @@ textarea {
   font-size: 12px;
 }
 
+.wanted-row {
+  justify-content: space-between;
+}
+
+.wanted-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.wanted-main > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
 .backlinks-empty {
   border: 0;
   border-radius: 0;
@@ -4445,6 +4462,11 @@ textarea {
     gap: 7px;
     padding: 7px 9px;
     font-size: 13.5px;
+  }
+
+  .wanted-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .home-hero h1,

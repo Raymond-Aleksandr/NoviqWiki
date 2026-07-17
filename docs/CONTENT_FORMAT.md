@@ -48,7 +48,7 @@ Use wiki links for internal page references:
 [[Getting Started|start here]]
 ```
 
-Wiki links resolve to `/page/{slug}` when the target page exists. Missing internal links render with a distinct missing-link state, and users with page creation permission can open a pre-filled new-page form from the missing link.
+Wiki links resolve to `/page/{slug}` when the target page exists. Missing internal links render with a distinct missing-link state, and users with page creation permission can open a pre-filled new-page form from the missing link. The `/wanted` maintenance page lists missing targets that are linked from published visible pages and removes them automatically once the target page is published.
 
 Categories are declared with wiki-link category declarations:
 
