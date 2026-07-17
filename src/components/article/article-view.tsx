@@ -11,6 +11,7 @@ import {
   ListTree,
   Ruler,
   RouteOff,
+  ShieldCheck,
   Tags
 } from "lucide-react";
 import type { Page, PageRevision } from "@/db/schema";
@@ -180,6 +181,10 @@ export function ArticleView({
             <Link href="/short-pages">
               <Ruler size={15} aria-hidden="true" />
               {messages.shortPages}
+            </Link>
+            <Link href="/protected-pages">
+              <ShieldCheck size={15} aria-hidden="true" />
+              {messages.protectedPages}
             </Link>
             <Link href="/uncategorized">
               <Tags size={15} aria-hidden="true" />

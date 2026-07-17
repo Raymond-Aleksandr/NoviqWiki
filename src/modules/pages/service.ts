@@ -519,6 +519,13 @@ export type ShortPage = {
   updatedAt: Date;
 };
 
+export type ProtectedPage = {
+  pageId: string;
+  title: string;
+  slug: string;
+  updatedAt: Date;
+};
+
 export type PublishedPageIndexEntry = {
   pageId: string;
   title: string;
@@ -750,6 +757,31 @@ export async function listShortPages(
     .filter((row) => !parseRedirectDirective(row.markdown))
     .slice(offset, offset + limit)
     .map(({ markdown: _markdown, ...row }) => row);
+}
+
+export async function listProtectedPages(
+  input: { siteId: string; limit?: number; offset?: number },
+  database: Database = db
+): Promise<ProtectedPage[]> {
+  return database
+    .select({
+      pageId: pages.id,
+      title: pages.title,
+      slug: pages.slug,
+      updatedAt: pages.updatedAt
+    })
+    .from(pages)
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt),
+        eq(pages.protectionLevel, "protected")
+      )
+    )
+    .orderBy(desc(pages.updatedAt), asc(pages.title))
+    .limit(input.limit ?? 100)
+    .offset(input.offset ?? 0);
 }
 
 export async function listPublishedPageIndex(
