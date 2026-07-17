@@ -64,6 +64,9 @@ export function ArticleView({
   const articleFacts = [
     { label: messages.type, value: messages.article },
     { label: messages.pageStatus, value: pageStatusLabel(page.status, messages) },
+    ...(page.protectionLevel === "protected"
+      ? [{ label: messages.protected, value: messages.pageProtected }]
+      : []),
     { label: messages.pageRevision, value: `r${revision.revisionNumber}` },
     { label: messages.pageRevisions, value: String(revisionCount) },
     {

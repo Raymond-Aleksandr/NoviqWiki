@@ -36,6 +36,19 @@ describe("ArticleView", () => {
     expect(html).toContain("/page/moved-topic");
   });
 
+  it("shows the page protection state in article information", () => {
+    const html = renderToStaticMarkup(
+      <ArticleView
+        page={{ ...page, protectionLevel: "protected" }}
+        revision={revision}
+        locale="en"
+        messages={en}
+      />
+    );
+
+    expect(html).toContain(en.pageProtected);
+  });
+
   it("renders missing wiki links as page creation links for authorized users", () => {
     const html = renderToStaticMarkup(
       <ArticleView
