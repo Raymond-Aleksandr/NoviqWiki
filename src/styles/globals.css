@@ -1383,6 +1383,7 @@ textarea {
   color: var(--text);
   font-size: 14.5px;
   font-weight: 500;
+  overflow-wrap: anywhere;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -2920,7 +2921,7 @@ pre.citation-block {
   vertical-align: super;
 }
 
-/* Imported and long-form wiki content can contain IDs, filenames, and prose without natural breaks. */
+/* Imported wiki content can contain long IDs, filenames, and legacy prose without natural breaks. */
 .article-body :where(p, li, blockquote, dd, dt, a, strong, em, code),
 .article-categories,
 .article-categories a,
