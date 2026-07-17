@@ -25,7 +25,7 @@ Create a local environment file from the repository template:
 cp .env.example .env.local
 ```
 
-For local Docker Compose development, the template defaults are enough to start. Set `NEXTWIKI_SECRET` before using login or setup flows:
+For local Docker Compose evaluation, no environment file is required. If `NEXTWIKI_SECRET` is omitted, the container generates an ephemeral runtime secret so setup and login flows can run immediately. Sessions are invalidated when that container is recreated, so set a persistent secret before production use or any long-lived installation:
 
 ```bash
 NEXTWIKI_SECRET=replace-with-a-long-random-secret

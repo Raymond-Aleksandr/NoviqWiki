@@ -12,3 +12,9 @@ media
 backups
 *.log
 *.tsbuildinfo
+AGENTS.md
+docs/DECISIONS.md
+docs/FINAL_REPORT.md
+docs/IMPLEMENTATION_PLAN.md
+docs/STATUS.md
+docs/TEST_MATRIX.md
