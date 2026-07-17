@@ -112,7 +112,8 @@ const credentials =
 
 const viewports: ViewportCase[] = [
   { name: "desktop", width: 1280, height: 820 },
-  { name: "mobile", width: 439, height: 734 }
+  { name: "mobile", width: 439, height: 734 },
+  { name: "narrow-mobile", width: 390, height: 844 }
 ];
 
 const expectedLightTokens = {
@@ -879,7 +880,7 @@ async function main() {
         await auditMediaDeleteDialog(page, browserName, viewport.name);
         await auditUserResetDialog(page, browserName, viewport.name);
       }
-      if (viewport.name === "mobile") {
+      if (viewport.width <= 560) {
         await auditMobileShell(page, browserName, viewport.name);
       }
       await context.close();
@@ -1173,6 +1174,7 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     addFailure({ kind: "server_error", browserName, sizeName, route, detail: response.status() });
   }
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
+  await waitForDesignStyles(page);
   const metrics = await readRouteMetricsWithRetry(page, browserName, sizeName, route);
   if (!metrics) {
     return;
@@ -1404,6 +1406,7 @@ async function readRouteMetricsWithRetry(
       }
       await page.waitForLoadState("domcontentloaded", { timeout: 4000 }).catch(() => null);
       await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
+      await waitForDesignStyles(page);
     }
   }
 
@@ -1424,6 +1427,22 @@ function isTransientNavigationError(error: unknown) {
       error.message.includes("Cannot find context") ||
       error.message.includes("Target page, context or browser has been closed"))
   );
+}
+
+async function waitForDesignStyles(page: Page) {
+  await page
+    .waitForFunction(
+      () => {
+        const rootStyle = getComputedStyle(document.documentElement);
+        return (
+          rootStyle.getPropertyValue("--control-height").trim() === "34px" &&
+          rootStyle.getPropertyValue("--nw-font-body").includes("Hanken Grotesk")
+        );
+      },
+      null,
+      { timeout: 4000 }
+    )
+    .catch(() => null);
 }
 
 async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
