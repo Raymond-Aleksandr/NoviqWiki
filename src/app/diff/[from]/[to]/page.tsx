@@ -62,24 +62,52 @@ export default async function DiffPage({ params }: Props) {
           />
         ) : null}
       </header>
-      <div className="diff diff-panel" aria-label={messages.unifiedDiff}>
-        {diff.lines.map((line, index) => (
-          <div
-            key={`${index}-${line.text}`}
-            className={`diff-line ${
-              line.type === "add"
-                ? "diff-add"
-                : line.type === "remove"
-                  ? "diff-remove"
-                  : line.type === "meta"
-                    ? "diff-meta"
-                    : ""
-            }`}
-          >
-            {line.text || " "}
+      <section className="diff-section">
+        <h2>{messages.sideBySideDiff}</h2>
+        <div className="side-by-side-diff" aria-label={messages.sideBySideDiff}>
+          <div className="side-by-side-diff-header">
+            <div>
+              {messages.oldRevision} r{diff.from.revisionNumber}
+            </div>
+            <div>
+              {messages.newRevision} r{diff.to.revisionNumber}
+            </div>
           </div>
-        ))}
-      </div>
+          {diff.sideBySide.map((row, index) => (
+            <div className={`side-by-side-diff-row side-by-side-${row.type}`} key={index}>
+              <div className="side-by-side-cell">
+                <span className="diff-line-number">{row.oldLineNumber ?? ""}</span>
+                <code>{row.oldText || " "}</code>
+              </div>
+              <div className="side-by-side-cell">
+                <span className="diff-line-number">{row.newLineNumber ?? ""}</span>
+                <code>{row.newText || " "}</code>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+      <section className="diff-section">
+        <h2>{messages.unifiedDiff}</h2>
+        <div className="diff diff-panel" aria-label={messages.unifiedDiff}>
+          {diff.lines.map((line, index) => (
+            <div
+              key={`${index}-${line.text}`}
+              className={`diff-line ${
+                line.type === "add"
+                  ? "diff-add"
+                  : line.type === "remove"
+                    ? "diff-remove"
+                    : line.type === "meta"
+                      ? "diff-meta"
+                      : ""
+              }`}
+            >
+              {line.text || " "}
+            </div>
+          ))}
+        </div>
+      </section>
       <div className="diff-summary">
         <span className="diff-count add">
           +{added} {messages.added}

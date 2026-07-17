@@ -18,7 +18,11 @@ import { writeAuditLog } from "@/modules/audit/service";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { renderMarkdown } from "@/modules/rendering/markdown";
 import { assertNoRedirectLoopForRevision } from "@/modules/redirects/service";
-import { createUnifiedDiff, parseUnifiedDiff } from "@/modules/revisions/diff";
+import {
+  createSideBySideDiff,
+  createUnifiedDiff,
+  parseUnifiedDiff
+} from "@/modules/revisions/diff";
 import { removeSearchIndex, upsertSearchIndex } from "@/modules/search/service";
 import { derivePageIdentity } from "./title";
 
@@ -543,7 +547,8 @@ export async function compareRevisions(
     from,
     to,
     unified,
-    lines: parseUnifiedDiff(unified)
+    lines: parseUnifiedDiff(unified),
+    sideBySide: createSideBySideDiff(from.markdown, to.markdown)
   };
 }
 
