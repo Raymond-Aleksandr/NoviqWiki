@@ -1906,7 +1906,8 @@ textarea {
   box-shadow: var(--sh-sm);
 }
 
-.redirect-notice {
+.redirect-notice,
+.revision-notice {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1921,9 +1922,19 @@ textarea {
   font-size: 13px;
 }
 
+.revision-notice {
+  background: var(--warning-bg);
+}
+
 .redirect-notice code {
   color: var(--text);
   overflow-wrap: anywhere;
+}
+
+.revision-notice a {
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
 }
 
 .article h1 {

@@ -13,6 +13,7 @@ export function ArticleView({
   outboundLinks = [],
   backlinkCount = 0,
   revisionCount = revision.revisionNumber,
+  currentRevisionNumber = revision.revisionNumber,
   locale,
   messages
 }: {
@@ -24,9 +25,11 @@ export function ArticleView({
   outboundLinks?: PageOutboundLink[];
   backlinkCount?: number;
   revisionCount?: number;
+  currentRevisionNumber?: number;
   locale: string;
   messages: Messages;
 }) {
+  const isHistoricalRevision = revision.revisionNumber !== currentRevisionNumber;
   const displayedDate = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short"
@@ -73,6 +76,15 @@ export function ArticleView({
               <span className="badge info">{messages.redirected}</span>
               <span>
                 {messages.redirectedFrom} <code>/page/{redirectedFrom}</code>
+              </span>
+            </div>
+          ) : null}
+          {isHistoricalRevision ? (
+            <div className="revision-notice">
+              <span className="badge warning">{messages.historicalRevision}</span>
+              <span>
+                {messages.viewingHistoricalRevision}{" "}
+                <Link href={`/page/${page.slug}`}>{messages.openCurrentRevision}</Link>
               </span>
             </div>
           ) : null}

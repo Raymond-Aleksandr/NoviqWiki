@@ -19,6 +19,22 @@ describe("ArticleView", () => {
     expect(html).toContain("Redirected from");
     expect(html).toContain("/page/old-topic");
   });
+
+  it("marks historical revisions and links back to the current revision", () => {
+    const html = renderToStaticMarkup(
+      <ArticleView
+        page={page}
+        revision={revision}
+        currentRevisionNumber={2}
+        locale="en"
+        messages={en}
+      />
+    );
+
+    expect(html).toContain("Historical revision");
+    expect(html).toContain("You are viewing an old revision of this page.");
+    expect(html).toContain("/page/moved-topic");
+  });
 });
 
 const now = new Date("2026-07-16T12:00:00Z");

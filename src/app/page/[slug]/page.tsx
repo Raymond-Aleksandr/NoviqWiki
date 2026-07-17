@@ -13,6 +13,7 @@ import {
   listRevisions
 } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
+import { invalidRevisionNumber, parseRevisionNumberParam } from "@/modules/revisions/params";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -31,7 +32,10 @@ export default async function ArticlePage({ params, searchParams }: Props) {
   if (!resolved || resolved.page.status === "deleted") {
     notFound();
   }
-  const revisionNumber = revisionParam ? Number(revisionParam) : null;
+  const revisionNumber = parseRevisionNumberParam(revisionParam);
+  if (revisionNumber === invalidRevisionNumber) {
+    notFound();
+  }
   const currentRevision = revisionNumber
     ? await getRevisionByNumber(resolved.page.id, revisionNumber).catch(() => null)
     : resolved.page.currentRevisionId
@@ -57,6 +61,10 @@ export default async function ArticlePage({ params, searchParams }: Props) {
       outboundLinks={outboundLinks}
       backlinkCount={backlinks.length}
       revisionCount={revisions.length}
+      currentRevisionNumber={
+        revisions.find((revision) => revision.id === resolved.page.currentRevisionId)
+          ?.revisionNumber
+      }
       locale={i18n.locale}
       messages={i18n.messages}
     />
