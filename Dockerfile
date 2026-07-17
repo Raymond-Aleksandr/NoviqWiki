@@ -17,7 +17,7 @@ ENV NODE_ENV=production
 RUN groupadd -r nextwiki && useradd -r -g nextwiki nextwiki
 COPY --from=builder /app ./
 RUN mkdir -p /app/media /app/backups /app/.next/standalone/.next && \
-    cp -R /app/public /app/.next/standalone/public && \
+    if [ -d /app/public ]; then cp -R /app/public /app/.next/standalone/public; fi && \
     cp -R /app/.next/static /app/.next/standalone/.next/static && \
     chown -R nextwiki:nextwiki /app
 USER nextwiki

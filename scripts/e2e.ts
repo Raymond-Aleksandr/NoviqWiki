@@ -1,7 +1,7 @@
 import "dotenv/config";
 
 import { spawn } from "node:child_process";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { access, cp, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 import { resetE2eDatabase } from "./e2e-support";
 
@@ -62,11 +62,23 @@ async function prepareStandaloneAssets() {
   const standaloneRoot = path.resolve(".next/standalone");
   const standaloneStatic = path.join(standaloneRoot, ".next/static");
   const standalonePublic = path.join(standaloneRoot, "public");
+  const publicRoot = path.resolve("public");
 
   await rm(standaloneStatic, { recursive: true, force: true });
   await cp(path.resolve(".next/static"), standaloneStatic, { recursive: true });
   await rm(standalonePublic, { recursive: true, force: true });
-  await cp(path.resolve("public"), standalonePublic, { recursive: true });
+  if (await pathExists(publicRoot)) {
+    await cp(publicRoot, standalonePublic, { recursive: true });
+  }
+}
+
+async function pathExists(targetPath: string) {
+  try {
+    await access(targetPath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 main().catch((error) => {
