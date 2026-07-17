@@ -155,6 +155,14 @@ const typographyDriftPatterns: Array<{ label: string; pattern: RegExp }> = [
   {
     label: "viewport font-size",
     pattern: /\bfont-size\s*:\s*[^;}]*\b(?:vw|vh|vmin|vmax)\b[^;}]*[;}]/i
+  },
+  {
+    label: "dynamic font-size",
+    pattern: /\bfont-size\s*:\s*(?:clamp|calc)\([^;}]+[;}]/i
+  },
+  {
+    label: "raw font-family",
+    pattern: /\bfont-family\s*:\s*(?!\s*var\(--nw-font-(?:body|serif|mono)\)\s*[;}])[^;}]+[;}]/i
   }
 ];
 
