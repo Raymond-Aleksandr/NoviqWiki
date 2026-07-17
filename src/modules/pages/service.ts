@@ -52,6 +52,7 @@ export async function createPage(
     if (duplicate.length > 0) {
       throw new ConflictError("A page with this title or slug already exists.");
     }
+    await assertAliasSlugAvailable({ siteId: input.siteId, slug: identity.slug, pageId: null }, tx);
 
     const [page] = await tx
       .insert(pages)
@@ -677,6 +678,10 @@ export async function renamePage(
     if (duplicate.length > 0) {
       throw new ConflictError("A page with this title or slug already exists.");
     }
+    await assertAliasSlugAvailable(
+      { siteId: page.siteId, slug: identity.slug, pageId: page.id },
+      tx
+    );
     if (input.createAlias) {
       await tx
         .insert(pageAliases)
@@ -688,6 +693,15 @@ export async function renamePage(
         })
         .onConflictDoNothing();
     }
+    await tx
+      .delete(pageAliases)
+      .where(
+        and(
+          eq(pageAliases.siteId, page.siteId),
+          eq(pageAliases.pageId, page.id),
+          eq(pageAliases.aliasSlug, identity.slug)
+        )
+      );
     const [updated] = await tx
       .update(pages)
       .set({
@@ -820,6 +834,20 @@ function normalizeProtectionLevel(value: string | null | undefined): PageProtect
 export function assertPageVisibleForRead(page: Pick<Page, "status" | "deletedAt">) {
   if (page.status === "deleted" || page.deletedAt) {
     throw new NotFoundError("Page not found.");
+  }
+}
+
+async function assertAliasSlugAvailable(
+  input: { siteId: string; slug: string; pageId: string | null },
+  database: Database
+) {
+  const [alias] = await database
+    .select({ pageId: pageAliases.pageId })
+    .from(pageAliases)
+    .where(and(eq(pageAliases.siteId, input.siteId), eq(pageAliases.aliasSlug, input.slug)))
+    .limit(1);
+  if (alias && alias.pageId !== input.pageId) {
+    throw new ConflictError("A page with this title or slug already exists.");
   }
 }
 

@@ -138,6 +138,32 @@ describe("page lifecycle integration", () => {
     expect(aliasSearch.rows).toContainEqual(
       expect.objectContaining({ title: "Moved Topic", slug: "moved-topic" })
     );
+    await expect(
+      createPage(
+        {
+          siteId: setup.site.id,
+          title: "Alias Collision",
+          slug: "lifecycle",
+          markdown: "# Alias Collision",
+          publish: true,
+          actorId: setup.owner.id,
+          actorDisplayName: setup.owner.displayName
+        },
+        test.db
+      )
+    ).rejects.toThrow("A page with this title or slug already exists.");
+    await expect(
+      renamePage(
+        {
+          pageId: sourcePage.id,
+          newTitle: "Alias Collision",
+          newSlug: "lifecycle",
+          actorId: setup.owner.id,
+          actorDisplayName: setup.owner.displayName
+        },
+        test.db
+      )
+    ).rejects.toThrow("A page with this title or slug already exists.");
 
     const revisionsAfterRename = await listRevisions(page.id, test.executor);
     expect(revisionsAfterRename).toHaveLength(2);
@@ -197,6 +223,24 @@ describe("page lifecycle integration", () => {
     expect(restoredSearch.rows).toContainEqual(
       expect.objectContaining({ title: "Moved Topic", slug: "moved-topic" })
     );
+
+    const movedBack = await renamePage(
+      {
+        pageId: page.id,
+        newTitle: "Lifecycle",
+        newSlug: "lifecycle",
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    expect(movedBack.slug).toBe("lifecycle");
+    const resolvedAfterMoveBack = await resolvePageBySlug(
+      { siteId: setup.site.id, slug: "lifecycle" },
+      test.executor
+    );
+    expect(resolvedAfterMoveBack.page.id).toBe(page.id);
+    expect(resolvedAfterMoveBack.redirectedFrom).toBeNull();
   });
 
   it("enforces page protection on server-side write operations", async () => {
