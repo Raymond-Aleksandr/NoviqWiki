@@ -174,6 +174,22 @@ const typographyDriftPatterns: Array<{ label: string; pattern: RegExp }> = [
 
 const rawColorLiteralPattern = /#[0-9a-f]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\(/i;
 
+const visualEffectDriftPatterns: Array<{ label: string; pattern: RegExp }> = [
+  {
+    label: "raw box-shadow",
+    pattern:
+      /\bbox-shadow\s*:\s*(?!\s*(?:none|var\(--(?:sh-(?:sm|md|lg)|button-active-shadow)\))\s*[;}])[^;}]+[;}]/i
+  },
+  {
+    label: "text-shadow",
+    pattern: /\btext-shadow\s*:\s*(?!\s*none\s*[;}])[^;}]+[;}]/i
+  },
+  {
+    label: "drop-shadow filter",
+    pattern: /\bfilter\s*:\s*[^;}]*drop-shadow\([^;}]+[;}]/i
+  }
+];
+
 const rawAuditActionValues = [
   "setup.complete",
   "auth.login",
@@ -349,6 +365,17 @@ async function auditSourceForColorDrift() {
   }
   addFailure({
     kind: "color_source_drift",
+    detail: matches.slice(0, 20)
+  });
+}
+
+async function auditSourceForVisualEffectDrift() {
+  const matches = await findVisualEffectDriftMatches(path.join(process.cwd(), "src"));
+  if (matches.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "visual_effect_source_drift",
     detail: matches.slice(0, 20)
   });
 }
@@ -581,6 +608,38 @@ async function findColorDriftMatches(directory: string): Promise<SourceMatch[]> 
         pattern: "raw color literal",
         text: line.trim().slice(0, 160)
       });
+    });
+  }
+
+  return matches;
+}
+
+async function findVisualEffectDriftMatches(directory: string): Promise<SourceMatch[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const matches: SourceMatch[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      matches.push(...(await findVisualEffectDriftMatches(entryPath)));
+      continue;
+    }
+    if (!entry.isFile() || path.extname(entry.name) !== ".css") {
+      continue;
+    }
+    const source = await readFile(entryPath, "utf8");
+    const lines = source.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      for (const { label, pattern } of visualEffectDriftPatterns) {
+        if (pattern.test(line)) {
+          matches.push({
+            file: path.relative(process.cwd(), entryPath),
+            line: index + 1,
+            pattern: label,
+            text: line.trim().slice(0, 160)
+          });
+        }
+      }
     });
   }
 
@@ -828,6 +887,7 @@ async function main() {
   await auditSourceForInlineStyles();
   await auditSourceForTypographyDrift();
   await auditSourceForColorDrift();
+  await auditSourceForVisualEffectDrift();
   await auditSourceForHardcodedVisibleText();
   await auditSourceForI18nDictionaryShape();
   await auditSourceForI18nDefaultLocaleDrift();
@@ -902,7 +962,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
