@@ -82,6 +82,7 @@ type RouteMetrics = {
   commandButtonSizeMismatches: ElementSummary[];
   badgeRhythmMismatches: ElementSummary[];
   navigationRhythmMismatches: ElementSummary[];
+  filterNavigationRhythmMismatches: ElementSummary[];
   oversizedText: ElementSummary[];
   overlappingActivityRows: ElementSummary[];
   duplicateTimelineActions: ElementSummary[];
@@ -991,7 +992,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, form-layout, page-header, content-row, editor-toolbar, or media-picker rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, editor-toolbar, or media-picker rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1487,6 +1488,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "navigation_rhythm_mismatch",
     metrics.navigationRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "filter_navigation_rhythm_mismatch",
+    metrics.filterNavigationRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -2113,6 +2121,143 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           !compactGap ||
           !icon ||
           !iconSized
+        );
+      })
+      .map(summarize)
+      .slice(0, 12);
+    const filterNavigationRhythmMismatches = visibleMatches(
+      [
+        ".filter-pills",
+        ".filter-pill",
+        ".search-filter-list",
+        ".search-filter-link",
+        ".timeline-pagination",
+        ".admin-pagination",
+        ".admin-pagination-actions",
+        ".timeline-pagination .button",
+        ".admin-pagination-actions .button"
+      ].join(",")
+    )
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        const isMobile = document.documentElement.clientWidth <= 560;
+        const viewportOverflow =
+          !element.matches(".filter-pill, .filter-pills") &&
+          isMobile &&
+          (rect.left < -1 || rect.right > document.documentElement.clientWidth + 1);
+        if (element.matches(".filter-pills")) {
+          const rowGap = Number.parseFloat(style.rowGap);
+          const columnGap = Number.parseFloat(style.columnGap);
+          const marginBottom = Number.parseFloat(style.marginBottom);
+          return (
+            style.display !== "flex" ||
+            (isMobile ? style.flexWrap !== "nowrap" : style.flexWrap !== "wrap") ||
+            style.alignItems !== "center" ||
+            !Number.isFinite(rowGap) ||
+            rowGap < 6 ||
+            rowGap > 10 ||
+            !Number.isFinite(columnGap) ||
+            columnGap < 6 ||
+            columnGap > 10 ||
+            !Number.isFinite(marginBottom) ||
+            marginBottom < 12 ||
+            marginBottom > 18 ||
+            (isMobile && !["auto", "scroll"].includes(style.overflowX))
+          );
+        }
+        if (element.matches(".search-filter-list")) {
+          const gap = Number.parseFloat(style.gap || style.rowGap);
+          return (
+            style.display !== "flex" ||
+            style.flexDirection !== "column" ||
+            !Number.isFinite(gap) ||
+            gap < 0 ||
+            gap > 8 ||
+            viewportOverflow
+          );
+        }
+        if (element.matches(".timeline-pagination, .admin-pagination-actions")) {
+          const gap = Number.parseFloat(style.gap || style.columnGap);
+          const childOverflow = [...element.children].filter(visible).some((child) => {
+            const childRect = child.getBoundingClientRect();
+            return (
+              childRect.left < rect.left - 1 ||
+              (!isMobile && childRect.right > rect.right + 1) ||
+              childRect.width > document.documentElement.clientWidth + 1
+            );
+          });
+          return (
+            style.display !== "flex" ||
+            style.flexWrap !== "wrap" ||
+            (isMobile
+              ? !["flex-start", "center"].includes(style.alignItems)
+              : style.alignItems !== "center") ||
+            !Number.isFinite(gap) ||
+            gap < 6 ||
+            gap > 10 ||
+            viewportOverflow ||
+            childOverflow
+          );
+        }
+        if (element.matches(".admin-pagination")) {
+          const gap = Number.parseFloat(style.gap || style.columnGap);
+          const paddingTop = Number.parseFloat(style.paddingTop);
+          const paddingInline = Number.parseFloat(style.paddingLeft);
+          const fontSize = Number.parseFloat(style.fontSize);
+          return (
+            style.display !== "flex" ||
+            (isMobile ? style.flexDirection !== "column" : style.flexDirection !== "row") ||
+            (isMobile ? style.alignItems !== "flex-start" : style.alignItems !== "center") ||
+            !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+            !Number.isFinite(fontSize) ||
+            fontSize < 12.5 ||
+            fontSize > 14.2 ||
+            !Number.isFinite(gap) ||
+            gap < 8 ||
+            gap > 14 ||
+            !Number.isFinite(paddingTop) ||
+            paddingTop < 10 ||
+            paddingTop > 16 ||
+            !Number.isFinite(paddingInline) ||
+            paddingInline < 12 ||
+            paddingInline > 18 ||
+            viewportOverflow
+          );
+        }
+        const isSearchFilter = element.matches(".search-filter-link");
+        const fontSize = Number.parseFloat(style.fontSize);
+        const lineHeight =
+          style.lineHeight === "normal" ? fontSize * 1.25 : Number.parseFloat(style.lineHeight);
+        const gap = Number.parseFloat(style.gap || style.columnGap);
+        const usesExpectedDisplay =
+          style.display === "flex" || style.display === "inline-flex";
+        const compactHeight = rect.height >= 32 && rect.height <= 42;
+        const borderOk =
+          isSearchFilter ||
+          (Number.parseFloat(style.borderTopWidth) >= 1 && style.borderTopStyle !== "none");
+        const backgroundOk =
+          isSearchFilter ||
+          style.backgroundColor !== "rgba(0, 0, 0, 0)" ||
+          element.classList.contains("active");
+        const childOverflow = [...element.children].filter(visible).some((child) => {
+          const childRect = child.getBoundingClientRect();
+          return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+        });
+        return (
+          !usesExpectedDisplay ||
+          style.alignItems !== "center" ||
+          !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+          !Number.isFinite(fontSize) ||
+          fontSize < 12.5 ||
+          fontSize > 14.2 ||
+          (Number.isFinite(lineHeight) && lineHeight > 19) ||
+          !compactHeight ||
+          (Number.isFinite(gap) && (gap < 6 || gap > 12)) ||
+          !borderOk ||
+          !backgroundOk ||
+          childOverflow ||
+          (!element.closest(".filter-pills") && viewportOverflow)
         );
       })
       .map(summarize)
@@ -3217,6 +3362,7 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       commandButtonSizeMismatches,
       badgeRhythmMismatches,
       navigationRhythmMismatches,
+      filterNavigationRhythmMismatches,
       oversizedText,
       overlappingActivityRows: visibleMatches(".activity-row, .timeline-row:not(.timeline-footer)")
         .filter((element) => {

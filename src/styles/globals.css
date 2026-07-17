@@ -1196,21 +1196,29 @@ textarea {
 .filter-pills {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+  min-width: 0;
   margin-bottom: 16px;
 }
 
 .filter-pill {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
+  flex: 0 0 auto;
+  min-block-size: 34px;
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--surface);
   color: var(--text);
+  font-family: var(--nw-font-body);
   font-size: 13px;
+  line-height: 1.2;
   padding: 7px 13px;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .filter-pill.active {
@@ -1528,6 +1536,7 @@ pre.citation-block {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  min-width: 0;
   margin-left: auto;
 }
 
@@ -2222,10 +2231,15 @@ pre.citation-block {
 
 .search-filter-link {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  min-block-size: 34px;
   border-radius: 8px;
   color: var(--text-muted);
+  font-family: var(--nw-font-body);
   font-size: 13.5px;
+  line-height: 1.2;
   padding: 7px 10px;
   text-decoration: none;
 }
@@ -3503,6 +3517,9 @@ pre.citation-block {
   justify-content: space-between;
   gap: 12px;
   border-top: 1px solid var(--border);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   padding: 12px 16px;
 }
 
@@ -3512,6 +3529,7 @@ pre.citation-block {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .disabled-link {
