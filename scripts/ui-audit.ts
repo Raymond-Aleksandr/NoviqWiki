@@ -97,6 +97,16 @@ type ModalMetrics = {
   radius: string | null;
   overflow: boolean;
   warningTextAlign: string | null;
+  warningFontOk: boolean;
+  warningCompact: boolean;
+  actionRowDisplay: string | null;
+  actionRowGap: number | null;
+  actionButtonCount: number;
+  actionButtonMinHeight: number | null;
+  actionButtonMaxHeight: number | null;
+  actionButtonHeightDelta: number | null;
+  actionButtonFontOk: boolean;
+  actionButtonIconOk: boolean;
 };
 
 type DesignTokenMetrics = {
@@ -1553,6 +1563,27 @@ function recordElementFailures(
   }
 }
 
+function modalHasConfirmRhythmMismatch(modal: ModalMetrics) {
+  return (
+    modal.warningTextAlign !== "left" ||
+    !modal.warningFontOk ||
+    !modal.warningCompact ||
+    modal.actionRowDisplay !== "flex" ||
+    modal.actionRowGap === null ||
+    modal.actionRowGap < 8 ||
+    modal.actionRowGap > 12 ||
+    modal.actionButtonCount < 2 ||
+    modal.actionButtonMinHeight === null ||
+    modal.actionButtonMaxHeight === null ||
+    modal.actionButtonMinHeight < 34 ||
+    modal.actionButtonMaxHeight > 44 ||
+    modal.actionButtonHeightDelta === null ||
+    modal.actionButtonHeightDelta > 2 ||
+    !modal.actionButtonFontOk ||
+    !modal.actionButtonIconOk
+  );
+}
+
 async function readRouteMetricsWithRetry(
   page: Page,
   browserName: string,
@@ -2779,7 +2810,7 @@ async function auditPageDeleteDialog(page: Page, browserName: string, sizeName: 
     !modal.hasDialog ||
     modal.radius !== "14px" ||
     modal.overflow ||
-    modal.warningTextAlign !== "left"
+    modalHasConfirmRhythmMismatch(modal)
   ) {
     addFailure({
       kind: "page_delete_modal_mismatch",
@@ -2808,7 +2839,7 @@ async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName:
     !modal.hasDialog ||
     modal.radius !== "14px" ||
     modal.overflow ||
-    modal.warningTextAlign !== "left"
+    modalHasConfirmRhythmMismatch(modal)
   ) {
     addFailure({
       kind: "media_delete_modal_mismatch",
@@ -2837,7 +2868,7 @@ async function auditUserResetDialog(page: Page, browserName: string, sizeName: s
     !modal.hasDialog ||
     modal.radius !== "14px" ||
     modal.overflow ||
-    modal.warningTextAlign !== "left"
+    modalHasConfirmRhythmMismatch(modal)
   ) {
     addFailure({
       kind: "user_reset_modal_mismatch",
@@ -2886,12 +2917,76 @@ async function readModalMetrics(page: Page, dialogSelector: string): Promise<Mod
         const dialog = document.querySelector(selector);
         const backdrop = document.querySelector(".modal-backdrop");
         const warning = dialog?.querySelector(".confirm-warning");
+        const warningStyle = warning ? getComputedStyle(warning) : null;
+        const warningFontSize = warningStyle ? Number.parseFloat(warningStyle.fontSize) : null;
+        const warningLineHeight = warningStyle
+          ? Number.parseFloat(warningStyle.lineHeight)
+          : null;
+        const warningRadius = warningStyle
+          ? Number.parseFloat(warningStyle.borderTopLeftRadius)
+          : null;
+        const actionRow = dialog?.querySelector(".confirm-actions");
+        const actionRowStyle = actionRow ? getComputedStyle(actionRow) : null;
+        const actionColumnGap = actionRowStyle ? Number.parseFloat(actionRowStyle.columnGap) : NaN;
+        const actionShorthandGap = actionRowStyle ? Number.parseFloat(actionRowStyle.gap) : NaN;
+        const actionRowGap = Number.isFinite(actionColumnGap)
+          ? actionColumnGap
+          : actionShorthandGap;
+        const actionButtons = actionRow
+          ? [...actionRow.querySelectorAll("button")].filter((button) => {
+              const rect = button.getBoundingClientRect();
+              const style = getComputedStyle(button);
+              return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
+            })
+          : [];
+        const actionButtonHeights = actionButtons.map(
+          (button) => button.getBoundingClientRect().height
+        );
+        const actionButtonMinHeight =
+          actionButtonHeights.length > 0 ? Math.min(...actionButtonHeights) : null;
+        const actionButtonMaxHeight =
+          actionButtonHeights.length > 0 ? Math.max(...actionButtonHeights) : null;
+        const actionButtonFontOk = actionButtons.every((button) =>
+          /Hanken Grotesk|Noto Sans SC/i.test(getComputedStyle(button).fontFamily)
+        );
+        const actionButtonIconOk = actionButtons.every((button) => {
+          const icon = button.querySelector("svg");
+          const rect = icon?.getBoundingClientRect();
+          return rect
+            ? rect.width >= 13 && rect.width <= 18 && rect.height >= 13 && rect.height <= 18
+            : false;
+        });
         return {
           hasDialog: Boolean(dialog),
           hasBackdrop: Boolean(backdrop),
           radius: dialog ? getComputedStyle(dialog).borderRadius : null,
           overflow: document.body.scrollWidth > document.documentElement.clientWidth + 2,
-          warningTextAlign: warning ? getComputedStyle(warning).textAlign : null
+          warningTextAlign: warning ? getComputedStyle(warning).textAlign : null,
+          warningFontOk: warningStyle
+            ? /Hanken Grotesk|Noto Sans SC/i.test(warningStyle.fontFamily)
+            : true,
+          warningCompact:
+            !warningStyle ||
+            (warningFontSize !== null &&
+              warningFontSize >= 12 &&
+              warningFontSize <= 13.5 &&
+              warningLineHeight !== null &&
+              warningLineHeight >= 17 &&
+              warningLineHeight <= 21 &&
+              warningRadius !== null &&
+              warningRadius >= 7 &&
+              warningRadius <= 10),
+          actionRowDisplay: actionRowStyle ? actionRowStyle.display : null,
+          actionRowGap: Number.isFinite(actionRowGap) ? actionRowGap : null,
+          actionButtonCount: actionButtons.length,
+          actionButtonMinHeight,
+          actionButtonMaxHeight,
+          actionButtonHeightDelta:
+            actionButtonMinHeight !== null && actionButtonMaxHeight !== null
+              ? actionButtonMaxHeight - actionButtonMinHeight
+              : null,
+          actionButtonFontOk,
+          actionButtonIconOk
         };
       })()`)) as ModalMetrics;
     } catch (error) {
@@ -2910,7 +3005,17 @@ async function readModalMetrics(page: Page, dialogSelector: string): Promise<Mod
     hasBackdrop: false,
     radius: null,
     overflow: false,
-    warningTextAlign: null
+    warningTextAlign: null,
+    warningFontOk: false,
+    warningCompact: false,
+    actionRowDisplay: null,
+    actionRowGap: null,
+    actionButtonCount: 0,
+    actionButtonMinHeight: null,
+    actionButtonMaxHeight: null,
+    actionButtonHeightDelta: null,
+    actionButtonFontOk: false,
+    actionButtonIconOk: false
   };
 }
 
