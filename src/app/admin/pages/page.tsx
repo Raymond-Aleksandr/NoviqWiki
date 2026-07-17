@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { ChevronDown, History, Pencil, Plus, RotateCcw, Search } from "lucide-react";
-import { deletePageAction, renamePageAction, restorePageAction } from "@/app/actions";
+import {
+  deletePageAction,
+  renamePageAction,
+  restorePageAction,
+  setPageProtectionAction
+} from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -45,12 +50,15 @@ export default async function AdminPagesPage() {
             <div className="muted" data-label={messages.slug}>
               {page.slug}
             </div>
-            <div data-label={messages.status}>
+            <div className="page-status-stack" data-label={messages.status}>
               <span
                 className={`badge ${page.status === "published" ? "success" : page.status === "deleted" ? "danger" : "warning"}`}
               >
                 {pageStatusLabel(page.status, messages)}
               </span>
+              {page.protectionLevel === "protected" ? (
+                <span className="badge info">{messages.pageProtected}</span>
+              ) : null}
             </div>
             <div className="mono muted" data-label={messages.updatedColumn}>
               {page.updatedAt.toLocaleString(locale)}
@@ -96,6 +104,41 @@ export default async function AdminPagesPage() {
                   </div>
                 </ConfirmActionForm>
               ) : null}
+              <ConfirmActionForm
+                action={setPageProtectionAction}
+                hiddenFields={[
+                  { name: "pageId", value: page.id },
+                  {
+                    name: "protectionLevel",
+                    value: page.protectionLevel === "protected" ? "none" : "protected"
+                  }
+                ]}
+                triggerLabel={
+                  page.protectionLevel === "protected" ? messages.unprotect : messages.protect
+                }
+                triggerClassName="button compact"
+                icon={page.protectionLevel === "protected" ? "unprotect" : "protect"}
+                title={`${
+                  page.protectionLevel === "protected"
+                    ? messages.unprotectPage
+                    : messages.protectPage
+                } · ${page.title}`}
+                body={
+                  page.protectionLevel === "protected"
+                    ? messages.unprotectPageConfirmBody
+                    : messages.protectPageConfirmBody
+                }
+                warning={
+                  page.protectionLevel === "protected"
+                    ? undefined
+                    : messages.protectPageConfirmWarning
+                }
+                confirmLabel={
+                  page.protectionLevel === "protected" ? messages.unprotect : messages.protect
+                }
+                cancelLabel={messages.cancel}
+                pendingLabel={messages.working}
+              />
               {page.status === "deleted" ? (
                 <ActionForm
                   action={restorePageAction}

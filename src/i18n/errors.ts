@@ -24,6 +24,7 @@ const exactMessageKeys: Record<string, MessageKey> = {
   "The final active Owner cannot be suspended or demoted.": "finalOwnerInvariant",
   "A page with this title or slug already exists.": "pageDuplicate",
   "Deleted pages must be restored before editing.": "deletedPageEdit",
+  "This page is protected.": "protectedPageDenied",
   "The page changed after this editor loaded it.": "editConflict",
   "Page not found.": "pageNotFound",
   "Revision not found.": "revisionNotFound",

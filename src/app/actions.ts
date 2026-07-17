@@ -38,6 +38,7 @@ import {
   restorePage,
   rollbackPage,
   saveDraft,
+  setPageProtection,
   softDeletePage
 } from "@/modules/pages/service";
 import { completeSetup } from "@/modules/setup/service";
@@ -331,6 +332,32 @@ export async function renamePageAction(
     }
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
     return { ok: true, message: messages.pageRenamed };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function setPageProtectionAction(
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    const session = await requireSession();
+    const site = await requireSite();
+    await requirePermission(session.user.id, site.site.id, "page.protect");
+    const protectionLevel = pageProtectionLevelValue(formData, "protectionLevel");
+    const page = await setPageProtection({
+      pageId: stringValue(formData, "pageId"),
+      protectionLevel,
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
+    });
+    revalidatePath("/admin/pages");
+    revalidatePath(`/page/${page.slug}`);
+    revalidatePath(`/edit/${page.slug}`);
+    revalidatePath(`/history/${page.slug}`);
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.pageProtectionUpdated };
   } catch (error) {
     return actionError(error);
   }
@@ -640,6 +667,14 @@ function localeValue(formData: FormData, key: string): "en" | "zh-CN" {
     throw new AppError(`Invalid locale: ${value}`, "validation_error", 422);
   }
   return value;
+}
+
+function pageProtectionLevelValue(formData: FormData, key: string): "none" | "protected" {
+  const value = stringValue(formData, key);
+  if (value === "none" || value === "protected") {
+    return value;
+  }
+  throw new AppError(`Invalid page protection level: ${value}`, "validation_error", 422);
 }
 
 async function actionError(error: unknown): Promise<ActionState> {

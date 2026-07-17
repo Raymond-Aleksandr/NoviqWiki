@@ -15,13 +15,20 @@ const spec = {
     "/pages/{id}": {
       get: { summary: "Get page", responses: { "200": { description: "Page" } } },
       patch: {
-        summary: "Update, rename, publish, or restore page",
+        summary: "Update, rename, publish, protect, or restore page",
         requestBody: {
           content: {
             "application/json": {
               schema: {
                 oneOf: [
                   { type: "object", properties: { action: { const: "restore" } } },
+                  {
+                    type: "object",
+                    properties: {
+                      protectionLevel: { enum: ["none", "protected"] }
+                    },
+                    required: ["protectionLevel"]
+                  },
                   {
                     type: "object",
                     properties: {

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useId, useState } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, Pencil, RotateCcw, Trash2, X } from "lucide-react";
+import { AlertTriangle, Pencil, RotateCcw, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
 import type { ActionState } from "@/app/actions";
 
 type HiddenField = {
@@ -10,7 +10,7 @@ type HiddenField = {
   value: string;
 };
 
-type ActionIconName = "trash" | "rollback" | "reset" | "rename";
+type ActionIconName = "trash" | "rollback" | "reset" | "rename" | "protect" | "unprotect";
 
 type Props = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
@@ -52,7 +52,11 @@ export function ConfirmActionForm({
   const titleId = useId();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(action, initialState);
-  const iconTone = danger ? "danger" : icon === "rename" ? "neutral" : "warning";
+  const iconTone = danger
+    ? "danger"
+    : icon === "rename" || icon === "unprotect"
+      ? "neutral"
+      : "warning";
 
   useEffect(() => {
     if (state.ok && state.message) {
@@ -88,6 +92,10 @@ export function ConfirmActionForm({
               <span className={`confirm-dialog-icon ${iconTone}`}>
                 {icon === "rename" ? (
                   <Pencil size={19} aria-hidden="true" />
+                ) : icon === "protect" ? (
+                  <ShieldCheck size={19} aria-hidden="true" />
+                ) : icon === "unprotect" ? (
+                  <ShieldOff size={19} aria-hidden="true" />
                 ) : (
                   <AlertTriangle size={19} aria-hidden="true" />
                 )}
@@ -135,6 +143,12 @@ function ActionIcon({ icon, size }: { icon?: ActionIconName; size: number }) {
   }
   if (icon === "rename") {
     return <Pencil size={size} aria-hidden="true" />;
+  }
+  if (icon === "protect") {
+    return <ShieldCheck size={size} aria-hidden="true" />;
+  }
+  if (icon === "unprotect") {
+    return <ShieldOff size={size} aria-hidden="true" />;
   }
   return null;
 }

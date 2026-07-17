@@ -11,16 +11,18 @@ import {
   type Page,
   type PageRevision
 } from "@/db/schema";
-import { ConflictError, NotFoundError } from "@/lib/errors";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { contentHash } from "@/lib/crypto";
 import { normalizeTitle, slugifyTitle } from "@/lib/normalize";
 import { writeAuditLog } from "@/modules/audit/service";
+import { hasPermission } from "@/modules/authorization/permissions";
 import { renderMarkdown } from "@/modules/rendering/markdown";
 import { createUnifiedDiff, parseUnifiedDiff } from "@/modules/revisions/diff";
 import { removeSearchIndex, upsertSearchIndex } from "@/modules/search/service";
 import { derivePageIdentity } from "./title";
 
 export type PublicationState = "draft" | "published";
+export type PageProtectionLevel = "none" | "protected";
 
 export async function createPage(
   input: {
@@ -149,6 +151,10 @@ export async function saveDraft(
   database: RootDatabase = db
 ) {
   const page = await getPageById(input.pageId, database);
+  if (page.deletedAt || page.status === "deleted") {
+    throw new ConflictError("Deleted pages must be restored before editing.");
+  }
+  await assertProtectedWriteAllowed(page, input.actorId, database);
   const [draft] = await database
     .insert(pageDrafts)
     .values({
@@ -199,6 +205,7 @@ export async function publishPage(
     if (page.deletedAt || page.status === "deleted") {
       throw new ConflictError("Deleted pages must be restored before editing.");
     }
+    await assertProtectedWriteAllowed(page, input.actorId, tx);
     const expectedBase = input.baseRevisionId ?? null;
     if ((page.currentRevisionId ?? null) !== expectedBase) {
       throw new ConflictError("The page changed after this editor loaded it.");
@@ -489,6 +496,10 @@ export async function rollbackPage(
 ) {
   return database.transaction(async (tx) => {
     const page = await getPageById(input.pageId, tx);
+    if (page.deletedAt || page.status === "deleted") {
+      throw new ConflictError("Deleted pages must be restored before editing.");
+    }
+    await assertProtectedWriteAllowed(page, input.actorId, tx);
     const target = await getRevisionById(input.targetRevisionId, tx);
     if (target.pageId !== page.id) {
       throw new ConflictError("Target revision belongs to another page.");
@@ -543,6 +554,7 @@ export async function softDeletePage(
   database: Database = db
 ) {
   const page = await getPageById(input.pageId, database);
+  await assertProtectedWriteAllowed(page, input.actorId, database);
   const [updated] = await database
     .update(pages)
     .set({
@@ -574,6 +586,7 @@ export async function restorePage(
   database: Database = db
 ) {
   const { page, revision } = await getPageWithCurrentRevision(input.pageId, database);
+  await assertProtectedWriteAllowed(page, input.actorId, database);
   const [updated] = await database
     .update(pages)
     .set({
@@ -624,6 +637,7 @@ export async function renamePage(
 ) {
   return database.transaction(async (tx) => {
     const page = await getPageById(input.pageId, tx);
+    await assertProtectedWriteAllowed(page, input.actorId, tx);
     const identity = derivePageIdentity(input.newTitle, input.newSlug);
     const duplicate = await tx
       .select({ id: pages.id })
@@ -689,6 +703,47 @@ export async function renamePage(
   });
 }
 
+export async function setPageProtection(
+  input: {
+    pageId: string;
+    protectionLevel: PageProtectionLevel;
+    actorId: string;
+    actorDisplayName: string;
+  },
+  database: Database = db
+) {
+  const page = await getPageById(input.pageId, database);
+  if (!(await hasPermission(input.actorId, page.siteId, "page.protect", database))) {
+    throw new ForbiddenError();
+  }
+  const protectionLevel = normalizeProtectionLevel(input.protectionLevel);
+  if (normalizeProtectionLevel(page.protectionLevel) === protectionLevel) {
+    return page;
+  }
+  const [updated] = await database
+    .update(pages)
+    .set({ protectionLevel, updatedAt: new Date() })
+    .where(eq(pages.id, page.id))
+    .returning();
+  await writeAuditLog(
+    {
+      siteId: page.siteId,
+      actorId: input.actorId,
+      actorDisplayName: input.actorDisplayName,
+      action: "page.updated",
+      targetType: "page",
+      targetId: page.id,
+      details: {
+        title: page.title,
+        previousProtectionLevel: normalizeProtectionLevel(page.protectionLevel),
+        protectionLevel
+      }
+    },
+    database
+  );
+  return updated;
+}
+
 async function createRevision(
   input: {
     siteId: string;
@@ -732,6 +787,19 @@ async function getNextRevisionNumber(pageId: string, database: Database) {
     .from(pageRevisions)
     .where(eq(pageRevisions.pageId, pageId));
   return (row.value ?? 0) + 1;
+}
+
+function normalizeProtectionLevel(value: string | null | undefined): PageProtectionLevel {
+  return value === "protected" ? "protected" : "none";
+}
+
+async function assertProtectedWriteAllowed(page: Page, actorId: string, database: Database) {
+  if (normalizeProtectionLevel(page.protectionLevel) === "none") {
+    return;
+  }
+  if (!(await hasPermission(actorId, page.siteId, "page.protect", database))) {
+    throw new ForbiddenError("This page is protected.");
+  }
 }
 
 async function updateRelationships(

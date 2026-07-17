@@ -332,6 +332,17 @@ export const en = {
   updatedColumn: "Updated",
   revisions: "Revisions",
   restore: "Restore",
+  protect: "Protect",
+  unprotect: "Unprotect",
+  protectPage: "Protect page",
+  unprotectPage: "Unprotect page",
+  pageProtected: "Protected",
+  protectPageConfirmBody:
+    "Protected pages require the page.protect permission before users can save drafts, publish, rename, delete, restore, or roll back the page.",
+  protectPageConfirmWarning:
+    "Editors without page.protect will be blocked server-side even if they can see edit controls.",
+  unprotectPageConfirmBody:
+    "Remove the extra page protection requirement. Normal role permissions still apply.",
   name: "Name",
   description: "Description",
   newGroup: "New group",
@@ -415,6 +426,7 @@ export const en = {
   pageDeleted: "Page deleted.",
   pageRestored: "Page restored.",
   pageRenamed: "Page renamed.",
+  pageProtectionUpdated: "Page protection updated.",
   settingsUpdated: "Settings updated.",
   selectFileToUpload: "Select a file to upload.",
   mediaUploaded: "Media uploaded.",
@@ -443,6 +455,7 @@ export const en = {
   finalOwnerInvariant: "The final active Owner cannot be suspended or demoted.",
   pageDuplicate: "A page with this title or slug already exists.",
   deletedPageEdit: "Deleted pages must be restored before editing.",
+  protectedPageDenied: "This page is protected.",
   editConflict: "The page changed after this editor loaded it.",
   pageNotFound: "Page not found.",
   revisionNotFound: "Revision not found.",

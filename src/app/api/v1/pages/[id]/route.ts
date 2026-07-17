@@ -6,6 +6,7 @@ import {
   publishPage,
   renamePage,
   restorePage,
+  setPageProtection,
   softDeletePage
 } from "@/modules/pages/service";
 import { ForbiddenError } from "@/lib/errors";
@@ -16,7 +17,8 @@ const patchSchema = z.object({
   slug: z.string().optional(),
   markdown: z.string().optional(),
   editSummary: z.string().optional(),
-  baseRevisionId: z.string().nullable().optional()
+  baseRevisionId: z.string().nullable().optional(),
+  protectionLevel: z.enum(["none", "protected"]).optional()
 });
 
 type Props = { params: Promise<{ id: string }> };
@@ -41,6 +43,16 @@ export async function PATCH(request: Request, { params }: Props) {
       await requireApiContext("page.restore");
       const page = await restorePage({
         pageId: id,
+        actorId: session.user.id,
+        actorDisplayName: session.user.displayName
+      });
+      return ok({ page });
+    }
+    if (body.protectionLevel) {
+      await requireApiContext("page.protect");
+      const page = await setPageProtection({
+        pageId: id,
+        protectionLevel: body.protectionLevel,
         actorId: session.user.id,
         actorDisplayName: session.user.displayName
       });

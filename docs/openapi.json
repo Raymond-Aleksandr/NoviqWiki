@@ -38,7 +38,7 @@
         }
       },
       "patch": {
-        "summary": "Update, rename, publish, or restore page",
+        "summary": "Update, rename, publish, protect, or restore page",
         "requestBody": {
           "content": {
             "application/json": {
@@ -51,6 +51,15 @@
                         "const": "restore"
                       }
                     }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "protectionLevel": {
+                        "enum": ["none", "protected"]
+                      }
+                    },
+                    "required": ["protectionLevel"]
                   },
                   {
                     "type": "object",

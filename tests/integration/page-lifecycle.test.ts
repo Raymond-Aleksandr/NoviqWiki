@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { and, eq } from "drizzle-orm";
+import { roles } from "@/db/schema";
+import {
+  assignRoleToGroup,
+  assignUserToGroup,
+  createGroup
+} from "@/modules/authorization/permissions";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { completeSetup } from "@/modules/setup/service";
+import { createUser } from "@/modules/users/service";
 import {
   createPage,
   listPageBacklinks,
@@ -10,7 +18,9 @@ import {
   renamePage,
   restorePage,
   rollbackPage,
-  softDeletePage
+  saveDraft,
+  softDeletePage,
+  setPageProtection
 } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
 import { searchPages } from "@/modules/search/service";
@@ -174,5 +184,199 @@ describe("page lifecycle integration", () => {
     expect(restoredSearch.rows).toContainEqual(
       expect.objectContaining({ title: "Moved Topic", slug: "moved-topic" })
     );
+  });
+
+  it("enforces page protection on server-side write operations", async () => {
+    const test = await createTestDatabase();
+    const setup = await completeSetup(
+      {
+        siteName: "Protected Wiki",
+        tagline: "Test",
+        baseUrl: "http://localhost:3000",
+        registrationMode: "closed",
+        mediaDriver: "local",
+        ownerUsername: "owner",
+        ownerEmail: "owner-protected@example.test",
+        ownerPassword: "OwnerPassword123"
+      },
+      test.db
+    );
+
+    const editor = await createUser(
+      {
+        username: "editor",
+        email: "editor@example.test",
+        password: "EditorPassword123",
+        displayName: "Editor",
+        status: "active"
+      },
+      test.executor
+    );
+    const [editorRole] = await test.executor
+      .select({ id: roles.id })
+      .from(roles)
+      .where(and(eq(roles.siteId, setup.site.id), eq(roles.normalizedName, "editor")))
+      .limit(1);
+    const editorGroup = await createGroup(
+      { siteId: setup.site.id, name: "Editors", description: "Can edit and publish." },
+      test.executor
+    );
+    await assignRoleToGroup(editorGroup.id, editorRole.id, test.executor);
+    await assignUserToGroup(editor.id, editorGroup.id, test.executor);
+
+    const created = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Protected Topic",
+        markdown: "# Protected Topic\n\nInitial.",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Initial"
+      },
+      test.db
+    );
+    const page = created.page;
+    const firstRevision = "revision" in created ? created.revision : null;
+    if (!firstRevision) {
+      throw new Error("Expected published page creation to return a revision.");
+    }
+
+    const editorRevision = await publishPage(
+      {
+        pageId: page.id,
+        baseRevisionId: firstRevision.id,
+        markdown: "# Protected Topic\n\nEditor can publish before protection.",
+        actorId: editor.id,
+        actorDisplayName: editor.displayName,
+        editSummary: "Editor update"
+      },
+      test.db
+    );
+    expect(editorRevision.revisionNumber).toBe(2);
+
+    const protectedPage = await setPageProtection(
+      {
+        pageId: page.id,
+        protectionLevel: "protected",
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.executor
+    );
+    expect(protectedPage.protectionLevel).toBe("protected");
+
+    await expect(
+      setPageProtection(
+        {
+          pageId: page.id,
+          protectionLevel: "none",
+          actorId: editor.id,
+          actorDisplayName: editor.displayName
+        },
+        test.executor
+      )
+    ).rejects.toThrow("You do not have permission to perform this action.");
+
+    await expect(
+      saveDraft(
+        {
+          pageId: page.id,
+          baseRevisionId: editorRevision.id,
+          markdown: "# Protected Topic\n\nBlocked draft.",
+          actorId: editor.id,
+          actorDisplayName: editor.displayName,
+          editSummary: "Blocked draft"
+        },
+        test.db
+      )
+    ).rejects.toThrow("This page is protected.");
+
+    await expect(
+      publishPage(
+        {
+          pageId: page.id,
+          baseRevisionId: editorRevision.id,
+          markdown: "# Protected Topic\n\nBlocked publish.",
+          actorId: editor.id,
+          actorDisplayName: editor.displayName,
+          editSummary: "Blocked publish"
+        },
+        test.db
+      )
+    ).rejects.toThrow("This page is protected.");
+
+    await expect(
+      renamePage(
+        {
+          pageId: page.id,
+          newTitle: "Blocked Protected Move",
+          actorId: editor.id,
+          actorDisplayName: editor.displayName
+        },
+        test.db
+      )
+    ).rejects.toThrow("This page is protected.");
+
+    await expect(
+      rollbackPage(
+        {
+          pageId: page.id,
+          targetRevisionId: firstRevision.id,
+          actorId: editor.id,
+          actorDisplayName: editor.displayName,
+          reason: "Blocked rollback"
+        },
+        test.db
+      )
+    ).rejects.toThrow("This page is protected.");
+
+    await expect(
+      softDeletePage(
+        {
+          pageId: page.id,
+          actorId: editor.id,
+          actorDisplayName: editor.displayName
+        },
+        test.executor
+      )
+    ).rejects.toThrow("This page is protected.");
+
+    const ownerRevision = await publishPage(
+      {
+        pageId: page.id,
+        baseRevisionId: editorRevision.id,
+        markdown: "# Protected Topic\n\nOwner can edit protected pages.",
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Owner update"
+      },
+      test.db
+    );
+    expect(ownerRevision.revisionNumber).toBe(3);
+
+    const unprotectedPage = await setPageProtection(
+      {
+        pageId: page.id,
+        protectionLevel: "none",
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.executor
+    );
+    expect(unprotectedPage.protectionLevel).toBe("none");
+
+    const finalEditorRevision = await publishPage(
+      {
+        pageId: page.id,
+        baseRevisionId: ownerRevision.id,
+        markdown: "# Protected Topic\n\nEditor can publish after protection is removed.",
+        actorId: editor.id,
+        actorDisplayName: editor.displayName,
+        editSummary: "Editor update after unprotect"
+      },
+      test.db
+    );
+    expect(finalEditorRevision.revisionNumber).toBe(4);
   });
 });
