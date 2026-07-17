@@ -76,7 +76,7 @@ The UI release audit is a non-reset browser audit for live review builds. It doe
 It checks:
 
 - Chromium and WebKit at desktop and mobile widths.
-- Public homepage, search, recent changes, special pages, random page redirect, all pages, wanted pages, orphaned pages, dead-end pages, short pages, protected pages, uncategorized pages, redirect maintenance, category index/detail, media, auth, recovery, reset, verification, registration, article, backlinks, history, and the first discoverable diff route.
+- Public homepage, search, recent changes, special pages, random page redirect, all pages, wanted pages, orphaned pages, dead-end pages, short pages, protected pages, uncategorized pages, redirect maintenance, category index/detail, media, auth, recovery, reset, verification, registration, article, backlinks, citation page, history, and the first discoverable diff route.
 - Authenticated editor and admin routes when credentials are provided.
 - Light and dark theme design tokens for background, surface, muted surface, sunken surface, text, primary, border, radius, and font stacks.
 - Production source does not use native browser `alert`, `confirm`, `prompt`, or `beforeunload` dialogs.

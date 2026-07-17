@@ -124,6 +124,7 @@ Last updated: 2026-07-17
 - 2026-07-17: Added a `/protected-pages` content-maintenance page for published pages with edit protection enabled. Article page tools now link to the protected-page index, the UI audit covers the route, and integration coverage verifies draft, unprotected, archived, and deleted protected pages are excluded.
 - 2026-07-17: Added a `/special` wiki index that groups public browsing links, content-maintenance reports, and permission-aware administration links. The site navigation and article page tools now expose Special pages, unit coverage locks the section/link model, and the UI audit covers the route.
 - 2026-07-17: Added `GET /random` for a traditional random-article workflow. The route enforces page-read permission, redirects to a random published non-redirect article, falls back to `/pages` when no readable article exists, appears in Special pages, and integration coverage verifies draft, archived, deleted, and redirect pages are excluded.
+- 2026-07-17: Added `/page/{slug}/cite` for APA, MLA, Chicago, and BibTeX citations pinned to the current permanent revision URL. Article tools now expose "Cite this page", citation formatting is unit-covered, and the UI audit covers the citation route when an article exists.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

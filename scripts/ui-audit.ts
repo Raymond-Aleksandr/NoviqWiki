@@ -417,6 +417,7 @@ function buildRoutes({
     routes.push(
       `/page/${articleSlug}`,
       `/page/${articleSlug}/backlinks`,
+      `/page/${articleSlug}/cite`,
       `/history/${articleSlug}`
     );
   }

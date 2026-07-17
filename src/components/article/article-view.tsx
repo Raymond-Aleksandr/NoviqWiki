@@ -10,6 +10,7 @@ import {
   Link2Off,
   ListChecks,
   ListTree,
+  Quote,
   Ruler,
   RouteOff,
   ShieldCheck,
@@ -207,6 +208,10 @@ export function ArticleView({
               <Info size={15} aria-hidden="true" />
               {messages.pageInformation}
             </a>
+            <Link href={`/page/${page.slug}/cite`}>
+              <Quote size={15} aria-hidden="true" />
+              {messages.citeThisPage}
+            </Link>
             {canEdit ? (
               <Link href={`/edit/${page.slug}`}>
                 <Edit3 size={15} aria-hidden="true" />
