@@ -62,7 +62,7 @@ html[data-theme="light"] {
   --nw-font-body: "Hanken Grotesk", "Noto Sans SC", system-ui, sans-serif;
   --nw-font-serif: "Source Serif 4", "Noto Serif SC", Georgia, serif;
   --nw-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
-  --control-height: 36px;
+  --control-height: 34px;
   --control-radius: 8px;
   --control-font-size: 13px;
   --control-pad-x: 12px;
@@ -492,10 +492,10 @@ button {
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.2;
-  min-block-size: 36px;
-  padding: 8px 14px;
+  min-block-size: var(--control-height);
+  padding: 8px 13px;
   text-decoration: none;
   box-shadow: var(--sh-sm);
   -webkit-tap-highlight-color: transparent;
@@ -569,14 +569,14 @@ textarea,
 select {
   box-sizing: border-box;
   width: 100%;
-  min-height: 42px;
+  min-height: 38px;
   border: 1px solid var(--border-strong);
-  border-radius: 9px;
+  border-radius: var(--control-radius);
   background: var(--bg);
   color: var(--text);
   font-size: 14px;
   line-height: 1.35;
-  padding: 10px 13px;
+  padding: 9px 12px;
   appearance: none;
   -webkit-appearance: none;
 }
@@ -584,8 +584,8 @@ select {
 input[type="file"].field {
   display: flex;
   align-items: center;
-  min-height: 42px;
-  padding: 7px 10px;
+  min-height: 38px;
+  padding: 5px 10px;
   line-height: 1.2;
 }
 
@@ -3318,7 +3318,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  min-block-size: 42px;
+  min-block-size: var(--control-height);
   color: var(--text-muted);
   font-size: 13px;
 }
@@ -3339,7 +3339,7 @@ textarea {
 }
 
 .history-compare-form button {
-  min-block-size: 42px;
+  min-block-size: var(--control-height);
 }
 
 .history-panel {
@@ -3941,26 +3941,28 @@ textarea {
   }
 
   .admin-filter-bar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 10px;
   }
 
   .admin-filter-control {
-    --control-height: 40px;
-    --control-font-size: 16px;
+    --control-height: 34px;
+    --control-font-size: 13px;
   }
 
   .admin-filter-search {
-    grid-column: 1 / -1;
+    flex: 1 1 100%;
     width: 100%;
     max-width: none;
   }
 
   .admin-filter-select {
+    flex: 1 1 136px;
     min-width: 0;
-    width: 100%;
+    width: auto;
+    max-width: 190px;
   }
 
   .admin-filter-select select {
@@ -3969,12 +3971,11 @@ textarea {
 
   .admin-filter-bar > .button,
   .admin-filter-bar > button {
-    --control-height: 40px;
-    --control-font-size: 16px;
+    --control-height: 34px;
+    --control-font-size: 13px;
   }
 
   .admin-filter-bar > .button.primary {
-    grid-column: 1 / -1;
     justify-self: start;
   }
 
