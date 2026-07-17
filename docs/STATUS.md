@@ -82,6 +82,9 @@ Last updated: 2026-07-16
 - 2026-07-16: Added a CSS source scan to `pnpm test:ui` that rejects non-`none` `transform` declarations inside `:active` rules, guarding against pressed-button movement returning through future stylesheet edits.
 - 2026-07-16: Exposed page rename/move from `/admin/pages` with the design-package confirmation modal, editable title/slug fields, and a default option to keep the previous slug as a redirect. The page lifecycle integration test now verifies old-slug resolution, alias-backed search, and unchanged immutable revision count after rename.
 - 2026-07-16: Added `NEXTWIKI_ALLOWED_DEV_ORIGINS` so local dev servers can safely allow LAN/mobile browser review without hardcoding workstation IP addresses. The live review server was restarted on `0.0.0.0:3100` and validated through `http://10.0.0.180:3100`.
+- 2026-07-16: Removed the duplicated global topbar search from every route. Search entry now flows through the homepage hero action or the dedicated `/search` page form, while `/search` remains fully functional on mobile and desktop.
+- 2026-07-16: Fixed the mobile Safari/search-page navigation regression by preventing the mobile shell grid from stretching short pages and forcing compact content-width sidebar nav items. WebKit mobile verification shows the sidebar at 59px tall and the `阅读` nav item at 36px tall on empty and populated search pages.
+- 2026-07-16: Improved PostgreSQL search recall with prefix full-text matching and safe substring fallback across title, aliases, categories, and plain text. Live verification confirmed `/api/v1/search?q=test` and `/search?q=test` return the `Testing` category article, and integration coverage now locks `test` matching `Testing`.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

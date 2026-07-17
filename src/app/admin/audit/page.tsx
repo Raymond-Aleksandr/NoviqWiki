@@ -1,4 +1,5 @@
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
 import { listAuditLogs } from "@/modules/audit/service";
 
@@ -21,8 +22,8 @@ export default async function AdminAuditPage() {
         </div>
         {logs.rows.map((log) => (
           <article className="admin-grid-row admin-audit-grid" key={log.id}>
-            <div className="mono audit-action" data-label={messages.auditEvent}>
-              {log.action}
+            <div className="audit-action" data-label={messages.auditEvent} title={log.action}>
+              {auditActionLabel(log.action, messages)}
             </div>
             <div className="muted" data-label={messages.target}>
               {log.targetType}:{log.targetId}

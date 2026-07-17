@@ -5,7 +5,6 @@ import { BookOpen, LogIn, LogOut, Rocket, UserRound } from "lucide-react";
 import "@/styles/globals.css";
 import { SiteNav } from "@/components/layout/site-nav";
 import { TopbarSettingsLink } from "@/components/layout/topbar-settings-link";
-import { TopbarSearch } from "@/components/layout/topbar-search";
 import { PreferenceControls } from "@/components/layout/theme-controls";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getCurrentSession } from "@/modules/auth/session";
@@ -84,7 +83,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </aside>
             <div className="main">
               <header className="topbar">
-                <TopbarSearch messages={messages} />
+                <div className="topbar-fill" aria-hidden="true" />
                 {session ? (
                   <>
                     <span className="topbar-user">

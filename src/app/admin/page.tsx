@@ -4,6 +4,7 @@ import { Activity, FileText, ImageIcon, Layers3, Users } from "lucide-react";
 import { db } from "@/db/client";
 import { mediaAssets, pageDrafts, pages, users } from "@/db/schema";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
 import { listRecentChanges } from "@/modules/activity/service";
 
@@ -46,7 +47,9 @@ export default async function AdminDashboard() {
           ) : (
             changes.map((change) => (
               <div className="admin-panel-row" key={change.id}>
-                <span className="mono admin-event-name">{change.action}</span>
+                <span className="admin-event-name">
+                  {auditActionLabel(change.action, messages)}
+                </span>
                 <span className="mono muted" style={{ marginLeft: "auto", fontSize: "11px" }}>
                   {change.actorDisplayName ?? messages.system} ·{" "}
                   {change.createdAt.toLocaleString(locale)}

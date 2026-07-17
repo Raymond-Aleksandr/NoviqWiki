@@ -58,6 +58,7 @@ type RouteMetrics = {
   adminSettingsLinks: ElementSummary[];
   adminTabsWithoutIcons: ElementSummary[];
   createAnchors: ElementSummary[];
+  rawAuditActions: string[];
 };
 
 type ModalMetrics = {
@@ -65,6 +66,7 @@ type ModalMetrics = {
   hasBackdrop: boolean;
   radius: string | null;
   overflow: boolean;
+  warningTextAlign: string | null;
 };
 
 type DesignTokenMetrics = {
@@ -129,6 +131,39 @@ const nativeDialogPatterns: Array<{ label: string; pattern: RegExp }> = [
   { label: "global prompt", pattern: /(^|[^\w.])prompt\s*\(/ },
   { label: "beforeunload", pattern: /\b(onbeforeunload|beforeunload)\b/ }
 ];
+
+const rawAuditActionValues = [
+  "setup.complete",
+  "auth.login",
+  "auth.logout",
+  "auth.login_failed",
+  "auth.password_reset_requested",
+  "auth.password_reset_completed",
+  "user.created",
+  "user.updated",
+  "user.suspended",
+  "user.activated",
+  "group.updated",
+  "role.updated",
+  "page.created",
+  "page.draft_saved",
+  "page.published",
+  "page.updated",
+  "page.renamed",
+  "page.deleted",
+  "page.restored",
+  "page.rollback",
+  "media.uploaded",
+  "media.deleted",
+  "settings.updated",
+  "backup.created",
+  "backup.restored"
+];
+
+const rawAuditActionPattern = new RegExp(
+  `\\b(?:${rawAuditActionValues.map(escapeRegExp).join("|")})\\b`,
+  "g"
+);
 
 const publicRoutes = [
   "/",
@@ -273,6 +308,10 @@ async function findActiveTransformMatches(directory: string): Promise<SourceMatc
 
 function countCharacter(value: string, character: string) {
   return [...value].filter((item) => item === character).length;
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function main() {
@@ -650,6 +689,15 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     sizeName,
     route
   );
+  if (metrics.rawAuditActions.length > 0) {
+    addFailure({
+      kind: "raw_audit_action_visible",
+      browserName,
+      sizeName,
+      route,
+      detail: metrics.rawAuditActions
+    });
+  }
 
   if (
     new URL(page.url()).pathname.startsWith("/admin") &&
@@ -733,6 +781,27 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
     const visibleMatches = (selector) =>
       [...document.querySelectorAll(selector)].filter(visible);
     const clientWidth = document.documentElement.clientWidth;
+    const rawAuditTextNodes = [];
+    const rawAuditWalker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const parent = node.parentElement;
+        if (
+          !parent ||
+          !visible(parent) ||
+          parent.closest(".permission-panel") ||
+          parent.closest(".permission-checkbox")
+        ) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    while (rawAuditWalker.nextNode()) {
+      rawAuditTextNodes.push(rawAuditWalker.currentNode.nodeValue || "");
+    }
+    const rawAuditActions = [
+      ...new Set((rawAuditTextNodes.join("\\n").match(${rawAuditActionPattern}) || []).slice(0, 12))
+    ];
 
     const commandButtonsWithoutIcons = visibleMatches("button, a.button, [role='button']")
       .filter(
@@ -797,7 +866,8 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         .map(summarize),
       createAnchors: visibleMatches("a[href='#create-group'], a[href='#create-role']").map(
         summarize
-      )
+      ),
+      rawAuditActions
     };
   })()`) as Promise<RouteMetrics>;
 }
@@ -924,7 +994,13 @@ async function auditPageDeleteDialog(page: Page, browserName: string, sizeName: 
   }
   await deleteButtons.nth(0).click();
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
-  if (!modal.hasBackdrop || !modal.hasDialog || modal.radius !== "14px" || modal.overflow) {
+  if (
+    !modal.hasBackdrop ||
+    !modal.hasDialog ||
+    modal.radius !== "14px" ||
+    modal.overflow ||
+    modal.warningTextAlign !== "left"
+  ) {
     addFailure({
       kind: "page_delete_modal_mismatch",
       browserName,
@@ -944,7 +1020,13 @@ async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName:
   }
   await deleteButtons.nth(0).click();
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
-  if (!modal.hasBackdrop || !modal.hasDialog || modal.radius !== "14px" || modal.overflow) {
+  if (
+    !modal.hasBackdrop ||
+    !modal.hasDialog ||
+    modal.radius !== "14px" ||
+    modal.overflow ||
+    modal.warningTextAlign !== "left"
+  ) {
     addFailure({
       kind: "media_delete_modal_mismatch",
       browserName,
@@ -963,7 +1045,13 @@ async function auditUserResetDialog(page: Page, browserName: string, sizeName: s
   }
   await resetButtons.nth(0).click();
   const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
-  if (!modal.hasBackdrop || !modal.hasDialog || modal.radius !== "14px" || modal.overflow) {
+  if (
+    !modal.hasBackdrop ||
+    !modal.hasDialog ||
+    modal.radius !== "14px" ||
+    modal.overflow ||
+    modal.warningTextAlign !== "left"
+  ) {
     addFailure({
       kind: "user_reset_modal_mismatch",
       browserName,
@@ -979,11 +1067,13 @@ async function readModalMetrics(page: Page, dialogSelector: string): Promise<Mod
     const selector = ${JSON.stringify(dialogSelector)};
     const dialog = document.querySelector(selector);
     const backdrop = document.querySelector(".modal-backdrop");
+    const warning = dialog?.querySelector(".confirm-warning");
     return {
       hasDialog: Boolean(dialog),
       hasBackdrop: Boolean(backdrop),
       radius: dialog ? getComputedStyle(dialog).borderRadius : null,
-      overflow: document.body.scrollWidth > document.documentElement.clientWidth + 2
+      overflow: document.body.scrollWidth > document.documentElement.clientWidth + 2,
+      warningTextAlign: warning ? getComputedStyle(warning).textAlign : null
     };
   })()`) as Promise<ModalMetrics>;
 }

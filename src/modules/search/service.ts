@@ -59,30 +59,50 @@ export async function searchPages(
     return { rows: [], count: 0 };
   }
   const tsQuery = sql`websearch_to_tsquery('simple', ${trimmed})`;
+  const prefixQueryText = buildPrefixTsQuery(trimmed);
+  const prefixTsQuery = prefixQueryText ? sql`to_tsquery('simple', ${prefixQueryText})` : undefined;
+  const likePattern = `%${escapeLikePattern(trimmed)}%`;
+  const startsWithPattern = `${escapeLikePattern(trimmed)}%`;
   const categoryWhere = input.category
     ? ilike(searchIndex.categories, `%${input.category}%`)
     : undefined;
   const visibility = input.includeDeleted
     ? undefined
     : and(eq(pages.status, "published"), sql`${pages.deletedAt} is null`);
-  const where = and(
-    eq(searchIndex.siteId, input.siteId),
-    or(sql`${searchIndex.searchVector} @@ ${tsQuery}`, ilike(searchIndex.title, `%${trimmed}%`)),
-    categoryWhere,
-    visibility
+  const textMatches = or(
+    sql`${searchIndex.searchVector} @@ ${tsQuery}`,
+    prefixTsQuery ? sql`${searchIndex.searchVector} @@ ${prefixTsQuery}` : undefined,
+    sql`${searchIndex.title} ilike ${likePattern} escape '\\'`,
+    sql`${searchIndex.aliases} ilike ${likePattern} escape '\\'`,
+    sql`${searchIndex.categories} ilike ${likePattern} escape '\\'`,
+    sql`${searchIndex.plainText} ilike ${likePattern} escape '\\'`
   );
+  const rankExpression = sql<number>`
+    ts_rank_cd(${searchIndex.searchVector}, ${tsQuery})
+    + ${prefixTsQuery ? sql`ts_rank_cd(${searchIndex.searchVector}, ${prefixTsQuery}) * 0.75` : sql`0`}
+    + case
+        when lower(${searchIndex.title}) = lower(${trimmed}) then 5
+        when ${searchIndex.title} ilike ${startsWithPattern} escape '\\' then 2
+        when ${searchIndex.title} ilike ${likePattern} escape '\\' then 1
+        when ${searchIndex.aliases} ilike ${likePattern} escape '\\' then 0.75
+        when ${searchIndex.categories} ilike ${likePattern} escape '\\' then 0.5
+        when ${searchIndex.plainText} ilike ${likePattern} escape '\\' then 0.25
+        else 0
+      end
+  `;
+  const where = and(eq(searchIndex.siteId, input.siteId), textMatches, categoryWhere, visibility);
   const rows = await database
     .select({
       pageId: searchIndex.pageId,
       title: searchIndex.title,
       slug: pages.slug,
-      excerpt: sql<string>`ts_headline('simple', ${searchIndex.plainText}, ${tsQuery}, 'StartSel=<mark>,StopSel=</mark>,MaxWords=32,MinWords=8')`,
-      rank: sql<number>`ts_rank_cd(${searchIndex.searchVector}, ${tsQuery}) + case when lower(${searchIndex.title}) = lower(${trimmed}) then 5 else 0 end`
+      excerpt: sql<string>`ts_headline('simple', ${searchIndex.plainText}, ${prefixTsQuery ?? tsQuery}, 'StartSel=<mark>,StopSel=</mark>,MaxWords=32,MinWords=8')`,
+      rank: rankExpression
     })
     .from(searchIndex)
     .innerJoin(pages, eq(pages.id, searchIndex.pageId))
     .where(where)
-    .orderBy(desc(sql`ts_rank_cd(${searchIndex.searchVector}, ${tsQuery})`))
+    .orderBy(desc(rankExpression))
     .limit(input.limit ?? 20)
     .offset(input.offset ?? 0);
   const [{ count }] = await database
@@ -91,6 +111,21 @@ export async function searchPages(
     .innerJoin(pages, eq(pages.id, searchIndex.pageId))
     .where(where);
   return { rows, count };
+}
+
+function buildPrefixTsQuery(query: string) {
+  const tokens = Array.from(query.matchAll(/[\p{L}\p{N}]+/gu))
+    .map((match) => match[0])
+    .filter(Boolean)
+    .slice(0, 12);
+  if (tokens.length === 0) {
+    return null;
+  }
+  return tokens.map((token) => `${token}:*`).join(" & ");
+}
+
+function escapeLikePattern(value: string) {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
 export async function rebuildSearchIndex(siteId: string, database: Database = db) {

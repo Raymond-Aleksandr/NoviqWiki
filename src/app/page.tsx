@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { BookOpen, ChevronRight, Clock3, Plus, Puzzle, Search, Tags } from "lucide-react";
+import { ChevronRight, Clock3, Plus, Puzzle, Search, Tags } from "lucide-react";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
 import { listCategories } from "@/modules/categories/service";
 import { listPages, listPagesBySlugs } from "@/modules/pages/service";
@@ -24,7 +25,7 @@ export default async function HomePage() {
       limit: 6
     }),
     listCategories(site.site.id),
-    listRecentChanges({ siteId: site.site.id, limit: 8 })
+    listRecentChanges({ siteId: site.site.id, limit: 5, publicOnly: true })
   ]);
   const { locale, messages } = await getRequestI18n(settings?.defaultLocale);
   const featuredPages = configuredPages.length > 0 ? configuredPages : recentPages.slice(0, 3);
@@ -41,28 +42,20 @@ export default async function HomePage() {
       <div className="home-hero">
         <div className="home-hero-media" aria-hidden="true" />
         <div className="home-hero-content">
-          {settings?.logoUrl && homepageSections.showLogo ? (
-            <img className="home-logo" src={settings.logoUrl} alt="" />
-          ) : (
-            <span className="home-logo home-logo-fallback" aria-hidden="true">
-              <BookOpen size={28} />
-            </span>
-          )}
           <p className="eyebrow">{messages.selfHostedKnowledgeBase}</p>
           <h1>{settings?.homepageTitle ?? site.site.name}</h1>
           <p>{settings?.homepageIntro ?? settings?.tagline}</p>
           {homepageSections.search ? (
-            <form action="/search" className="home-search" role="search">
-              <input
-                name="q"
-                aria-label={messages.searchThisWiki}
-                placeholder={messages.searchThisWikiPlaceholder}
-              />
-              <button className="primary">
+            <div className="home-actions">
+              <Link className="button primary home-action" href="/search">
                 <Search size={16} aria-hidden="true" />
                 {messages.search}
-              </button>
-            </form>
+              </Link>
+              <Link className="button secondary home-action" href="/edit/new">
+                <Plus size={16} aria-hidden="true" />
+                {messages.createPage}
+              </Link>
+            </div>
           ) : null}
         </div>
       </div>
@@ -128,7 +121,7 @@ export default async function HomePage() {
                 {changes.map((change) => (
                   <p key={change.id}>
                     <span className={`badge audit-action ${badgeForAction(change.action)}`}>
-                      {change.action}
+                      {auditActionLabel(change.action, messages)}
                     </span>
                     <span>{change.actorDisplayName}</span>
                     <span className="muted">{change.createdAt.toLocaleString(locale)}</span>

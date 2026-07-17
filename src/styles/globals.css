@@ -449,50 +449,13 @@ input[type="radio"]:disabled {
   backdrop-filter: blur(8px);
 }
 
-.global-search {
-  flex: 1;
-  max-width: 560px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 14px;
-  background: var(--surface-muted);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--text-faint);
-}
-
-.global-search input {
-  width: 100%;
-  min-width: 0;
-  min-height: 32px;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--text);
-  padding: 0;
-}
-
-.global-search button {
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  min-block-size: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--text-muted);
-  box-shadow: none;
-}
-
 .topbar-fill {
   flex: 1;
   min-height: 36px;
 }
 
 .topbar-user,
-.topbar button,
+.topbar button:not(.sr-only),
 .topbar .button {
   display: flex;
   align-items: center;
@@ -716,7 +679,6 @@ textarea {
 
 .home-hero {
   position: relative;
-  min-height: 296px;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 16px;
@@ -768,14 +730,14 @@ textarea {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 64px;
-  height: 64px;
+  width: 138px;
+  height: 138px;
   object-fit: contain;
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 28px;
   background: var(--surface);
   color: var(--primary);
-  box-shadow: var(--sh-sm);
+  box-shadow: var(--sh-md);
 }
 
 .home-logo-fallback {
@@ -799,11 +761,16 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin-top: 18px;
+  margin: 0 0 18px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface);
   padding: 4px 11px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: none;
 }
 
 .home-hero .eyebrow::before {
@@ -815,47 +782,44 @@ textarea {
 }
 
 .home-hero h1 {
-  margin: 18px 0 12px;
+  margin: 0 0 12px;
   font-size: 46px;
   line-height: 1.05;
+  letter-spacing: -0.02em;
 }
 
 .home-layout-portal .home-hero-content {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  max-width: none;
-  min-height: 336px;
-  text-align: center;
-  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  align-items: flex-start;
 }
 
 .home-layout-portal .home-hero p:not(.eyebrow) {
-  margin-inline: auto;
+  margin-inline: 0;
 }
 
-.home-layout-portal .home-search {
-  margin-inline: auto;
+.home-layout-portal .home-actions {
+  margin-inline: 0;
 }
 
 .home-layout-compact .home-hero {
   min-height: auto;
+  border-radius: 16px;
 }
 
 .home-layout-compact .home-hero-content {
-  max-width: none;
-  padding: 30px;
-  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  max-width: 640px;
+  padding: 36px 30px;
 }
 
 .home-layout-compact .home-logo {
-  width: 48px;
-  height: 48px;
-  border-radius: 11px;
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
 }
 
 .home-layout-compact .home-hero h1 {
-  font-size: 34px;
+  font-size: 38px;
 }
 
 .home-hero p:not(.eyebrow) {
@@ -863,24 +827,27 @@ textarea {
   color: var(--text-muted);
   font-size: 16px;
   line-height: 1.6;
+  margin: 0 0 22px;
 }
 
-.home-search {
+.home-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
-  max-width: 520px;
-  margin-top: 22px;
 }
 
-.home-search input {
-  flex: 1;
-  min-width: 0;
-  border: 1.5px solid var(--border-strong);
+.home-action {
+  min-height: 42px;
   border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 11px 18px;
+}
+
+.home-action.secondary {
+  border-color: var(--border-strong);
   background: var(--surface);
   color: var(--text);
-  box-shadow: var(--sh-sm);
-  padding: 11px 14px;
 }
 
 .section-heading {
@@ -1400,6 +1367,7 @@ textarea {
   justify-content: center;
   padding: 24px;
   background: rgb(15 18 20 / 0.55);
+  text-align: left;
 }
 
 .modal-header {
@@ -1541,12 +1509,18 @@ textarea {
   background: var(--surface);
   box-shadow: var(--sh-lg);
   padding: 24px;
+  text-align: left;
 }
 
 .confirm-dialog-heading {
   display: flex;
   gap: 13px;
   margin-bottom: 14px;
+  text-align: left;
+}
+
+.confirm-dialog-heading > div {
+  min-width: 0;
 }
 
 .confirm-dialog-heading p {
@@ -1586,11 +1560,13 @@ textarea {
   line-height: 1.5;
   margin-bottom: 18px;
   padding: 9px 12px;
+  text-align: left;
 }
 
 .confirm-action-form {
   display: grid;
   gap: 12px;
+  text-align: left;
 }
 
 .confirm-field-grid {
@@ -1604,6 +1580,7 @@ textarea {
   color: var(--text);
   font-size: 13px;
   font-weight: 600;
+  text-align: left;
 }
 
 .confirm-actions {
@@ -3430,14 +3407,20 @@ textarea {
   }
 
   .shell {
+    display: block;
+    min-height: auto;
     grid-template-columns: 1fr;
+    align-content: start;
   }
 
   .sidebar {
     flex-direction: row;
     align-items: center;
+    min-height: 60px;
+    max-height: 60px;
     gap: 10px;
     padding: 10px 14px;
+    overflow: hidden;
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
@@ -3467,16 +3450,22 @@ textarea {
   .nav-list {
     flex: 1;
     min-width: 0;
+    height: 40px;
     display: flex;
     flex-direction: row;
+    align-items: center;
     gap: 6px;
     overflow-x: auto;
+    overflow-y: hidden;
     padding: 2px 0;
     scrollbar-width: thin;
   }
 
   .nav-list a {
     flex: 0 0 auto;
+    width: max-content;
+    inline-size: max-content;
+    max-width: max-content;
     min-block-size: 38px;
     gap: 8px;
     padding: 8px 10px;
@@ -3675,6 +3664,8 @@ textarea {
 
 @media (max-width: 560px) {
   .sidebar {
+    min-height: 59px;
+    max-height: 59px;
     padding: 9px 12px;
   }
 
@@ -3697,6 +3688,46 @@ textarea {
   .home-hero h1,
   .setup-hero h1 {
     font-size: 34px;
+  }
+
+  .home-hero {
+    min-height: auto;
+    border-radius: 16px;
+  }
+
+  .home-logo {
+    width: 62px;
+    height: 62px;
+    border-radius: 14px;
+  }
+
+  .home-hero .eyebrow {
+    gap: 7px;
+    margin: 0 0 16px;
+    padding: 4px 11px;
+    font-size: 11px;
+  }
+
+  .home-hero .eyebrow::before {
+    inline-size: 6px;
+    block-size: 6px;
+  }
+
+  .home-hero h1 {
+    margin: 0 0 12px;
+  }
+
+  .home-hero p:not(.eyebrow) {
+    font-size: 15.5px;
+  }
+
+  .home-actions {
+    gap: 8px;
+  }
+
+  .home-action {
+    min-height: 40px;
+    padding: 10px 15px;
   }
 
   .article h1 {

@@ -37,7 +37,7 @@ describe("page lifecycle integration", () => {
       {
         siteId: setup.site.id,
         title: "Lifecycle",
-        markdown: "# Lifecycle\n\nOriginal [[Category:Tests]]",
+        markdown: "# Lifecycle\n\nOriginal [[Category:Testing]]",
         publish: true,
         actorId: setup.owner.id,
         actorDisplayName: setup.owner.displayName,
@@ -82,7 +82,7 @@ describe("page lifecycle integration", () => {
       {
         pageId: page.id,
         baseRevisionId: page.currentRevisionId,
-        markdown: "# Lifecycle\n\nUpdated searchable content [[Category:Tests]]",
+        markdown: "# Lifecycle\n\nUpdated searchable content [[Category:Testing]]",
         actorId: setup.owner.id,
         actorDisplayName: setup.owner.displayName,
         editSummary: "Update"
@@ -93,6 +93,8 @@ describe("page lifecycle integration", () => {
 
     const search = await searchPages({ siteId: setup.site.id, query: "searchable" }, test.executor);
     expect(search.rows[0]?.title).toBe("Lifecycle");
+    const prefixSearch = await searchPages({ siteId: setup.site.id, query: "test" }, test.executor);
+    expect(prefixSearch.rows).toContainEqual(expect.objectContaining({ title: "Lifecycle" }));
 
     const renamed = await renamePage(
       {

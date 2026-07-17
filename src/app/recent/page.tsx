@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
 import { listRecentChanges } from "@/modules/activity/service";
 
@@ -9,7 +10,7 @@ export default async function RecentChangesPage() {
     redirect("/setup");
   }
   const [changes, i18n] = await Promise.all([
-    listRecentChanges({ siteId: site.site.id, limit: 100 }),
+    listRecentChanges({ siteId: site.site.id, limit: 100, publicOnly: true }),
     getRequestI18n(site.settings?.defaultLocale)
   ]);
   const { locale, messages } = i18n;
@@ -37,14 +38,14 @@ export default async function RecentChangesPage() {
           changes.map((change) => (
             <article className="timeline-row" key={change.id}>
               <span className={`badge timeline-action ${badgeForAction(change.action)}`}>
-                {shortAction(change.action)}
+                {auditActionLabel(change.action, messages)}
               </span>
               <span className="timeline-title">
                 <strong>
                   {change.targetType}
                   {change.targetId ? `:${change.targetId.slice(0, 8)}` : ""}
                 </strong>
-                <span className="mono muted">{change.action}</span>
+                <span className="muted">{auditActionLabel(change.action, messages)}</span>
               </span>
               <span className="timeline-meta">
                 <span>{change.actorDisplayName ?? messages.system}</span>
@@ -64,11 +65,6 @@ export default async function RecentChangesPage() {
       </div>
     </section>
   );
-}
-
-function shortAction(action: string) {
-  const short = action.split(".").at(-1) ?? action;
-  return short.length > 10 ? short.slice(0, 10) : short;
 }
 
 function badgeForAction(action: string) {
