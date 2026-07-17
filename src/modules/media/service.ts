@@ -8,6 +8,7 @@ import { mediaAssets, pageRevisions, pages, siteSettings } from "@/db/schema";
 import { contentHash } from "@/lib/crypto";
 import { AppError, ConflictError, NotFoundError } from "@/lib/errors";
 import { writeAuditLog } from "@/modules/audit/service";
+import { defaultAllowedMediaTypes } from "@/modules/settings/service";
 import { getStorageAdapter } from "./storage";
 
 const unsafeSvgMime = "image/svg+xml";
@@ -27,13 +28,7 @@ export async function validateMediaUpload(
     .where(eq(siteSettings.siteId, input.siteId))
     .limit(1);
   const maxBytes = settings?.uploadMaxBytes ?? 5_242_880;
-  const allowed = settings?.allowedMediaTypes ?? [
-    "image/png",
-    "image/jpeg",
-    "image/gif",
-    "image/webp",
-    "application/pdf"
-  ];
+  const allowed = settings?.allowedMediaTypes ?? [...defaultAllowedMediaTypes];
   if (input.bytes.length === 0) {
     throw new AppError("File is empty.", "empty_upload", 422);
   }

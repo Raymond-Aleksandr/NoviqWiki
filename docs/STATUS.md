@@ -109,6 +109,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Completed user group membership administration. `/admin/users` now shows assigned groups, exposes editable group membership forms, `PATCH /api/v1/admin/users/{id}` updates group IDs through the same authorization service, and membership replacement refuses changes that would remove the final active Owner.
 - 2026-07-16: Completed admin user search. `/admin/users` now supports the design-package filter bar, `?q=` username/email filtering, clear-filter navigation, and an empty state while reusing the existing permission-protected `listUsers` query path.
 - 2026-07-16: Completed audit log filtering and pagination. `/admin/audit` now supports action and text filters, clear-filter navigation, paginated results, localized event labels, and empty states; `/api/v1/admin/audit` exposes the same `q`, `action`, `page`, and `pageSize` query boundary.
+- 2026-07-16: Completed upload allowlist administration. `/admin/settings` now exposes safe MIME type allowlist editing, settings actions normalize and reject invalid or SVG MIME entries, and media upload validation reads the configured allowlist from site settings.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

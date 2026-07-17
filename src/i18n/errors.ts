@@ -46,6 +46,8 @@ const exactMessageKeys: Record<string, MessageKey> = {
   "File is empty.": "fileEmpty",
   "File is larger than the configured upload limit.": "fileTooLarge",
   "This file type is not allowed.": "fileTypeNotAllowed",
+  "Allowed media types must include at least one MIME type.": "allowedMediaTypesRequired",
+  "Allowed media types must be valid safe MIME types.": "allowedMediaTypeInvalid",
   "Unsafe filename.": "unsafeFilename",
   "Media asset not found.": "mediaNotFound",
   "Media is still referenced by published pages.": "mediaStillReferenced"

@@ -413,6 +413,8 @@ export const zhCN = {
   footer: "页脚",
   uploadPolicy: "上传策略",
   uploadMaxBytes: "上传最大字节数",
+  allowedMediaTypes: "允许的媒体类型",
+  allowedMediaTypesHelp: "用英文逗号或换行分隔安全 MIME 类型。默认拒绝 SVG，除非未来加入清洗器。",
   saveChanges: "保存更改",
   runtime: "运行时",
   unavailable: "不可用",
@@ -493,6 +495,8 @@ export const zhCN = {
   fileEmpty: "文件为空。",
   fileTooLarge: "文件超过了配置的上传大小限制。",
   fileTypeNotAllowed: "不允许上传此文件类型。",
+  allowedMediaTypesRequired: "允许的媒体类型至少需要包含一个 MIME 类型。",
+  allowedMediaTypeInvalid: "允许的媒体类型必须是安全且有效的 MIME 类型。",
   unsafeFilename: "文件名不安全。",
   mediaNotFound: "未找到媒体文件。",
   mediaStillReferenced: "此媒体仍被已发布页面引用。"

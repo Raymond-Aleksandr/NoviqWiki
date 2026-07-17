@@ -43,7 +43,7 @@ import {
   softDeletePage
 } from "@/modules/pages/service";
 import { completeSetup } from "@/modules/setup/service";
-import { updateSiteSettings } from "@/modules/settings/service";
+import { normalizeAllowedMediaTypes, updateSiteSettings } from "@/modules/settings/service";
 import {
   assignUserToGroup,
   createGroup,
@@ -433,6 +433,7 @@ export async function updateSettingsAction(
         },
         footerContent: optionalString(formData, "footerContent") ?? "",
         uploadMaxBytes: Number(formData.get("uploadMaxBytes") ?? 5242880),
+        allowedMediaTypes: normalizeAllowedMediaTypes(stringValue(formData, "allowedMediaTypes")),
         seoTitle: optionalString(formData, "seoTitle") ?? null,
         seoDescription: optionalString(formData, "seoDescription") ?? null
       }

@@ -1,7 +1,19 @@
 import { eq } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import { siteSettings } from "@/db/schema";
+import { AppError } from "@/lib/errors";
 import { writeAuditLog } from "@/modules/audit/service";
+
+export const defaultAllowedMediaTypes = [
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "application/pdf"
+] as const;
+
+const unsafeSvgMime = "image/svg+xml";
+const mimeTypePattern = /^[a-z0-9][a-z0-9!#$&^_.+-]*\/[a-z0-9][a-z0-9!#$&^_.+-]*$/i;
 
 export type SiteSettingsUpdate = Partial<{
   tagline: string;
@@ -31,6 +43,33 @@ export type SiteSettingsUpdate = Partial<{
   seoTitle: string | null;
   seoDescription: string | null;
 }>;
+
+export function normalizeAllowedMediaTypes(input: string | string[]) {
+  const values = (Array.isArray(input) ? input : [input])
+    .flatMap((value) => value.split(/[,\s]+/))
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  const unique = Array.from(new Set(values));
+  if (unique.length === 0) {
+    throw new AppError(
+      "Allowed media types must include at least one MIME type.",
+      "validation_error",
+      422
+    );
+  }
+  const invalid = unique.find((value) => value === unsafeSvgMime || !mimeTypePattern.test(value));
+  if (invalid) {
+    throw new AppError(
+      "Allowed media types must be valid safe MIME types.",
+      "validation_error",
+      422,
+      {
+        mimeType: invalid
+      }
+    );
+  }
+  return unique;
+}
 
 export async function getSiteSettings(siteId: string, database: Database = db) {
   const [settings] = await database

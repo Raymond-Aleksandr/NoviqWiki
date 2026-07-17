@@ -201,6 +201,15 @@ export default async function AdminSettingsPage() {
               defaultValue={settings.uploadMaxBytes}
             />
           </label>
+          <label>
+            {messages.allowedMediaTypes}
+            <textarea
+              className="mono"
+              name="allowedMediaTypes"
+              defaultValue={settings.allowedMediaTypes.join("\n")}
+            />
+            <span className="muted">{messages.allowedMediaTypesHelp}</span>
+          </label>
         </section>
         <div className="settings-actions">
           <button className="primary">

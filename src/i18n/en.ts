@@ -427,6 +427,9 @@ export const en = {
   footer: "Footer",
   uploadPolicy: "Upload policy",
   uploadMaxBytes: "Upload max bytes",
+  allowedMediaTypes: "Allowed media types",
+  allowedMediaTypesHelp:
+    "Comma- or newline-separated safe MIME types. SVG is rejected unless a future sanitizer is added.",
   saveChanges: "Save changes",
   runtime: "Runtime",
   unavailable: "unavailable",
@@ -508,6 +511,8 @@ export const en = {
   fileEmpty: "File is empty.",
   fileTooLarge: "File is larger than the configured upload limit.",
   fileTypeNotAllowed: "This file type is not allowed.",
+  allowedMediaTypesRequired: "Allowed media types must include at least one MIME type.",
+  allowedMediaTypeInvalid: "Allowed media types must be valid safe MIME types.",
   unsafeFilename: "Unsafe filename.",
   mediaNotFound: "Media asset not found.",
   mediaStillReferenced: "Media is still referenced by published pages."

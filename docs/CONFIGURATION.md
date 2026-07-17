@@ -54,6 +54,8 @@ This setting is only for local development. Production deployments should expose
 
 Use private buckets for production and scope credentials to the media bucket. Include the media backend in backup and restore drills.
 
+Upload size and safe MIME type allowlists are site settings managed from `/admin/settings`. The default allowlist is `image/png`, `image/jpeg`, `image/gif`, `image/webp`, and `application/pdf`; SVG remains rejected by default.
+
 ## Email
 
 Email is optional. Password reset and email verification tokens are created by the application; delivery requires SMTP configuration.
