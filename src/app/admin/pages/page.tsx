@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, History, Pencil, Plus, RotateCcw, Search } from "lucide-react";
+import { ChevronDown, History, Pencil, Plus, RotateCcw, Search, X } from "lucide-react";
 import {
   archivePageAction,
   deletePageAction,
@@ -13,29 +13,62 @@ import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { listPages } from "@/modules/pages/service";
 
-export default async function AdminPagesPage() {
+type Props = {
+  searchParams: Promise<{ q?: string; status?: string }>;
+};
+
+type PageStatusFilter = "draft" | "published" | "archived" | "deleted";
+
+export default async function AdminPagesPage({ searchParams }: Props) {
   const site = await getPrimarySiteWithSettings();
-  const rows = await listPages({ siteId: site!.site.id, includeDeleted: true, limit: 200 });
+  const params = await searchParams;
+  const query = params.q?.trim() ?? "";
+  const status = pageStatusFilterValue(params.status);
+  const rows = await listPages({
+    siteId: site!.site.id,
+    includeDeleted: true,
+    query: query || undefined,
+    status,
+    limit: 200
+  });
   const { locale, messages } = await getRequestI18n(site!.settings?.defaultLocale);
+  const hasFilters = Boolean(query || status);
   return (
     <section className="admin-page">
       <h1>{messages.pages}</h1>
       <div className="data-panel admin-table">
-        <div className="admin-filter-bar">
-          <div className="admin-filter-control">
+        <form className="admin-filter-bar" action="/admin/pages">
+          <label className="admin-filter-control admin-filter-search">
             <Search size={15} aria-hidden="true" />
-            {messages.filterPages}
-          </div>
-          <div className="admin-filter-control">
-            {messages.statusAll}
+            <input name="q" defaultValue={query} placeholder={messages.filterPages} />
+          </label>
+          <label className="admin-filter-control admin-filter-select">
+            <span className="sr-only">{messages.status}</span>
+            <select name="status" defaultValue={status ?? ""}>
+              <option value="">{messages.statusAll}</option>
+              <option value="published">{messages.statusPublished}</option>
+              <option value="draft">{messages.statusDraft}</option>
+              <option value="archived">{messages.statusArchived}</option>
+              <option value="deleted">{messages.statusDeleted}</option>
+            </select>
             <ChevronDown size={14} aria-hidden="true" />
-          </div>
-          <div style={{ flex: 1 }} />
+          </label>
+          <button className="button compact">
+            <Search size={14} aria-hidden="true" />
+            {messages.search}
+          </button>
+          {hasFilters ? (
+            <Link className="button compact" href="/admin/pages">
+              <X size={14} aria-hidden="true" />
+              {messages.clearFilters}
+            </Link>
+          ) : null}
+          <div className="admin-filter-spacer" />
           <Link className="button primary" href="/edit/new">
             <Plus size={15} aria-hidden="true" />
             {messages.createPage}
           </Link>
-        </div>
+        </form>
         <div className="admin-grid-header admin-pages-grid">
           <div>{messages.title}</div>
           <div>{messages.slug}</div>
@@ -43,6 +76,7 @@ export default async function AdminPagesPage() {
           <div>{messages.updatedColumn}</div>
           <div>{messages.actions}</div>
         </div>
+        {rows.length === 0 ? <div className="admin-empty-state">{messages.noResults}</div> : null}
         {rows.map((page) => (
           <article className="admin-grid-row admin-pages-grid" key={page.id}>
             <Link href={`/page/${page.slug}`} data-label={messages.title}>
@@ -190,6 +224,13 @@ export default async function AdminPagesPage() {
       </div>
     </section>
   );
+}
+
+function pageStatusFilterValue(value: string | undefined): PageStatusFilter | undefined {
+  if (value === "published" || value === "draft" || value === "archived" || value === "deleted") {
+    return value;
+  }
+  return undefined;
 }
 
 function pageStatusLabel(

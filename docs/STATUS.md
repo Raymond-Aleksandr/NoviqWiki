@@ -93,6 +93,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Hardened page slug and alias integrity. Page creation and rename now reject slugs already reserved by another page alias, while allowing a page to move back to its own previous slug and clearing the self-alias. Integration coverage verifies aliases cannot be shadowed by new pages or other page renames.
 - 2026-07-16: Completed the page archive lifecycle. Admin pages now expose a design-package archive confirmation flow, archived pages keep revision history and direct URLs, archive removes pages from the search index, restore clears `archivedAt` and reindexes published content, `/api/v1/pages/{id}` accepts `{"action":"archive"}`, and integration coverage verifies archive/restore search behavior plus protected-page enforcement.
 - 2026-07-16: Tightened mobile history typography after live Safari review. History summary rows now use a dedicated label/summary/date grid so edit summaries such as `Rollback to revision 1` stay readable instead of being squeezed into centered multi-line text; browser verification at `439x734` showed no horizontal overflow.
+- 2026-07-16: Made `/admin/pages` filtering functional. The design-package filter bar now submits `q` and `status` query parameters, supports title/slug search, draft/published/archived/deleted filtering, clear-filter navigation, empty-state rendering, and integration coverage for the underlying page listing filters.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

@@ -2662,6 +2662,7 @@ textarea {
 
 .admin-filter-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   padding: 13px 16px;
@@ -2678,6 +2679,52 @@ textarea {
   color: var(--text-faint);
   font-size: 13px;
   padding: 8px 12px;
+}
+
+.admin-filter-search {
+  flex: 1 1 220px;
+  max-width: 340px;
+}
+
+.admin-filter-search input,
+.admin-filter-select select {
+  min-width: 0;
+  width: 100%;
+  height: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text);
+  font: inherit;
+  padding: 0;
+}
+
+.admin-filter-search input::placeholder {
+  color: var(--text-faint);
+}
+
+.admin-filter-select {
+  flex: 0 0 auto;
+}
+
+.admin-filter-select select {
+  min-width: 128px;
+  appearance: none;
+}
+
+.admin-filter-select svg {
+  pointer-events: none;
+}
+
+.admin-filter-spacer {
+  flex: 1 1 auto;
+}
+
+.admin-empty-state {
+  padding: 28px 18px;
+  color: var(--text-muted);
+  font-weight: 650;
 }
 
 .admin-table {

@@ -323,6 +323,7 @@ export const zhCN = {
   returnToPage: "返回页面",
   rollBackToRevision: "回滚到",
   filterPages: "筛选页面...",
+  clearFilters: "清除筛选",
   title: "标题",
   statusAll: "状态：全部",
   updatedColumn: "更新",

@@ -15,6 +15,7 @@ import {
   compareRevisionsForRead,
   getRevisionForRead,
   getDraftForEditor,
+  listPages,
   listPageBacklinks,
   listPageOutboundLinks,
   listRevisions,
@@ -88,6 +89,22 @@ describe("page lifecycle integration", () => {
     );
     expect(storedNewPageDraft?.markdown).toContain("Work in progress.");
     expect(storedNewPageDraft?.baseRevisionId).toBeNull();
+    const draftRows = await listPages(
+      { siteId: setup.site.id, status: "draft", includeDeleted: true },
+      test.db
+    );
+    expect(draftRows.map((row) => row.id)).toContain(draftOnly.page.id);
+    expect(draftRows.map((row) => row.id)).not.toContain(page.id);
+    const titleFilterRows = await listPages(
+      { siteId: setup.site.id, query: "life", includeDeleted: true },
+      test.db
+    );
+    expect(titleFilterRows.map((row) => row.id)).toContain(page.id);
+    const slugFilterRows = await listPages(
+      { siteId: setup.site.id, query: "draft-only", includeDeleted: true },
+      test.db
+    );
+    expect(slugFilterRows.map((row) => row.id)).toContain(draftOnly.page.id);
 
     const savedDraft = await saveDraft(
       {
@@ -239,6 +256,11 @@ describe("page lifecycle integration", () => {
     );
     expect(archived.status).toBe("archived");
     expect(archived.archivedAt).toBeInstanceOf(Date);
+    const archivedRows = await listPages(
+      { siteId: setup.site.id, status: "archived", includeDeleted: true },
+      test.db
+    );
+    expect(archivedRows.map((row) => row.id)).toContain(page.id);
     const archivedSearch = await searchPages(
       { siteId: setup.site.id, query: "test" },
       test.executor
