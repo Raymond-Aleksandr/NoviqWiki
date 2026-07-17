@@ -79,6 +79,7 @@ export function ConfirmActionForm({
       <button
         type="button"
         className={triggerClassName}
+        data-confirm-action={icon ?? "confirm"}
         aria-label={triggerIconOnly ? triggerLabel : undefined}
         title={triggerTitle ?? (triggerIconOnly ? triggerLabel : undefined)}
         onClick={() => setOpen(true)}

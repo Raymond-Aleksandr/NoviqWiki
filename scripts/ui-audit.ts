@@ -147,6 +147,17 @@ const nativeDialogPatterns: Array<{ label: string; pattern: RegExp }> = [
   { label: "beforeunload", pattern: /\b(onbeforeunload|beforeunload)\b/ }
 ];
 
+const typographyDriftPatterns: Array<{ label: string; pattern: RegExp }> = [
+  {
+    label: "nonzero letter-spacing",
+    pattern: /\bletter-spacing\s*:\s*(?!\s*0(?:\.0+)?(?:px|em|rem)?\s*[;}])[^;}]+[;}]/i
+  },
+  {
+    label: "viewport font-size",
+    pattern: /\bfont-size\s*:\s*[^;}]*\b(?:vw|vh|vmin|vmax)\b[^;}]*[;}]/i
+  }
+];
+
 const rawAuditActionValues = [
   "setup.complete",
   "auth.login",
@@ -258,6 +269,17 @@ async function auditSourceForInlineStyles() {
   });
 }
 
+async function auditSourceForTypographyDrift() {
+  const matches = await findTypographyDriftMatches(path.join(process.cwd(), "src"));
+  if (matches.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "typography_source_drift",
+    detail: matches.slice(0, 20)
+  });
+}
+
 async function auditSourceForHardcodedVisibleText() {
   const matches = [
     ...(await findUnexpectedHardcodedVisibleTextMatches(path.join(process.cwd(), "src/app"))),
@@ -330,6 +352,38 @@ async function findUnexpectedInlineStyleMatches(directory: string): Promise<Sour
         pattern: "inline style",
         text: line.trim().slice(0, 160)
       });
+    });
+  }
+
+  return matches;
+}
+
+async function findTypographyDriftMatches(directory: string): Promise<SourceMatch[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const matches: SourceMatch[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      matches.push(...(await findTypographyDriftMatches(entryPath)));
+      continue;
+    }
+    if (!entry.isFile() || path.extname(entry.name) !== ".css") {
+      continue;
+    }
+    const source = await readFile(entryPath, "utf8");
+    const lines = source.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      for (const { label, pattern } of typographyDriftPatterns) {
+        if (pattern.test(line)) {
+          matches.push({
+            file: path.relative(process.cwd(), entryPath),
+            line: index + 1,
+            pattern: label,
+            text: line.trim().slice(0, 160)
+          });
+        }
+      }
     });
   }
 
@@ -501,6 +555,7 @@ async function main() {
   await auditSourceForNativeDialogs();
   await auditSourceForActiveTransforms();
   await auditSourceForInlineStyles();
+  await auditSourceForTypographyDrift();
   await auditSourceForHardcodedVisibleText();
   const storageState = credentials ? await createAuthState(credentials) : undefined;
   const articleSlug =
@@ -572,7 +627,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, hardcoded visible text, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, hardcoded visible text, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -811,14 +866,15 @@ function toHex(value: number) {
 
 async function auditRoute(page: Page, route: string, browserName: string, sizeName: string) {
   const response = await page
-    .goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" })
+    .goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 45000 })
     .catch((error: unknown) => {
       if (
         error instanceof Error &&
-        error.message.includes("is interrupted by another navigation")
+        (error.message.includes("is interrupted by another navigation") ||
+          error.message.includes("Timeout"))
       ) {
         return page
-          .goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" })
+          .goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded", timeout: 45000 })
           .catch((retryError: unknown) => {
             addFailure({
               kind: "navigation_error",
@@ -846,7 +902,10 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     addFailure({ kind: "server_error", browserName, sizeName, route, detail: response.status() });
   }
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
-  const metrics = await readRouteMetrics(page);
+  const metrics = await readRouteMetricsWithRetry(page, browserName, sizeName, route);
+  if (!metrics) {
+    return;
+  }
 
   if (metrics.bodyScrollWidth > metrics.clientWidth + 2) {
     addFailure({
@@ -1041,6 +1100,45 @@ function recordElementFailures(
   if (elements.length > 0) {
     addFailure({ kind, browserName, sizeName, route, detail: elements });
   }
+}
+
+async function readRouteMetricsWithRetry(
+  page: Page,
+  browserName: string,
+  sizeName: string,
+  route: string
+): Promise<RouteMetrics | null> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      return await readRouteMetrics(page);
+    } catch (error) {
+      lastError = error;
+      if (!isTransientNavigationError(error)) {
+        break;
+      }
+      await page.waitForLoadState("domcontentloaded", { timeout: 4000 }).catch(() => null);
+      await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
+    }
+  }
+
+  addFailure({
+    kind: "route_metrics_error",
+    browserName,
+    sizeName,
+    route,
+    detail: lastError instanceof Error ? lastError.message : String(lastError)
+  });
+  return null;
+}
+
+function isTransientNavigationError(error: unknown) {
+  return (
+    error instanceof Error &&
+    (error.message.includes("Execution context was destroyed") ||
+      error.message.includes("Cannot find context") ||
+      error.message.includes("Target page, context or browser has been closed"))
+  );
 }
 
 async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
@@ -1554,7 +1652,7 @@ async function auditMobileShell(page: Page, browserName: string, sizeName: strin
 async function auditPageDeleteDialog(page: Page, browserName: string, sizeName: string) {
   await page.goto(`${baseUrl}/admin/pages`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
-  const deleteButtons = page.locator("button.button.danger");
+  const deleteButtons = page.locator('button[data-confirm-action="trash"]');
   if ((await deleteButtons.count()) === 0) {
     return;
   }
@@ -1608,7 +1706,7 @@ async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName:
 async function auditUserResetDialog(page: Page, browserName: string, sizeName: string) {
   await page.goto(`${baseUrl}/admin/users`, { waitUntil: "domcontentloaded" });
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
-  const resetButtons = page.locator(".admin-action-list button.icon-button[aria-label]");
+  const resetButtons = page.locator('button[data-confirm-action="reset"]');
   if ((await resetButtons.count()) === 0) {
     return;
   }

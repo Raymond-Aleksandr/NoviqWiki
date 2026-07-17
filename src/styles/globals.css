@@ -297,7 +297,7 @@ input[type="radio"]:disabled {
   color: var(--text-faint);
   font-family: var(--nw-font-mono);
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
 }
 
 .preference-controls {
@@ -370,7 +370,7 @@ input[type="radio"]:disabled {
 .brand > span:last-child {
   font-size: 18px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 .brand-mark {
@@ -699,7 +699,7 @@ textarea {
   font-family: var(--nw-font-mono);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -785,7 +785,7 @@ textarea {
 .section-heading h2 {
   font-family: var(--nw-font-serif);
   font-weight: 700;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
 }
 
 .home-hero .eyebrow {
@@ -800,7 +800,7 @@ textarea {
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: none;
 }
 
@@ -816,7 +816,7 @@ textarea {
   margin: 0 0 12px;
   font-size: 46px;
   line-height: 1.05;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .home-layout-portal .home-hero-content {
@@ -1139,7 +1139,7 @@ textarea {
   font-family: var(--nw-font-serif);
   font-size: 32px;
   font-weight: 700;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
   line-height: 1.1;
 }
 
@@ -2143,7 +2143,7 @@ pre.citation-block {
   color: var(--text-faint);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -2622,7 +2622,7 @@ pre.citation-block {
   margin-bottom: 12px;
   color: var(--text-faint);
   font-size: 11px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -2653,7 +2653,7 @@ pre.citation-block {
 .aside-actions strong {
   color: var(--text-faint);
   font-size: 11px;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -3184,7 +3184,7 @@ pre.citation-block {
   margin-top: 10px;
   font-size: 30px;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .admin-stat-card span {
@@ -3611,7 +3611,7 @@ pre.citation-block {
   color: var(--text-faint);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -3682,12 +3682,14 @@ pre.citation-block {
 }
 
 .permission-checkbox {
+  min-inline-size: 0;
   width: 100%;
   color: var(--text-muted);
   font-size: 12.5px;
 }
 
 .permission-checkbox .mono {
+  min-inline-size: 0;
   overflow-wrap: anywhere;
 }
 
@@ -3701,6 +3703,7 @@ pre.citation-block {
 .role-card {
   display: grid;
   gap: 14px;
+  min-inline-size: 0;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
@@ -3713,6 +3716,7 @@ pre.citation-block {
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
+  min-inline-size: 0;
 }
 
 .role-card-header h2 {
@@ -3728,6 +3732,15 @@ pre.citation-block {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow: hidden;
+}
+
+.role-permission-summary .badge {
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .role-edit-form {
@@ -3994,7 +4007,7 @@ pre.citation-block {
   font-family: var(--nw-font-body);
   font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -4262,7 +4275,7 @@ pre.citation-block {
   color: var(--text-muted);
   font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   text-transform: uppercase;
 }
 
@@ -4707,6 +4720,24 @@ pre.citation-block {
   .role-card-grid,
   .role-permission-checkboxes {
     grid-template-columns: 1fr;
+  }
+
+  .role-card {
+    padding: 16px;
+  }
+
+  .role-card-header {
+    flex-wrap: wrap;
+  }
+
+  .role-permission-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .role-permission-summary .badge {
+    justify-content: flex-start;
+    min-inline-size: 0;
   }
 
   .settings-card {
