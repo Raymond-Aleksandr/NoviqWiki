@@ -5357,7 +5357,7 @@ pre.citation-block {
   .history-action-buttons {
     display: grid;
     grid-column: 2;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
     width: 100%;
   }
@@ -5390,9 +5390,15 @@ pre.citation-block {
   .admin-grid-row.admin-users-grid .admin-action-list button,
   .history-row .history-actions .button,
   .history-row .history-actions button {
+    min-width: 0;
     min-block-size: 34px;
+    block-size: auto;
+    max-block-size: none;
     padding: 7px 10px;
     font-size: 13px;
+    line-height: 1.15;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 
   .admin-grid-row.admin-pages-grid .admin-action-list .button,

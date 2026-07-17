@@ -92,6 +92,7 @@ type RouteMetrics = {
   mobileAdminGridLabelMismatches: ElementSummary[];
   unevenAdminPageActions: ElementSummary[];
   unevenHistoryActions: ElementSummary[];
+  historyActionButtonOverflow: ElementSummary[];
   misalignedHistoryRows: ElementSummary[];
   stackedHistoryCurrentBadges: ElementSummary[];
   adminSettingsLinks: ElementSummary[];
@@ -995,7 +996,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, permission-matrix, editor-toolbar, or media-picker rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, permission-matrix, admin-summary, editor-toolbar, media-picker, or history-action rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1555,6 +1556,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "uneven_history_actions",
     metrics.unevenHistoryActions,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "history_action_button_overflow",
+    metrics.historyActionButtonOverflow,
     browserName,
     sizeName,
     route
@@ -3827,6 +3835,46 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         })
         .map(summarize)
         .slice(0, 12),
+      historyActionButtonOverflow: visibleMatches(
+        ".history-row .history-action-buttons .button, .history-row .history-action-buttons button"
+      )
+        .filter((element) => {
+          if (document.documentElement.clientWidth > 560) return false;
+          const buttonRect = element.getBoundingClientRect();
+          const grid = element.closest(".history-action-buttons");
+          const gridTracks = grid
+            ? getComputedStyle(grid)
+                .gridTemplateColumns.split(" ")
+                .filter((track) => track.trim().length > 0)
+            : [];
+          if (gridTracks.length > 2) return true;
+          if (element.scrollWidth > element.clientWidth + 1) return true;
+          if (element.scrollHeight > element.clientHeight + 1) return true;
+
+          const contentRectOverflows = (rect) =>
+            rect.left < buttonRect.left - 1 ||
+            rect.right > buttonRect.right + 1 ||
+            rect.top < buttonRect.top - 1 ||
+            rect.bottom > buttonRect.bottom + 1;
+
+          const childOverflows = [...element.children].some((child) =>
+            contentRectOverflows(child.getBoundingClientRect())
+          );
+          if (childOverflows) return true;
+
+          const textRange = document.createRange();
+          let textOverflows = false;
+          for (const node of [...element.childNodes]) {
+            if (node.nodeType !== Node.TEXT_NODE || !node.textContent?.trim()) continue;
+            textRange.selectNodeContents(node);
+            textOverflows = [...textRange.getClientRects()].some(contentRectOverflows);
+            if (textOverflows) break;
+          }
+          textRange.detach();
+          return textOverflows;
+        })
+        .map(summarize)
+        .slice(0, 12),
       misalignedHistoryRows: visibleMatches(".history-row:not(.header)")
         .filter((element) => {
           if (document.documentElement.clientWidth > 560) return false;
@@ -4074,8 +4122,8 @@ async function auditMobileShell(page: Page, browserName: string, sizeName: strin
 }
 
 async function auditPageDeleteDialog(page: Page, browserName: string, sizeName: string) {
-  await page.goto(`${baseUrl}/admin/pages`, { waitUntil: "domcontentloaded" });
-  await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
+  const ready = await gotoDialogAuditRoute(page, "/admin/pages", browserName, sizeName);
+  if (!ready) return;
   const opened = await openFirstDialogButton(
     page,
     'button[data-confirm-action="trash"]',
@@ -4103,8 +4151,8 @@ async function auditPageDeleteDialog(page: Page, browserName: string, sizeName: 
 }
 
 async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName: string) {
-  await page.goto(`${baseUrl}/media`, { waitUntil: "domcontentloaded" });
-  await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
+  const ready = await gotoDialogAuditRoute(page, "/media", browserName, sizeName);
+  if (!ready) return;
   const opened = await openFirstDialogButton(
     page,
     ".media-delete-form button.danger",
@@ -4132,8 +4180,8 @@ async function auditMediaDeleteDialog(page: Page, browserName: string, sizeName:
 }
 
 async function auditUserResetDialog(page: Page, browserName: string, sizeName: string) {
-  await page.goto(`${baseUrl}/admin/users`, { waitUntil: "domcontentloaded" });
-  await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
+  const ready = await gotoDialogAuditRoute(page, "/admin/users", browserName, sizeName);
+  if (!ready) return;
   const opened = await openFirstDialogButton(
     page,
     'button[data-confirm-action="reset"]',
@@ -4158,6 +4206,42 @@ async function auditUserResetDialog(page: Page, browserName: string, sizeName: s
       detail: modal
     });
   }
+}
+
+async function gotoDialogAuditRoute(
+  page: Page,
+  route: string,
+  browserName: string,
+  sizeName: string
+) {
+  const response = await page
+    .goto(`${baseUrl}${route}`, { waitUntil: "commit", timeout: 15000 })
+    .catch((error: unknown) => {
+      addFailure({
+        kind: "dialog_audit_navigation_error",
+        browserName,
+        sizeName,
+        route,
+        detail: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    });
+  if (!response) {
+    return false;
+  }
+  if (response.status() >= 500) {
+    addFailure({
+      kind: "dialog_audit_navigation_error",
+      browserName,
+      sizeName,
+      route,
+      detail: response.status()
+    });
+    return false;
+  }
+  await page.waitForLoadState("domcontentloaded", { timeout: 8000 }).catch(() => null);
+  await waitForDesignStyles(page);
+  return true;
 }
 
 async function openFirstDialogButton(page: Page, buttonSelector: string, dialogSelector: string) {
