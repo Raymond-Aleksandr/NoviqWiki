@@ -63,6 +63,7 @@ type RouteMetrics = {
   controlTextOverflow: ElementSummary[];
   textContentOverflow: ElementSummary[];
   surfaceRhythmMismatches: ElementSummary[];
+  emptyStateRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
   articleMediaTooTall: ElementSummary[];
@@ -983,7 +984,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge or navigation rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, or empty-state rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1352,6 +1353,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "surface_rhythm_mismatch",
     metrics.surfaceRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "empty_state_rhythm_mismatch",
+    metrics.emptyStateRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -2435,6 +2443,53 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             !mobileViewport ||
             (rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1);
           return !hasBorder || !hasBackground || !hasReasonableRadius || !mobileViewportFit;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      emptyStateRhythmMismatches: visibleMatches(".empty-state, .admin-empty-state")
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const isAdminEmpty = element.classList.contains("admin-empty-state");
+          const fontSize = Number.parseFloat(style.fontSize);
+          const rowGap = Number.parseFloat(style.rowGap);
+          const borderWidth = Number.parseFloat(style.borderTopWidth);
+          const radius = Number.parseFloat(style.borderTopLeftRadius);
+          const paddingTop = Number.parseFloat(style.paddingTop);
+          const paddingInline = Number.parseFloat(style.paddingLeft);
+          const hasDesignFont = /Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily);
+          const fitsMobile =
+            document.documentElement.clientWidth > 560 ||
+            (rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1);
+          const compactText = Number.isFinite(fontSize) && fontSize >= 12.5 && fontSize <= 16;
+          const comfortablePadding =
+            Number.isFinite(paddingTop) &&
+            Number.isFinite(paddingInline) &&
+            paddingTop >= 16 &&
+            paddingTop <= 32 &&
+            paddingInline >= 14 &&
+            paddingInline <= 32;
+          if (isAdminEmpty) {
+            return !hasDesignFont || !compactText || !comfortablePadding || !fitsMobile;
+          }
+          const hasBorder =
+            Number.isFinite(borderWidth) && borderWidth >= 1 && style.borderTopStyle !== "none";
+          const hasBackground =
+            style.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+            style.backgroundColor !== "transparent";
+          const hasRadius = Number.isFinite(radius) && radius >= 8 && radius <= 14;
+          const compactGap = !Number.isFinite(rowGap) || (rowGap >= 6 && rowGap <= 14);
+          return (
+            style.display !== "grid" ||
+            !hasDesignFont ||
+            !compactText ||
+            !comfortablePadding ||
+            !compactGap ||
+            !hasBorder ||
+            !hasBackground ||
+            !hasRadius ||
+            !fitsMobile
+          );
         })
         .map(summarize)
         .slice(0, 12),
