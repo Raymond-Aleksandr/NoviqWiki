@@ -113,11 +113,13 @@ Uploads are validated against configured size and MIME allowlists and stored thr
 ```http
 GET /api/v1/admin/users
 GET /api/v1/admin/groups
+POST /api/v1/admin/groups
+PATCH /api/v1/admin/groups/{id}
 GET /api/v1/admin/roles
 GET /api/v1/admin/audit
 ```
 
-Admin endpoints require the corresponding server-side permission. Mutating administrative workflows are currently exposed through the server-rendered admin UI and server actions.
+Admin endpoints require the corresponding server-side permission. Group creation and role assignment are available through both JSON API routes and the server-rendered admin UI; other administrative mutation workflows remain server-action backed in v0.1.0.
 
 ## Operational Endpoints
 

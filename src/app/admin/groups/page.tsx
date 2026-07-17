@@ -1,24 +1,14 @@
-import { eq } from "drizzle-orm";
-import { Plus, Users } from "lucide-react";
-import { createGroupAction } from "@/app/actions";
+import { Plus, Save, Users } from "lucide-react";
+import { createGroupAction, updateGroupAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
-import { db } from "@/db/client";
-import { groups, roles } from "@/db/schema";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
+import { getGroupSummaries, getRoleSummaries } from "@/modules/authorization/permissions";
 
 export default async function AdminGroupsPage() {
   const site = await getPrimarySiteWithSettings();
-  const rows = await db
-    .select()
-    .from(groups)
-    .where(eq(groups.siteId, site!.site.id))
-    .orderBy(groups.name);
-  const roleRows = await db
-    .select()
-    .from(roles)
-    .where(eq(roles.siteId, site!.site.id))
-    .orderBy(roles.name);
+  const rows = await getGroupSummaries(site!.site.id);
+  const roleRows = await getRoleSummaries(site!.site.id);
   const { messages } = await getRequestI18n(site!.settings?.defaultLocale);
   return (
     <section className="admin-page">
@@ -74,9 +64,61 @@ export default async function AdminGroupsPage() {
             <p className="muted" style={{ margin: "0 0 14px" }}>
               {group.description || messages.noDescriptionProvided}
             </p>
-            <span className={`badge ${group.builtIn ? "warning" : "info"}`}>
-              {group.builtIn ? messages.protected : messages.editable}
-            </span>
+            <div className="group-role-badges">
+              <span className={`badge ${group.builtIn ? "warning" : "info"}`}>
+                {group.builtIn ? messages.protected : messages.editable}
+              </span>
+              {group.roleNames.length > 0 ? (
+                group.roleNames.map((roleName) => (
+                  <span className="badge success" key={`${group.id}-${roleName}`}>
+                    {roleName}
+                  </span>
+                ))
+              ) : (
+                <span className="badge">{messages.noAssignedRoles}</span>
+              )}
+            </div>
+            <ActionForm
+              action={updateGroupAction}
+              className="group-edit-form"
+              pendingLabel={messages.working}
+            >
+              <input type="hidden" name="groupId" value={group.id} />
+              <label>
+                {messages.name}
+                <input
+                  className="field"
+                  name="name"
+                  defaultValue={group.name}
+                  readOnly={group.builtIn}
+                  required
+                />
+              </label>
+              <label>
+                {messages.description}
+                <input className="field" name="description" defaultValue={group.description} />
+              </label>
+              <fieldset>
+                <legend>{messages.assignedRoles}</legend>
+                <div className="group-role-checkboxes">
+                  {roleRows.map((role) => (
+                    <label className="checkbox-row permission-checkbox" key={role.id}>
+                      <input
+                        type="checkbox"
+                        name="roleId"
+                        value={role.id}
+                        defaultChecked={group.roleIds.includes(role.id)}
+                      />
+                      <span>{role.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <button className="primary">
+                <Save size={15} aria-hidden="true" />
+                {messages.saveChanges}
+              </button>
+            </ActionForm>
           </article>
         ))}
       </div>

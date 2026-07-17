@@ -93,7 +93,11 @@ const spec = {
       get: { summary: "List users", responses: { "200": { description: "Users" } } }
     },
     "/admin/groups": {
-      get: { summary: "List groups", responses: { "200": { description: "Groups" } } }
+      get: { summary: "List groups", responses: { "200": { description: "Groups" } } },
+      post: { summary: "Create group", responses: { "201": { description: "Group" } } }
+    },
+    "/admin/groups/{id}": {
+      patch: { summary: "Update group", responses: { "200": { description: "Group" } } }
     },
     "/admin/roles": {
       get: { summary: "List roles", responses: { "200": { description: "Roles" } } }

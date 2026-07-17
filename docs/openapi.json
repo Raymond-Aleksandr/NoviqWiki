@@ -250,6 +250,24 @@
             "description": "Groups"
           }
         }
+      },
+      "post": {
+        "summary": "Create group",
+        "responses": {
+          "201": {
+            "description": "Group"
+          }
+        }
+      }
+    },
+    "/admin/groups/{id}": {
+      "patch": {
+        "summary": "Update group",
+        "responses": {
+          "200": {
+            "description": "Group"
+          }
+        }
       }
     },
     "/admin/roles": {

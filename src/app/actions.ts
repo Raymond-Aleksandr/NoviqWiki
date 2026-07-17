@@ -45,11 +45,11 @@ import {
 import { completeSetup } from "@/modules/setup/service";
 import { updateSiteSettings } from "@/modules/settings/service";
 import {
-  assignRoleToGroup,
   assignUserToGroup,
   createGroup,
   createRole,
-  permissionKeys
+  permissionKeys,
+  updateGroup
 } from "@/modules/authorization/permissions";
 import { createUser, setUserStatus } from "@/modules/users/service";
 
@@ -582,11 +582,48 @@ export async function createGroupAction(
     });
     const roleId = optionalString(formData, "roleId");
     if (roleId) {
-      await assignRoleToGroup(group.id, roleId);
+      await updateGroup({
+        siteId: site.site.id,
+        groupId: group.id,
+        name: group.name,
+        description: group.description,
+        roleIds: [roleId],
+        actorId: session.user.id,
+        actorDisplayName: session.user.displayName
+      });
     }
     revalidatePath("/admin/groups");
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
     return { ok: true, message: messages.groupCreated };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function updateGroupAction(
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    const session = await requireSession();
+    const site = await requireSite();
+    await requirePermission(session.user.id, site.site.id, "group.manage");
+    const roleIds = formData
+      .getAll("roleId")
+      .filter((value): value is string => typeof value === "string" && value.trim() !== "");
+    await updateGroup({
+      siteId: site.site.id,
+      groupId: stringValue(formData, "groupId"),
+      name: stringValue(formData, "name"),
+      description: optionalString(formData, "description"),
+      roleIds,
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
+    });
+    revalidatePath("/admin/groups");
+    revalidatePath("/admin/roles");
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.groupUpdated };
   } catch (error) {
     return actionError(error);
   }

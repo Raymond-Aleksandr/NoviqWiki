@@ -1,5 +1,5 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { db, type Database } from "@/db/client";
+import { db, type Database, type RootDatabase } from "@/db/client";
 import {
   groups,
   groupRoles,
@@ -10,7 +10,8 @@ import {
   userGroups,
   users
 } from "@/db/schema";
-import { ForbiddenError } from "@/lib/errors";
+import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
+import { writeAuditLog } from "@/modules/audit/service";
 
 export const permissionKeys = [
   "site.view",
@@ -236,6 +237,128 @@ export async function createGroup(
   return group;
 }
 
+export async function getGroupSummaries(siteId: string, database: Database = db) {
+  return database
+    .select({
+      id: groups.id,
+      siteId: groups.siteId,
+      name: groups.name,
+      normalizedName: groups.normalizedName,
+      description: groups.description,
+      builtIn: groups.builtIn,
+      roleIds: sql<
+        string[]
+      >`coalesce(array_agg(${roles.id}::text order by ${roles.name}) filter (where ${roles.id} is not null), ARRAY[]::text[])`,
+      roleNames: sql<
+        string[]
+      >`coalesce(array_agg(${roles.name} order by ${roles.name}) filter (where ${roles.id} is not null), ARRAY[]::text[])`
+    })
+    .from(groups)
+    .leftJoin(groupRoles, eq(groupRoles.groupId, groups.id))
+    .leftJoin(roles, eq(roles.id, groupRoles.roleId))
+    .where(eq(groups.siteId, siteId))
+    .groupBy(groups.id)
+    .orderBy(groups.name);
+}
+
+export async function updateGroup(
+  input: {
+    siteId: string;
+    groupId: string;
+    name: string;
+    description?: string;
+    roleIds: string[];
+    actorId?: string;
+    actorDisplayName?: string;
+  },
+  database: RootDatabase = db
+) {
+  return database.transaction(async (tx) => {
+    const [group] = await tx
+      .select()
+      .from(groups)
+      .where(and(eq(groups.id, input.groupId), eq(groups.siteId, input.siteId)))
+      .limit(1);
+    if (!group) {
+      throw new NotFoundError("Group not found.");
+    }
+
+    const nextName = input.name.trim();
+    if (!nextName) {
+      throw new ConflictError("Group name is required.");
+    }
+    const normalizedName = nextName.toLowerCase();
+    if (group.builtIn && normalizedName !== group.normalizedName) {
+      throw new ForbiddenError("Built-in groups cannot be renamed.");
+    }
+    if (normalizedName !== group.normalizedName) {
+      const [duplicate] = await tx
+        .select({ id: groups.id })
+        .from(groups)
+        .where(and(eq(groups.siteId, input.siteId), eq(groups.normalizedName, normalizedName)))
+        .limit(1);
+      if (duplicate && duplicate.id !== group.id) {
+        throw new ConflictError("A group with that name already exists.");
+      }
+    }
+
+    const uniqueRoleIds = Array.from(new Set(input.roleIds.filter(Boolean)));
+    const validRoles =
+      uniqueRoleIds.length > 0
+        ? await tx
+            .select({ id: roles.id })
+            .from(roles)
+            .where(and(eq(roles.siteId, input.siteId), inArray(roles.id, uniqueRoleIds)))
+        : [];
+    if (validRoles.length !== uniqueRoleIds.length) {
+      throw new NotFoundError("Role not found.");
+    }
+
+    const [updated] = await tx
+      .update(groups)
+      .set({
+        name: group.builtIn ? group.name : nextName,
+        normalizedName: group.builtIn ? group.normalizedName : normalizedName,
+        description: input.description?.trim() ?? "",
+        updatedAt: new Date()
+      })
+      .where(eq(groups.id, group.id))
+      .returning();
+
+    await tx.delete(groupRoles).where(eq(groupRoles.groupId, group.id));
+    if (uniqueRoleIds.length > 0) {
+      await tx
+        .insert(groupRoles)
+        .values(uniqueRoleIds.map((roleId) => ({ groupId: group.id, roleId })))
+        .onConflictDoNothing();
+    }
+
+    if ((await countActiveOwners(input.siteId, tx)) < 1) {
+      throw new ForbiddenError("The final active Owner cannot be suspended or demoted.");
+    }
+
+    if (input.actorId) {
+      await writeAuditLog(
+        {
+          siteId: input.siteId,
+          actorId: input.actorId,
+          actorDisplayName: input.actorDisplayName,
+          action: "group.updated",
+          targetType: "group",
+          targetId: group.id,
+          details: {
+            name: updated.name,
+            roleIds: uniqueRoleIds
+          }
+        },
+        tx
+      );
+    }
+
+    return updated;
+  });
+}
+
 export async function createRole(
   input: { siteId: string; name: string; description?: string; permissionKeys?: PermissionKey[] },
   database: Database = db
@@ -378,4 +501,18 @@ export async function isFinalActiveOwner(userId: string, siteId: string, databas
       )
     );
   return count <= 1;
+}
+
+async function countActiveOwners(siteId: string, database: Database) {
+  const [{ count }] = await database
+    .select({ count: sql<number>`count(distinct ${users.id})::int` })
+    .from(users)
+    .innerJoin(userGroups, eq(userGroups.userId, users.id))
+    .innerJoin(groups, eq(groups.id, userGroups.groupId))
+    .innerJoin(groupRoles, eq(groupRoles.groupId, groups.id))
+    .innerJoin(roles, eq(roles.id, groupRoles.roleId))
+    .where(
+      and(eq(groups.siteId, siteId), eq(roles.normalizedName, "owner"), eq(users.status, "active"))
+    );
+  return count;
 }
