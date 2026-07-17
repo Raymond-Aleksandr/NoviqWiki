@@ -4565,6 +4565,13 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
                 rowCounts.set(rowTop, (rowCounts.get(rowTop) ?? 0) + 1);
               }
               if ([...rowCounts.values()].some((count) => count > 2)) return true;
+              if (
+                document.documentElement.clientWidth >= 360 &&
+                buttonRect.width >= 216 &&
+                buttons.length >= 2 &&
+                ![...rowCounts.values()].some((count) => count === 2)
+              )
+                return true;
             }
             return childRects.some((rect) => rect.width < 108);
           }
@@ -4574,9 +4581,18 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
                 .gridTemplateColumns.split(" ")
                 .filter((track) => track.trim().length > 0)
             : [];
+          const gridRect = grid?.getBoundingClientRect();
           if (
             document.documentElement.clientWidth <= 480 &&
             gridTracks.length > 2
+          )
+            return true;
+          if (
+            document.documentElement.clientWidth >= 360 &&
+            document.documentElement.clientWidth <= 480 &&
+            Boolean(gridRect && gridRect.width >= 216) &&
+            grid?.querySelectorAll(".button, button").length >= 2 &&
+            gridTracks.length !== 2
           )
             return true;
           if (element.scrollWidth > element.clientWidth + 1) return true;

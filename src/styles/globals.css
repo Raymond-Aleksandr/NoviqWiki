@@ -5342,6 +5342,11 @@ pre.citation-block {
     text-align: left;
   }
 
+  .history-row > * {
+    grid-template-columns: 64px minmax(0, 1fr);
+    column-gap: 12px;
+  }
+
   .admin-grid-row.admin-users-grid > div::before,
   .admin-grid-row.admin-pages-grid > *::before,
   .admin-grid-row.admin-audit-grid > *::before,
@@ -5434,8 +5439,8 @@ pre.citation-block {
 
   .history-row .history-actions {
     display: grid;
-    grid-template-columns: minmax(72px, max-content) minmax(0, 1fr);
-    column-gap: 14px;
+    grid-template-columns: 64px minmax(0, 1fr);
+    column-gap: 12px;
     row-gap: 8px;
     justify-items: start;
     justify-content: stretch;
@@ -5448,11 +5453,11 @@ pre.citation-block {
   .history-action-buttons {
     display: grid;
     grid-column: 2;
-    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(104px, 100%), 1fr));
     gap: 8px;
     min-width: 0;
     max-width: 100%;
-    width: 100%;
+    width: min(100%, 260px);
   }
 
   .history-row .history-actions .button,
@@ -5566,8 +5571,9 @@ pre.citation-block {
 
   .history-row .history-revision-cell {
     display: grid;
-    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-columns: 64px minmax(0, 1fr);
     align-items: center;
+    column-gap: 12px;
     font-size: 16px;
     justify-content: stretch;
     text-align: left;
@@ -5575,10 +5581,10 @@ pre.citation-block {
 
   .history-row .history-summary-cell {
     display: grid;
-    grid-template-columns: 72px minmax(0, 1fr);
+    grid-template-columns: 64px minmax(0, 1fr);
     align-items: start;
     justify-content: initial;
-    column-gap: 14px;
+    column-gap: 12px;
     row-gap: 2px;
     text-align: left;
   }
