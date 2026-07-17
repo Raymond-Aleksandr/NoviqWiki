@@ -69,6 +69,7 @@ type RouteMetrics = {
   contentRowRhythmMismatches: ElementSummary[];
   keyValueRhythmMismatches: ElementSummary[];
   permissionMatrixRhythmMismatches: ElementSummary[];
+  adminSummaryRhythmMismatches: ElementSummary[];
   editorToolbarRhythmMismatches: ElementSummary[];
   mediaPickerRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
@@ -1405,6 +1406,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "permission_matrix_rhythm_mismatch",
     metrics.permissionMatrixRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "admin_summary_rhythm_mismatch",
+    metrics.adminSummaryRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -3195,6 +3203,126 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             childOverflow ||
             !centeredCellsOk ||
             rect.height > 56
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      adminSummaryRhythmMismatches: visibleMatches(
+        ".admin-stat-card, .system-grid, .system-grid > div"
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const isMobile = document.documentElement.clientWidth <= 560;
+          const fitsViewport =
+            !isMobile ||
+            (rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1);
+          if (element.matches(".admin-stat-card")) {
+            const icon = element.querySelector("svg");
+            const strong = element.querySelector("strong");
+            const label = element.querySelector("span");
+            const iconRect = icon?.getBoundingClientRect();
+            const strongStyle = strong ? getComputedStyle(strong) : null;
+            const labelStyle = label ? getComputedStyle(label) : null;
+            const paddingTop = Number.parseFloat(style.paddingTop);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            const rowGap = Number.parseFloat(style.rowGap);
+            const strongFont = strongStyle ? Number.parseFloat(strongStyle.fontSize) : NaN;
+            const strongLineHeight = strongStyle ? Number.parseFloat(strongStyle.lineHeight) : NaN;
+            const labelFont = labelStyle ? Number.parseFloat(labelStyle.fontSize) : NaN;
+            const labelLineHeight = labelStyle ? Number.parseFloat(labelStyle.lineHeight) : NaN;
+            return (
+              style.display !== "grid" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(rowGap) ||
+              rowGap < 2 ||
+              rowGap > 6 ||
+              !Number.isFinite(paddingTop) ||
+              paddingTop < 14 ||
+              paddingTop > 20 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 14 ||
+              paddingInline > 20 ||
+              !icon ||
+              !iconRect ||
+              iconRect.width < 16 ||
+              iconRect.width > 22 ||
+              iconRect.height < 16 ||
+              iconRect.height > 22 ||
+              !strong ||
+              !strongStyle ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(strongStyle.fontFamily) ||
+              !Number.isFinite(strongFont) ||
+              strongFont < 26 ||
+              strongFont > 34 ||
+              !Number.isFinite(strongLineHeight) ||
+              strongLineHeight > 36 ||
+              !label ||
+              !labelStyle ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(labelStyle.fontFamily) ||
+              !Number.isFinite(labelFont) ||
+              labelFont < 11.5 ||
+              labelFont > 13.2 ||
+              !Number.isFinite(labelLineHeight) ||
+              labelLineHeight > 18 ||
+              !fitsViewport ||
+              element.scrollWidth > element.clientWidth + 2
+            );
+          }
+          if (element.matches(".system-grid")) {
+            const rowGap = Number.parseFloat(style.rowGap);
+            const columnGap = Number.parseFloat(style.columnGap);
+            const paddingTop = Number.parseFloat(style.paddingTop);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            const childOverflow = [...element.children].filter(visible).some((child) => {
+              const childRect = child.getBoundingClientRect();
+              return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+            });
+            return (
+              style.display !== "grid" ||
+              !Number.isFinite(rowGap) ||
+              rowGap < 10 ||
+              rowGap > 22 ||
+              !Number.isFinite(columnGap) ||
+              columnGap < 10 ||
+              columnGap > 22 ||
+              !Number.isFinite(paddingTop) ||
+              paddingTop < 16 ||
+              paddingTop > 24 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 16 ||
+              paddingInline > 24 ||
+              childOverflow ||
+              !fitsViewport
+            );
+          }
+          const label = element.querySelector(".system-label");
+          const value = element.querySelector("strong");
+          const labelStyle = label ? getComputedStyle(label) : null;
+          const valueStyle = value ? getComputedStyle(value) : null;
+          const labelFont = labelStyle ? Number.parseFloat(labelStyle.fontSize) : NaN;
+          const valueFont = valueStyle ? Number.parseFloat(valueStyle.fontSize) : NaN;
+          const rowGap = Number.parseFloat(style.rowGap);
+          return (
+            style.display !== "grid" ||
+            !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+            !Number.isFinite(rowGap) ||
+            rowGap < 1 ||
+            rowGap > 5 ||
+            !label ||
+            !labelStyle ||
+            !/Hanken Grotesk|Noto Sans SC/i.test(labelStyle.fontFamily) ||
+            !Number.isFinite(labelFont) ||
+            labelFont < 10.5 ||
+            labelFont > 11.8 ||
+            !value ||
+            !valueStyle ||
+            !/Hanken Grotesk|Noto Sans SC/i.test(valueStyle.fontFamily) ||
+            !Number.isFinite(valueFont) ||
+            valueFont < 13 ||
+            valueFont > 15.5 ||
+            !fitsViewport ||
+            element.scrollWidth > element.clientWidth + 2
           );
         })
         .map(summarize)
