@@ -977,6 +977,7 @@ async function main() {
         await auditMediaPicker(page, articleSlug, browserName, viewport.name);
       }
       if (storageState) {
+        await auditPageRenameDialog(page, browserName, viewport.name);
         await auditPageDeleteDialog(page, browserName, viewport.name);
         await auditMediaDeleteDialog(page, browserName, viewport.name);
         await auditUserResetDialog(page, browserName, viewport.name);
@@ -4779,23 +4780,21 @@ async function auditMediaPicker(
     });
     return;
   }
-  const clicked = await mediaButton.click({ timeout: 5000 }).then(
-    () => true,
-    (error: unknown) => {
-      addFailure({
-        kind: "media_picker_modal_mismatch",
-        browserName,
-        sizeName,
-        route,
-        detail: error instanceof Error ? error.message : String(error)
-      });
-      return false;
-    }
+  const opened = await openFirstDialogButton(
+    page,
+    '.editor-toolbar .editor-tool-button[data-editor-command="image"]',
+    ".media-picker-dialog[role='dialog']"
   );
-  if (!clicked) {
+  if (!opened) {
+    addFailure({
+      kind: "media_picker_modal_mismatch",
+      browserName,
+      sizeName,
+      route,
+      detail: "image toolbar button did not open the media picker dialog"
+    });
     return;
   }
-  await waitForModal(page, ".media-picker-dialog[role='dialog']");
   const modal = await readModalMetrics(page, ".media-picker-dialog[role='dialog']");
   if (!modal.hasBackdrop || !modal.hasDialog || modal.radius !== "14px" || modal.overflow) {
     addFailure({
@@ -4864,6 +4863,174 @@ async function auditMobileShell(page: Page, browserName: string, sizeName: strin
       sizeName,
       route: "/",
       detail: shell
+    });
+  }
+}
+
+async function auditPageRenameDialog(page: Page, browserName: string, sizeName: string) {
+  const ready = await gotoDialogAuditRoute(page, "/admin/pages", browserName, sizeName);
+  if (!ready) return;
+  const opened = await openFirstDialogButton(
+    page,
+    'button[data-confirm-action="rename"]',
+    ".confirm-dialog[role='dialog'] .confirm-field-grid"
+  );
+  if (!opened) {
+    return;
+  }
+  const modal = await readModalMetrics(page, ".confirm-dialog[role='dialog']");
+  const fieldMetrics = (await page.evaluate(`(() => {
+    const visible = (element) => {
+      const rect = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.visibility !== "hidden" &&
+        style.display !== "none"
+      );
+    };
+    const roundedRect = (element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        className: String(element.className || ""),
+        text: (element.textContent || "").trim().slice(0, 80),
+        left: Math.round(rect.left),
+        right: Math.round(rect.right),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height)
+      };
+    };
+    const failures = [];
+    const dialog = document.querySelector(".confirm-dialog");
+    const grid = document.querySelector(".confirm-field-grid");
+    if (!dialog || !grid) {
+      failures.push({ kind: "missing_confirm_field_grid", detail: "missing grid" });
+      return failures;
+    }
+    const clientWidth = document.documentElement.clientWidth;
+    const dialogRect = dialog.getBoundingClientRect();
+    if (
+      dialogRect.left < 8 ||
+      dialogRect.right > clientWidth - 8 ||
+      dialog.scrollWidth > dialog.clientWidth + 1
+    ) {
+      failures.push({ kind: "confirm_dialog_viewport", detail: roundedRect(dialog) });
+    }
+
+    const gridStyle = getComputedStyle(grid);
+    const gridGap = Number.parseFloat(gridStyle.rowGap || gridStyle.gap);
+    if (
+      gridStyle.display !== "grid" ||
+      !Number.isFinite(gridGap) ||
+      gridGap < 10 ||
+      gridGap > 14 ||
+      grid.scrollWidth > grid.clientWidth + 1
+    ) {
+      failures.push({ kind: "confirm_field_grid", detail: roundedRect(grid) });
+    }
+
+    for (const label of [...grid.querySelectorAll("label")].filter(visible)) {
+      const labelStyle = getComputedStyle(label);
+      const labelRect = label.getBoundingClientRect();
+      const fontSize = Number.parseFloat(labelStyle.fontSize);
+      const lineHeight =
+        labelStyle.lineHeight === "normal"
+          ? fontSize * 1.35
+          : Number.parseFloat(labelStyle.lineHeight);
+      const overflow =
+        label.scrollWidth > label.clientWidth + 1 || labelRect.right > dialogRect.right - 12;
+      if (label.matches(".checkbox-row")) {
+        const gap = Number.parseFloat(labelStyle.gap || labelStyle.columnGap);
+        if (
+          !["flex", "inline-flex"].includes(labelStyle.display) ||
+          !Number.isFinite(gap) ||
+          gap < 8 ||
+          gap > 12 ||
+          overflow
+        ) {
+          failures.push({ kind: "confirm_checkbox_row", detail: roundedRect(label) });
+        }
+        continue;
+      }
+      const rowGap = Number.parseFloat(labelStyle.rowGap || labelStyle.gap);
+      if (
+        labelStyle.display !== "grid" ||
+        !/Hanken Grotesk|Noto Sans SC/i.test(labelStyle.fontFamily) ||
+        !Number.isFinite(fontSize) ||
+        fontSize < 12.5 ||
+        fontSize > 13.5 ||
+        !Number.isFinite(lineHeight) ||
+        lineHeight < 16 ||
+        lineHeight > 19 ||
+        !Number.isFinite(rowGap) ||
+        rowGap < 5 ||
+        rowGap > 8 ||
+        overflow
+      ) {
+        failures.push({ kind: "confirm_field_label", detail: roundedRect(label) });
+      }
+    }
+
+    for (const field of [...grid.querySelectorAll(".field")].filter(visible)) {
+      const fieldStyle = getComputedStyle(field);
+      const fieldRect = field.getBoundingClientRect();
+      const fontSize = Number.parseFloat(fieldStyle.fontSize);
+      if (
+        !/Hanken Grotesk|Noto Sans SC/i.test(fieldStyle.fontFamily) ||
+        !Number.isFinite(fontSize) ||
+        fontSize < 13 ||
+        fontSize > 14 ||
+        fieldRect.height < 34 ||
+        fieldRect.height > 44 ||
+        fieldRect.right > dialogRect.right - 12 ||
+        field.scrollWidth > field.clientWidth + 1
+      ) {
+        failures.push({ kind: "confirm_field_control", detail: roundedRect(field) });
+      }
+    }
+
+    for (const button of [...document.querySelectorAll(".confirm-actions button")].filter(visible)) {
+      const buttonRect = button.getBoundingClientRect();
+      if (
+        buttonRect.height < 34 ||
+        buttonRect.height > 44 ||
+        button.scrollWidth > button.clientWidth + 1
+      ) {
+        failures.push({ kind: "confirm_action_button", detail: roundedRect(button) });
+      }
+    }
+
+    return failures;
+  })()`)) as Array<{ kind: string; detail: unknown }>;
+  const actionRhythmMismatch =
+    modal.actionRowDisplay !== "flex" ||
+    modal.actionRowGap === null ||
+    modal.actionRowGap < 8 ||
+    modal.actionRowGap > 12 ||
+    modal.actionButtonCount < 2 ||
+    modal.actionButtonMinHeight === null ||
+    modal.actionButtonMaxHeight === null ||
+    modal.actionButtonMinHeight < 34 ||
+    modal.actionButtonMaxHeight > 44 ||
+    modal.actionButtonHeightDelta === null ||
+    modal.actionButtonHeightDelta > 2 ||
+    !modal.actionButtonFontOk ||
+    !modal.actionButtonIconOk;
+  if (
+    !modal.hasBackdrop ||
+    !modal.hasDialog ||
+    modal.radius !== "14px" ||
+    modal.overflow ||
+    actionRhythmMismatch ||
+    fieldMetrics.length > 0
+  ) {
+    addFailure({
+      kind: "page_rename_modal_mismatch",
+      browserName,
+      sizeName,
+      route: "/admin/pages",
+      detail: { modal, fieldMetrics }
     });
   }
 }

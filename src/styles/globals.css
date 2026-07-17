@@ -2100,15 +2100,31 @@ pre.citation-block {
 .confirm-field-grid {
   display: grid;
   gap: 12px;
+  min-width: 0;
 }
 
 .confirm-field-grid label:not(.checkbox-row) {
   display: grid;
   gap: 6px;
+  min-width: 0;
   color: var(--text);
+  font-family: var(--nw-font-body);
   font-size: 13px;
   font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
   text-align: left;
+}
+
+.confirm-field-grid label:not(.checkbox-row) span,
+.confirm-field-grid .checkbox-row span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.confirm-field-grid .field {
+  min-width: 0;
+  width: 100%;
 }
 
 .confirm-actions {
