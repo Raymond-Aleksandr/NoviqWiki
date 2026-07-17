@@ -219,11 +219,13 @@ const publicRoutes = [
   "/register",
   "/forgot-password",
   "/reset-password?token=ui-audit",
-  "/verify-email?token=ui-audit"
+  "/verify-email?token=ui-audit",
+  "/setup"
 ];
 
 const authenticatedRoutes = [
   "/watchlist",
+  "/edit/new",
   "/admin",
   "/admin/pages",
   "/admin/users",
@@ -234,6 +236,47 @@ const authenticatedRoutes = [
   "/admin/audit",
   "/admin/status"
 ];
+
+const auditedPageRoutes = new Set([
+  "/",
+  "/admin",
+  "/admin/audit",
+  "/admin/groups",
+  "/admin/media",
+  "/admin/pages",
+  "/admin/roles",
+  "/admin/settings",
+  "/admin/status",
+  "/admin/users",
+  "/categories",
+  "/categories/[slug]",
+  "/dead-end",
+  "/diff/[from]/[to]",
+  "/edit/[slug]",
+  "/edit/new",
+  "/forgot-password",
+  "/history/[slug]",
+  "/login",
+  "/media",
+  "/orphaned",
+  "/page/[slug]",
+  "/page/[slug]/backlinks",
+  "/page/[slug]/cite",
+  "/pages",
+  "/protected-pages",
+  "/recent",
+  "/redirects",
+  "/register",
+  "/reset-password",
+  "/search",
+  "/setup",
+  "/short-pages",
+  "/special",
+  "/uncategorized",
+  "/verify-email",
+  "/wanted",
+  "/watchlist"
+]);
 
 const failures: Failure[] = [];
 
@@ -302,6 +345,18 @@ async function auditSourceForHardcodedVisibleText() {
   });
 }
 
+async function auditSourceForPageRouteCoverage() {
+  const routes = await findAppPageRoutes(path.join(process.cwd(), "src/app"));
+  const missingRoutes = routes.filter((route) => !auditedPageRoutes.has(route));
+  if (missingRoutes.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "ui_route_coverage_gap",
+    detail: missingRoutes
+  });
+}
+
 async function findNativeDialogMatches(directory: string): Promise<SourceMatch[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const matches: SourceMatch[] = [];
@@ -364,6 +419,32 @@ async function findUnexpectedInlineStyleMatches(directory: string): Promise<Sour
   }
 
   return matches;
+}
+
+async function findAppPageRoutes(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const routes: string[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      routes.push(...(await findAppPageRoutes(entryPath)));
+      continue;
+    }
+    if (!entry.isFile() || entry.name !== "page.tsx") {
+      continue;
+    }
+    routes.push(appPagePathToRoute(entryPath));
+  }
+
+  return routes.sort();
+}
+
+function appPagePathToRoute(pagePath: string) {
+  const appRoot = path.join(process.cwd(), "src/app");
+  const relative = path.relative(appRoot, pagePath).replaceAll(path.sep, "/");
+  const route = relative.replace(/\/?page\.tsx$/, "");
+  return route ? `/${route}` : "/";
 }
 
 async function findTypographyDriftMatches(directory: string): Promise<SourceMatch[]> {
@@ -565,6 +646,7 @@ async function main() {
   await auditSourceForInlineStyles();
   await auditSourceForTypographyDrift();
   await auditSourceForHardcodedVisibleText();
+  await auditSourceForPageRouteCoverage();
   const storageState = credentials ? await createAuthState(credentials) : undefined;
   const articleSlug =
     process.env.UI_AUDIT_ARTICLE_SLUG ?? (await discoverArticleSlug(storageState));
@@ -635,7 +717,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, hardcoded visible text, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, hardcoded visible text, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 

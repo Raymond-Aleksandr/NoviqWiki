@@ -141,6 +141,7 @@ Last updated: 2026-07-17
 - 2026-07-17: Normalized CSS typography drift after scanning the full stylesheet. All `letter-spacing` declarations now resolve to `0`, and `pnpm test:ui` fails if future CSS introduces nonzero letter spacing or viewport-unit font sizing that would make fonts drift between desktop and mobile layouts.
 - 2026-07-17: Tightened `/admin/roles` mobile layout after authenticated WebKit audit found permission badges could push the page wider than the viewport. Role cards, permission summaries, and permission checkbox labels now shrink/wrap inside the design grid, and confirmation-trigger audits use stable `data-confirm-action` hooks so page/user destructive-action modals are checked without hitting unrelated icon buttons.
 - 2026-07-17: Extended typography source checks so CSS font families must use the design-package font tokens (`--nw-font-body`, `--nw-font-serif`, or `--nw-font-mono`) and font sizes cannot use dynamic `clamp()`/`calc()` expressions. The stylesheet currently passes with tokenized body/serif/mono font usage only.
+- 2026-07-17: Added source-level route coverage to `pnpm test:ui`. Every `src/app/**/page.tsx` route must now be represented in the UI audit matrix; `/edit/new` and `/setup` were added to the live route sweep so new page surfaces cannot silently bypass desktop/mobile layout, i18n, typography, and control-size checks.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes
