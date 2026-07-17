@@ -1089,6 +1089,7 @@ textarea {
   color: var(--text);
   font-size: 13px;
   padding: 7px 13px;
+  text-decoration: none;
 }
 
 .filter-pill.active {
@@ -3859,6 +3860,21 @@ textarea {
 }
 
 @media (max-width: 560px) {
+  .filter-pills {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .filter-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-pill {
+    flex: 0 0 auto;
+  }
+
   .sidebar {
     min-height: 59px;
     max-height: 59px;

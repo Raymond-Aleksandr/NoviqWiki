@@ -101,6 +101,18 @@ export async function createPage(
           siteId: input.siteId,
           actorId: input.actorId,
           actorDisplayName: input.actorDisplayName,
+          action: "page.created",
+          targetType: "page",
+          targetId: page.id,
+          details: { title: page.title, revisionId: revision.id }
+        },
+        tx
+      );
+      await writeAuditLog(
+        {
+          siteId: input.siteId,
+          actorId: input.actorId,
+          actorDisplayName: input.actorDisplayName,
           action: "page.published",
           targetType: "page",
           targetId: page.id,

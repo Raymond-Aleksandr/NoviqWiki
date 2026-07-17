@@ -9,6 +9,7 @@ import {
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { completeSetup } from "@/modules/setup/service";
 import { createUser } from "@/modules/users/service";
+import { actionsForRecentChangeFilter, listRecentChanges } from "@/modules/activity/service";
 import {
   archivePage,
   createPage,
@@ -83,6 +84,25 @@ describe("page lifecycle integration", () => {
       test.db
     );
     expect(draftOnly.page.status).toBe("draft");
+    const createdChanges = await listRecentChanges(
+      {
+        siteId: setup.site.id,
+        actions: actionsForRecentChangeFilter("created"),
+        publicOnly: true
+      },
+      test.executor
+    );
+    expect(createdChanges.map((change) => change.targetId)).toContain(page.id);
+    expect(createdChanges.map((change) => change.targetId)).not.toContain(draftOnly.page.id);
+    const publishedChanges = await listRecentChanges(
+      {
+        siteId: setup.site.id,
+        actions: actionsForRecentChangeFilter("published"),
+        publicOnly: true
+      },
+      test.executor
+    );
+    expect(publishedChanges.map((change) => change.targetId)).toContain(page.id);
     const storedNewPageDraft = await getDraftForEditor(
       { pageId: draftOnly.page.id, editorId: setup.owner.id },
       test.executor
@@ -243,6 +263,15 @@ describe("page lifecycle integration", () => {
       test.db
     );
     expect(rollback.revisionNumber).toBe(3);
+    const rollbackChanges = await listRecentChanges(
+      {
+        siteId: setup.site.id,
+        actions: actionsForRecentChangeFilter("rollback"),
+        publicOnly: true
+      },
+      test.executor
+    );
+    expect(rollbackChanges.map((change) => change.targetId)).toContain(page.id);
     const revisions = await listRevisions(page.id, test.executor);
     expect(revisions).toHaveLength(3);
 

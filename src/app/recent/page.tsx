@@ -1,18 +1,44 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
-import { listRecentChanges } from "@/modules/activity/service";
+import {
+  actionsForRecentChangeFilter,
+  listRecentChanges,
+  recentChangeFilterValue,
+  type RecentChangeFilter
+} from "@/modules/activity/service";
 
-export default async function RecentChangesPage() {
+type Props = {
+  searchParams: Promise<{ type?: string }>;
+};
+
+const recentChangeFilters: RecentChangeFilter[] = [
+  "all",
+  "created",
+  "edited",
+  "published",
+  "rollback",
+  "media"
+];
+
+export default async function RecentChangesPage({ searchParams }: Props) {
   const site = await getPrimarySiteWithSettings();
   if (!site) {
     redirect("/setup");
   }
   await requirePageReadAccess(site.site.id);
+  const params = await searchParams;
+  const activeFilter = recentChangeFilterValue(params.type);
   const [changes, i18n] = await Promise.all([
-    listRecentChanges({ siteId: site.site.id, limit: 100, publicOnly: true }),
+    listRecentChanges({
+      siteId: site.site.id,
+      limit: 100,
+      publicOnly: true,
+      actions: actionsForRecentChangeFilter(activeFilter)
+    }),
     getRequestI18n(site.settings?.defaultLocale)
   ]);
   const { locale, messages } = i18n;
@@ -23,12 +49,16 @@ export default async function RecentChangesPage() {
         <p className="page-description">{messages.recentChangesDescription}</p>
       </header>
       <div className="filter-pills" aria-label={messages.recentChangesFilters}>
-        <span className="filter-pill active">{messages.all}</span>
-        <span className="filter-pill">{messages.created}</span>
-        <span className="filter-pill">{messages.edited}</span>
-        <span className="filter-pill">{messages.publishedLower}</span>
-        <span className="filter-pill">{messages.rollbackLower}</span>
-        <span className="filter-pill">{messages.mediaLower}</span>
+        {recentChangeFilters.map((filter) => (
+          <Link
+            aria-current={activeFilter === filter ? "page" : undefined}
+            className={`filter-pill ${activeFilter === filter ? "active" : ""}`}
+            href={filter === "all" ? "/recent" : `/recent?type=${filter}`}
+            key={filter}
+          >
+            {filterLabel(filter, messages)}
+          </Link>
+        ))}
       </div>
       <div className="timeline-panel">
         {changes.length === 0 ? (
@@ -67,6 +97,27 @@ export default async function RecentChangesPage() {
       </div>
     </section>
   );
+}
+
+function filterLabel(
+  filter: RecentChangeFilter,
+  messages: Awaited<ReturnType<typeof getRequestI18n>>["messages"]
+) {
+  switch (filter) {
+    case "created":
+      return messages.created;
+    case "edited":
+      return messages.edited;
+    case "published":
+      return messages.publishedLower;
+    case "rollback":
+      return messages.rollbackLower;
+    case "media":
+      return messages.mediaLower;
+    case "all":
+    default:
+      return messages.all;
+  }
 }
 
 function badgeForAction(action: string) {
