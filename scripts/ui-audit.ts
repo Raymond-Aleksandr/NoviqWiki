@@ -78,6 +78,7 @@ type RouteMetrics = {
   articleMediaOverflow: ElementSummary[];
   articleMediaTooTall: ElementSummary[];
   articleMediaSizingMismatches: ElementSummary[];
+  articleProseRhythmMismatches: ElementSummary[];
   visibleDialogs: ElementSummary[];
   commandButtonsWithoutIcons: ElementSummary[];
   iconOnlyControlsWithoutNames: ElementSummary[];
@@ -997,7 +998,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, permission-matrix, admin-summary, diff, editor-toolbar, media-picker, or history-action rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, permission-matrix, admin-summary, diff, article-prose, editor-toolbar, media-picker, or history-action rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1474,6 +1475,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "article_media_sizing_mismatch",
     metrics.articleMediaSizingMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "article_prose_rhythm_mismatch",
+    metrics.articleProseRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -3905,6 +3913,167 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         })
         .map(summarize)
         .slice(0, 12),
+      articleProseRhythmMismatches: (() => {
+        const articleBody = document.querySelector(".article-body");
+        if (!articleBody) {
+          return [];
+        }
+        const fixture = document.createElement("div");
+        fixture.className = "article-prose-audit-fixture";
+        fixture.innerHTML = [
+          "<h2>Typography Fixture 中英文混排</h2>",
+          "<p>Long bilingual paragraph with averyveryveryveryveryveryverylongwordthatshouldnotbreakthearticlelayout and 中文内容保持阅读节奏。</p>",
+          "<blockquote>Quote with mixed language and averyveryveryveryverylongtokenthatmustwrap.</blockquote>",
+          "<ul><li>Task-like item with averyveryveryveryverylongtokenthatmustwrap</li><li>中文列表项</li></ul>",
+          "<ol><li>Ordered item with averyveryveryveryverylongtokenthatmustwrap</li></ol>",
+          "<table><thead><tr><th>Column alpha</th><th>Column beta long header</th><th>中文列</th></tr></thead><tbody><tr><td>averyveryveryveryveryverylongcellvaluethatmustnotescape</td><td>Normal value</td><td>中文内容</td></tr></tbody></table>",
+          '<pre><code>const impossibleLongIdentifierName = "averyveryveryveryveryveryverylongcodetokenthatshouldwrapinsidethecodeblock";</code></pre>',
+          '<p><code>inlineVeryVeryVeryLongCodeTokenThatShouldStillWrap</code> <a class="wiki-link" href="#">Internal Link</a> <a class="wiki-link-missing" href="#">Missing Link</a></p>'
+        ].join("");
+        articleBody.prepend(fixture);
+        const bodyRect = articleBody.getBoundingClientRect();
+        const failures = [
+          ...fixture.querySelectorAll(
+            "h2, p, blockquote, ul, ol, table, th, td, pre, pre code, p code, a"
+          )
+        ].filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const fontSize = Number.parseFloat(style.fontSize);
+          const lineHeight =
+            style.lineHeight === "normal" ? fontSize * 1.35 : Number.parseFloat(style.lineHeight);
+          const paddingLeft = Number.parseFloat(style.paddingLeft);
+          const paddingTop = Number.parseFloat(style.paddingTop);
+          const fitsArticle =
+            rect.left >= bodyRect.left - 1 &&
+            rect.right <= bodyRect.right + 1 &&
+            rect.width <= bodyRect.width + 1;
+          const scrollOverflow =
+            !["TABLE", "TH", "TD"].includes(element.tagName) &&
+            element.scrollWidth > element.clientWidth + 2;
+
+          if (element.matches("h2")) {
+            return (
+              !/Source Serif 4|Noto Serif SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 24 ||
+              fontSize > 30 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight > 42 ||
+              !fitsArticle ||
+              scrollOverflow
+            );
+          }
+
+          if (element.matches("p, ul, ol, blockquote")) {
+            const isBlockquote = element.matches("blockquote");
+            return (
+              !/Source Serif 4|Noto Serif SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 16 ||
+              fontSize > 19 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight < 25 ||
+              lineHeight > 33 ||
+              style.overflowWrap !== "anywhere" ||
+              !fitsArticle ||
+              scrollOverflow ||
+              (isBlockquote &&
+                (Number.parseFloat(style.marginLeft) !== 0 ||
+                  Number.parseFloat(style.marginRight) !== 0 ||
+                  !Number.isFinite(paddingLeft) ||
+                  paddingLeft < 14 ||
+                  paddingLeft > 22))
+            );
+          }
+
+          if (element.matches("table")) {
+            return (
+              style.display !== "block" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 13 ||
+              fontSize > 15 ||
+              !["auto", "scroll"].includes(style.overflowX) ||
+              !fitsArticle
+            );
+          }
+
+          if (element.matches("th, td")) {
+            return (
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 13 ||
+              fontSize > 15 ||
+              !Number.isFinite(paddingTop) ||
+              paddingTop < 6 ||
+              paddingTop > 10 ||
+              !Number.isFinite(paddingLeft) ||
+              paddingLeft < 10 ||
+              paddingLeft > 18
+            );
+          }
+
+          if (element.matches("pre")) {
+            return (
+              !/JetBrains Mono|SFMono|Menlo|monospace/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 13 ||
+              fontSize > 14.5 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight < 21 ||
+              lineHeight > 24 ||
+              style.whiteSpace !== "pre-wrap" ||
+              !["anywhere", "break-word"].includes(style.overflowWrap) ||
+              !["hidden", "clip"].includes(style.overflowX) ||
+              !fitsArticle ||
+              scrollOverflow
+            );
+          }
+
+          if (element.matches("pre code")) {
+            return (
+              style.display !== "block" ||
+              !/JetBrains Mono|SFMono|Menlo|monospace/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 13 ||
+              fontSize > 14.5 ||
+              style.backgroundColor !== "rgba(0, 0, 0, 0)" ||
+              style.whiteSpace !== "pre-wrap" ||
+              !["anywhere", "break-word"].includes(style.overflowWrap) ||
+              !fitsArticle ||
+              scrollOverflow
+            );
+          }
+
+          if (element.matches("p code")) {
+            return (
+              !/JetBrains Mono|SFMono|Menlo|monospace/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 15 ||
+              fontSize > 17 ||
+              !["anywhere", "break-word"].includes(style.overflowWrap) ||
+              !fitsArticle
+            );
+          }
+
+          if (element.matches("a")) {
+            return (
+              !/Source Serif 4|Noto Serif SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 16 ||
+              fontSize > 19 ||
+              style.overflowWrap !== "anywhere" ||
+              !fitsArticle
+            );
+          }
+
+          return false;
+        });
+        const summaries = failures.map(summarize).slice(0, 12);
+        fixture.remove();
+        return summaries;
+      })(),
       visibleDialogs: visibleMatches("[role='dialog'], .modal-backdrop, [popover]")
         .map(summarize)
         .slice(0, 12),
