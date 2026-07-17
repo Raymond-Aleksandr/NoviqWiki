@@ -21,7 +21,11 @@ export default async function HistoryPage({ params }: Props) {
   }
   const session = await requirePageReadAccess(site.site.id);
   const { slug } = await params;
-  const resolved = await resolvePageBySlug({ siteId: site.site.id, slug }).catch(() => null);
+  const resolved = await resolvePageBySlug({
+    siteId: site.site.id,
+    slug,
+    followContentRedirects: false
+  }).catch(() => null);
   if (!resolved || resolved.page.status === "deleted") {
     notFound();
   }
@@ -65,7 +69,7 @@ export default async function HistoryPage({ params }: Props) {
             <div className="history-actions" data-label={messages.actions}>
               <Link
                 className="button compact"
-                href={`/page/${resolved.page.slug}?revision=${revision.revisionNumber}`}
+                href={`/page/${resolved.page.slug}?revision=${revision.revisionNumber}&redirect=no`}
               >
                 <Eye size={14} aria-hidden="true" />
                 {messages.view}

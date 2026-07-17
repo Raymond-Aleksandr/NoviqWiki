@@ -27,7 +27,11 @@ export default async function EditPage({ params }: Props) {
   }
   await requirePermission(session.user.id, site.site.id, "page.edit");
   const { slug } = await params;
-  const resolved = await resolvePageBySlug({ siteId: site.site.id, slug }).catch(() => null);
+  const resolved = await resolvePageBySlug({
+    siteId: site.site.id,
+    slug,
+    followContentRedirects: false
+  }).catch(() => null);
   if (!resolved || resolved.page.status === "deleted") {
     notFound();
   }

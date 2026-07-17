@@ -113,6 +113,87 @@ describe("page lifecycle integration", () => {
     expect(firstRevision.revisionNumber).toBe(1);
 
     const page = first.page;
+    const redirectSource = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Redirect Source",
+        markdown: "#REDIRECT [[Lifecycle]]",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Create redirect"
+      },
+      test.db
+    );
+    const redirectSourceRevision = "revision" in redirectSource ? redirectSource.revision : null;
+    if (!redirectSourceRevision) {
+      throw new Error("Expected redirect source creation to return a revision.");
+    }
+    const resolvedRedirect = await resolvePageBySlug(
+      { siteId: setup.site.id, slug: "redirect-source" },
+      test.executor
+    );
+    expect(resolvedRedirect.page.id).toBe(page.id);
+    expect(resolvedRedirect.redirectedFrom).toBe("redirect-source");
+    const redirectSourceForEdit = await resolvePageBySlug(
+      { siteId: setup.site.id, slug: "redirect-source", followContentRedirects: false },
+      test.executor
+    );
+    expect(redirectSourceForEdit.page.id).toBe(redirectSource.page.id);
+    const redirectOutboundLinks = await listPageOutboundLinks(
+      { siteId: setup.site.id, pageId: redirectSource.page.id },
+      test.executor
+    );
+    expect(redirectOutboundLinks).toContainEqual(
+      expect.objectContaining({
+        targetTitle: "Lifecycle",
+        targetPageId: page.id,
+        exists: true
+      })
+    );
+
+    const loopAlpha = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Loop Alpha",
+        markdown: "# Loop Alpha\n\nStable target.",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Create loop alpha"
+      },
+      test.db
+    );
+    const loopAlphaRevision = "revision" in loopAlpha ? loopAlpha.revision : null;
+    if (!loopAlphaRevision) {
+      throw new Error("Expected loop alpha creation to return a revision.");
+    }
+    await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Loop Beta",
+        markdown: "#REDIRECT [[Loop Alpha]]",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Create loop beta redirect"
+      },
+      test.db
+    );
+    await expect(
+      publishPage(
+        {
+          pageId: loopAlpha.page.id,
+          actorId: setup.owner.id,
+          actorDisplayName: setup.owner.displayName,
+          markdown: "#REDIRECT [[Loop Beta]]",
+          editSummary: "Attempt loop",
+          baseRevisionId: loopAlphaRevision.id
+        },
+        test.db
+      )
+    ).rejects.toThrow("Redirect loop detected.");
+
     const draftOnly = await createPage(
       {
         siteId: setup.site.id,

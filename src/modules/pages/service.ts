@@ -17,6 +17,7 @@ import { normalizeTitle, slugifyTitle } from "@/lib/normalize";
 import { writeAuditLog } from "@/modules/audit/service";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { renderMarkdown } from "@/modules/rendering/markdown";
+import { assertNoRedirectLoopForRevision } from "@/modules/redirects/service";
 import { createUnifiedDiff, parseUnifiedDiff } from "@/modules/revisions/diff";
 import { removeSearchIndex, upsertSearchIndex } from "@/modules/search/service";
 import { derivePageIdentity } from "./title";
@@ -67,6 +68,15 @@ export async function createPage(
       .returning();
 
     if (input.publish) {
+      await assertNoRedirectLoopForRevision(
+        {
+          siteId: input.siteId,
+          pageId: page.id,
+          pageSlug: page.slug,
+          markdown: input.markdown
+        },
+        tx
+      );
       const revision = await createRevision(
         {
           siteId: input.siteId,
@@ -223,6 +233,15 @@ export async function publishPage(
     if ((page.currentRevisionId ?? null) !== expectedBase) {
       throw new ConflictError("The page changed after this editor loaded it.");
     }
+    await assertNoRedirectLoopForRevision(
+      {
+        siteId: page.siteId,
+        pageId: page.id,
+        pageSlug: page.slug,
+        markdown: input.markdown
+      },
+      tx
+    );
     const revisionNumber = await getNextRevisionNumber(page.id, tx);
     const revision = await createRevision(
       {
@@ -558,6 +577,15 @@ export async function rollbackPage(
     if (target.pageId !== page.id) {
       throw new ConflictError("Target revision belongs to another page.");
     }
+    await assertNoRedirectLoopForRevision(
+      {
+        siteId: page.siteId,
+        pageId: page.id,
+        pageSlug: page.slug,
+        markdown: target.markdown
+      },
+      tx
+    );
     const revision = await createRevision(
       {
         siteId: page.siteId,

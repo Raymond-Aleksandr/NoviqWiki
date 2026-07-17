@@ -17,7 +17,7 @@ import { invalidRevisionNumber, parseRevisionNumberParam } from "@/modules/revis
 
 type Props = {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ revision?: string }>;
+  searchParams: Promise<{ revision?: string; redirect?: string }>;
 };
 
 export default async function ArticlePage({ params, searchParams }: Props) {
@@ -27,8 +27,12 @@ export default async function ArticlePage({ params, searchParams }: Props) {
   }
   const session = await requirePageReadAccess(site.site.id);
   const { slug } = await params;
-  const { revision: revisionParam } = await searchParams;
-  const resolved = await resolvePageBySlug({ siteId: site.site.id, slug }).catch(() => null);
+  const { revision: revisionParam, redirect: redirectMode } = await searchParams;
+  const resolved = await resolvePageBySlug({
+    siteId: site.site.id,
+    slug,
+    followContentRedirects: redirectMode !== "no"
+  }).catch(() => null);
   if (!resolved || resolved.page.status === "deleted") {
     notFound();
   }

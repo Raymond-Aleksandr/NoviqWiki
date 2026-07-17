@@ -37,13 +37,39 @@ v0.1.0 supports the Markdown features provided by the project renderer:
 Use standard Markdown links:
 
 ```markdown
-[Display text](/wiki/getting-started)
+[Display text](/page/getting-started)
 [External site](https://example.com)
 ```
 
-Internal wiki links should point at application routes, not MediaWiki-compatible syntax. Editor helpers may make link insertion easier, but the saved source remains Markdown.
+Use wiki links for internal page references:
 
-Categories are page metadata used for browsing, filtering, and search. Do not rely on source-only category tags as the canonical category record.
+```markdown
+[[Getting Started]]
+[[Getting Started|start here]]
+```
+
+Wiki links resolve to `/page/{slug}` when the target page exists. Missing internal links render with a distinct missing-link state, and users with page creation permission can open a pre-filled new-page form from the missing link.
+
+Categories are declared with wiki-link category declarations:
+
+```markdown
+[[Category:Operations]]
+```
+
+Published revisions update category membership, backlinks, outbound links, and search metadata transactionally.
+
+## Redirect Pages
+
+Create a redirect page by making the first non-empty source line a redirect directive:
+
+```markdown
+#REDIRECT [[Target Page]]
+#重定向 [[目标页面]]
+```
+
+Redirect pages keep their own immutable revision history. Public article browsing resolves redirect pages server-side to the target page and displays the redirect origin. Editing, history, and backlinks routes can still address the redirect source page directly so maintainers can inspect or change it.
+
+The publish pipeline rejects redirect loops that can be detected from the current page graph, and runtime page resolution also enforces loop and depth limits.
 
 ## Media and Attachments
 
