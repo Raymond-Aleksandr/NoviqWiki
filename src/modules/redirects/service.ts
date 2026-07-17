@@ -1,8 +1,24 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import { pageAliases, pageRevisions, pages, type Page } from "@/db/schema";
 import { ConflictError, NotFoundError } from "@/lib/errors";
 import { parseRedirectDirective } from "./directive";
+
+export type RedirectTargetStatus =
+  "valid" | "missing" | "draft" | "archived" | "deleted" | "double";
+
+export type RedirectPageEntry = {
+  pageId: string;
+  title: string;
+  slug: string;
+  targetTitle: string;
+  targetSlug: string;
+  targetPageId: string | null;
+  targetPageTitle: string | null;
+  targetPageSlug: string | null;
+  targetStatus: RedirectTargetStatus;
+  updatedAt: Date;
+};
 
 export async function resolvePageBySlug(
   input: { siteId: string; slug: string; maxDepth?: number; followContentRedirects?: boolean },
@@ -58,6 +74,54 @@ export async function resolvePageBySlug(
   throw new ConflictError("Redirect depth exceeded.");
 }
 
+export async function listRedirectPages(
+  input: { siteId: string; limit?: number; offset?: number },
+  database: Database = db
+): Promise<{ rows: RedirectPageEntry[]; count: number }> {
+  const sourceRows = await database
+    .select({
+      pageId: pages.id,
+      title: pages.title,
+      slug: pages.slug,
+      updatedAt: pages.updatedAt,
+      markdown: pageRevisions.markdown
+    })
+    .from(pages)
+    .innerJoin(pageRevisions, eq(pageRevisions.id, pages.currentRevisionId))
+    .where(
+      and(eq(pages.siteId, input.siteId), eq(pages.status, "published"), isNull(pages.deletedAt))
+    )
+    .orderBy(asc(pages.title), asc(pages.slug));
+
+  const entries: RedirectPageEntry[] = [];
+  for (const row of sourceRows) {
+    const directive = parseRedirectDirective(row.markdown);
+    if (!directive) {
+      continue;
+    }
+    const target = await findPageOrAliasTarget(input.siteId, directive.targetSlug, database);
+    const targetStatus = await redirectTargetStatus(target, database);
+    entries.push({
+      pageId: row.pageId,
+      title: row.title,
+      slug: row.slug,
+      targetTitle: directive.targetTitle,
+      targetSlug: directive.targetSlug,
+      targetPageId: target?.id ?? null,
+      targetPageTitle: target?.title ?? null,
+      targetPageSlug: target?.slug ?? null,
+      targetStatus,
+      updatedAt: row.updatedAt
+    });
+  }
+
+  const offset = input.offset ?? 0;
+  return {
+    rows: entries.slice(offset, offset + (input.limit ?? 100)),
+    count: entries.length
+  };
+}
+
 export async function assertNoRedirectLoopForRevision(
   input: {
     siteId: string;
@@ -101,6 +165,26 @@ export async function assertNoRedirectLoopForRevision(
   }
 
   throw new ConflictError("Redirect depth exceeded.");
+}
+
+async function redirectTargetStatus(
+  target: Page | null,
+  database: Database
+): Promise<RedirectTargetStatus> {
+  if (!target) {
+    return "missing";
+  }
+  if (target.deletedAt || target.status === "deleted") {
+    return "deleted";
+  }
+  if (target.status === "archived") {
+    return "archived";
+  }
+  if (target.status === "draft") {
+    return "draft";
+  }
+  const directive = await getCurrentRedirectDirective(target, database);
+  return directive ? "double" : "valid";
 }
 
 async function findPageOrAliasTarget(siteId: string, slug: string, database: Database) {

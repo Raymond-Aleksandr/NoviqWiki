@@ -581,6 +581,16 @@ select {
   -webkit-appearance: none;
 }
 
+input.field:not([type="file"]),
+select {
+  height: var(--control-height);
+  min-height: var(--control-height);
+  max-height: var(--control-height);
+  block-size: var(--control-height);
+  min-block-size: var(--control-height);
+  max-block-size: var(--control-height);
+}
+
 input[type="file"].field {
   display: flex;
   align-items: center;
@@ -2354,6 +2364,46 @@ textarea {
   display: grid;
   min-width: 0;
   gap: 2px;
+}
+
+.redirect-row {
+  justify-content: space-between;
+}
+
+.redirect-flow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.redirect-source,
+.redirect-target {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.redirect-source a,
+.redirect-target a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.redirect-source a:hover,
+.redirect-source a:focus-visible,
+.redirect-target a:hover,
+.redirect-target a:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.redirect-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
 }
 
 .backlinks-empty {
@@ -4283,61 +4333,53 @@ textarea {
   }
 
   .admin-filter-bar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    display: flex;
+    flex-wrap: nowrap;
     align-items: center;
-    justify-content: stretch;
+    justify-content: flex-start;
     gap: 8px;
+    min-height: 53px;
+    overflow-x: auto;
+    overflow-y: hidden;
     padding: 9px 12px;
+    scrollbar-width: none;
+  }
+
+  .admin-filter-bar::-webkit-scrollbar {
+    display: none;
   }
 
   .admin-filter-control {
     --control-height: 34px;
     --control-font-size: 13.5px;
+    flex: 0 0 auto;
   }
 
   .admin-filter-search {
-    grid-column: 1;
-    grid-row: 1;
-    width: 100%;
+    flex-basis: min(64vw, 260px);
+    width: min(64vw, 260px);
     min-width: 0;
     max-width: none;
   }
 
   .admin-filter-select {
-    grid-column: 1;
-    grid-row: 2;
+    flex-basis: auto;
     min-width: 0;
-    width: 100%;
+    width: auto;
     max-width: none;
   }
 
   .admin-filter-select select {
-    min-width: 0;
+    min-width: 128px;
   }
 
   .admin-filter-bar > .button,
   .admin-filter-bar > button {
     --control-height: 34px;
     --control-font-size: 13.5px;
-    width: max-content;
+    flex: 0 0 auto;
+    width: auto;
     white-space: nowrap;
-  }
-
-  .admin-filter-bar > button {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .admin-filter-bar > .button.primary {
-    grid-column: 2;
-    grid-row: 2;
-    justify-self: end;
-  }
-
-  .admin-filter-bar > .button.compact:not(.primary) {
-    grid-column: 2;
-    justify-self: end;
   }
 
   .admin-filter-spacer {
@@ -4538,6 +4580,17 @@ textarea {
   .wanted-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .redirect-row,
+  .redirect-flow,
+  .redirect-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .redirect-actions {
+    width: 100%;
   }
 
   .home-hero h1,

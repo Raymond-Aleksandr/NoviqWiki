@@ -53,6 +53,7 @@ type RouteMetrics = {
   smallTargets: ElementSummary[];
   tinyFormControls: ElementSummary[];
   oversizedFormControls: ElementSummary[];
+  oversizedFilterBars: ElementSummary[];
   badFileInputs: ElementSummary[];
   visibleDialogs: ElementSummary[];
   commandButtonsWithoutIcons: ElementSummary[];
@@ -173,6 +174,7 @@ const publicRoutes = [
   "/pages",
   "/wanted",
   "/orphaned",
+  "/redirects",
   "/categories",
   "/media",
   "/login",
@@ -694,6 +696,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     sizeName,
     route
   );
+  recordElementFailures(
+    "oversized_filter_bars",
+    metrics.oversizedFilterBars,
+    browserName,
+    sizeName,
+    route
+  );
   recordElementFailures("bad_file_inputs", metrics.badFileInputs, browserName, sizeName, route);
   recordElementFailures("stray_dialogs", metrics.visibleDialogs, browserName, sizeName, route);
   recordElementFailures(
@@ -896,6 +905,13 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
               element.classList.contains("admin-filter-control")
           );
           return compactFilter ? rect.height > 36 : rect.height > 44;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      oversizedFilterBars: visibleMatches(".admin-filter-bar")
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          return rect.height > 66;
         })
         .map(summarize)
         .slice(0, 12),

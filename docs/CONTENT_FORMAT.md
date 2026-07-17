@@ -67,7 +67,7 @@ Create a redirect page by making the first non-empty source line a redirect dire
 #重定向 [[目标页面]]
 ```
 
-Redirect pages keep their own immutable revision history. Public article browsing resolves redirect pages server-side to the target page and displays the redirect origin. Editing, history, and backlinks routes can still address the redirect source page directly so maintainers can inspect or change it.
+Redirect pages keep their own immutable revision history. Public article browsing resolves redirect pages server-side to the target page and displays the redirect origin. Editing, history, and backlinks routes can still address the redirect source page directly so maintainers can inspect or change it. The `/redirects` maintenance page lists published redirect pages and flags valid targets, double redirects, and missing or non-public targets.
 
 The publish pipeline rejects redirect loops that can be detected from the current page graph, and runtime page resolution also enforces loop and depth limits.
 

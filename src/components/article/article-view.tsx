@@ -3,6 +3,7 @@ import {
   BookOpen,
   Edit3,
   FileQuestion,
+  GitBranch,
   History,
   Info,
   Link2,
@@ -168,6 +169,10 @@ export function ArticleView({
             <Link href="/orphaned">
               <Link2Off size={15} aria-hidden="true" />
               {messages.orphanedPages}
+            </Link>
+            <Link href="/redirects">
+              <GitBranch size={15} aria-hidden="true" />
+              {messages.redirectPages}
             </Link>
             <Link href={`/page/${page.slug}?revision=${revision.revisionNumber}`}>
               <Link2 size={15} aria-hidden="true" />
