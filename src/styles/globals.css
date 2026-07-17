@@ -3760,8 +3760,11 @@ pre.citation-block {
   display: grid;
   grid-template-columns: 1.4fr repeat(var(--role-count), minmax(96px, 1fr));
   align-items: center;
+  gap: 0;
   border-bottom: 1px solid var(--border);
+  font-family: var(--nw-font-body);
   font-size: 13.5px;
+  line-height: 1.35;
   padding: 12px 18px;
 }
 
@@ -3775,7 +3778,15 @@ pre.citation-block {
 .permission-cell-center {
   display: flex;
   justify-content: center;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: center;
   color: var(--text-faint);
+}
+
+.permission-row > .mono {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .permission-cell-center.allowed {

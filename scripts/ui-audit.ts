@@ -68,6 +68,7 @@ type RouteMetrics = {
   pageHeaderRhythmMismatches: ElementSummary[];
   contentRowRhythmMismatches: ElementSummary[];
   keyValueRhythmMismatches: ElementSummary[];
+  permissionMatrixRhythmMismatches: ElementSummary[];
   editorToolbarRhythmMismatches: ElementSummary[];
   mediaPickerRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
@@ -993,7 +994,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, editor-toolbar, or media-picker rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, permission-matrix, editor-toolbar, or media-picker rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1397,6 +1398,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "key_value_rhythm_mismatch",
     metrics.keyValueRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "permission_matrix_rhythm_mismatch",
+    metrics.permissionMatrixRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -3102,6 +3110,91 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             ddOverflow ||
             childOverflow ||
             viewportMismatch
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      permissionMatrixRhythmMismatches: visibleMatches(
+        ".permission-panel, .permission-matrix, .permission-row"
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const isMobile = document.documentElement.clientWidth <= 560;
+          if (element.matches(".permission-panel")) {
+            const borderWidth = Number.parseFloat(style.borderTopWidth);
+            const radius = Number.parseFloat(style.borderTopLeftRadius);
+            const hasBorder =
+              Number.isFinite(borderWidth) && borderWidth >= 1 && style.borderTopStyle !== "none";
+            const hasBackground =
+              style.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+              style.backgroundColor !== "transparent";
+            const fitsViewport =
+              !isMobile ||
+              (rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1);
+            return (
+              !["auto", "scroll"].includes(style.overflowX) ||
+              !hasBorder ||
+              !hasBackground ||
+              !Number.isFinite(radius) ||
+              radius < 8 ||
+              radius > 16 ||
+              !fitsViewport
+            );
+          }
+          if (element.matches(".permission-matrix")) {
+            const panel = element.closest(".permission-panel");
+            const panelRect = panel?.getBoundingClientRect();
+            const minWidth = Number.parseFloat(style.minWidth);
+            return (
+              !panel ||
+              !panelRect ||
+              !Number.isFinite(minWidth) ||
+              minWidth < 700 ||
+              rect.width < Math.min(minWidth, 700) - 1 ||
+              rect.left < panelRect.left - 1 ||
+              (isMobile && document.documentElement.scrollWidth > document.documentElement.clientWidth + 2)
+            );
+          }
+          const isHeader = element.classList.contains("header");
+          const fontSize = Number.parseFloat(style.fontSize);
+          const lineHeight =
+            style.lineHeight === "normal" ? fontSize * 1.35 : Number.parseFloat(style.lineHeight);
+          const paddingTop = Number.parseFloat(style.paddingTop);
+          const paddingInline = Number.parseFloat(style.paddingLeft);
+          const gap = Number.parseFloat(style.columnGap || style.gap);
+          const children = [...element.children].filter(visible);
+          const childOverflow = children.some((child) => {
+            const childRect = child.getBoundingClientRect();
+            return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+          });
+          const centeredCellsOk = children.slice(1).every((child) => {
+            const childStyle = getComputedStyle(child);
+            return (
+              childStyle.display === "flex" &&
+              childStyle.justifyContent === "center" &&
+              childStyle.textAlign === "center"
+            );
+          });
+          return (
+            style.display !== "grid" ||
+            !style.gridTemplateColumns.includes("px") ||
+            !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+            !Number.isFinite(fontSize) ||
+            fontSize < (isHeader ? 11.5 : 12.8) ||
+            fontSize > (isHeader ? 12.8 : 14) ||
+            !Number.isFinite(lineHeight) ||
+            lineHeight > 20 ||
+            !Number.isFinite(paddingTop) ||
+            paddingTop < 10 ||
+            paddingTop > 14 ||
+            !Number.isFinite(paddingInline) ||
+            paddingInline < 14 ||
+            paddingInline > 20 ||
+            (Number.isFinite(gap) && gap !== 0) ||
+            childOverflow ||
+            !centeredCellsOk ||
+            rect.height > 56
           );
         })
         .map(summarize)
