@@ -54,6 +54,7 @@ type RouteMetrics = {
   tinyFormControls: ElementSummary[];
   oversizedFormControls: ElementSummary[];
   controlTypographyMismatches: ElementSummary[];
+  formLabelTypographyMismatches: ElementSummary[];
   oversizedFilterBars: ElementSummary[];
   segmentedControlMismatches: ElementSummary[];
   badFileInputs: ElementSummary[];
@@ -965,7 +966,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, control typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, control or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1277,6 +1278,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "control_typography_mismatch",
     metrics.controlTypographyMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "form_label_typography_mismatch",
+    metrics.formLabelTypographyMismatches,
     browserName,
     sizeName,
     route
@@ -1942,6 +1950,60 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         })
         .map(summarize)
         .slice(0, 12),
+      formLabelTypographyMismatches: visibleMatches(
+        [
+          ".form label:not(.checkbox-row)",
+          ".admin-form-grid label:not(.checkbox-row)",
+          ".setup-fields label:not(.checkbox-row)",
+          ".confirm-field-grid label:not(.checkbox-row)",
+          ".settings-card label:not(.checkbox-row)",
+          ".group-edit-form label:not(.checkbox-row)",
+          ".role-edit-form label:not(.checkbox-row)",
+          ".history-compare-form label:not(.checkbox-row)",
+          ".media-picker-detail label",
+          ".editor-footer span",
+          ".user-group-form legend",
+          ".group-edit-form legend",
+          ".role-edit-form legend",
+          ".settings-kicker",
+          ".settings-switch-title",
+          ".settings-switch-help",
+          ".admin-status-label",
+          ".system-label"
+        ].join(",")
+      )
+        .filter((element) => {
+          if (
+            element.closest(".cm-editor") ||
+            element.closest(".article-body") ||
+            element.closest(".permission-panel") ||
+            element.closest(".permission-checkbox") ||
+            element.closest(".role-permission-checkboxes")
+          ) {
+            return false;
+          }
+          const label = labelOf(element);
+          if (!label && !element.matches(".settings-kicker")) {
+            return false;
+          }
+          const style = getComputedStyle(element);
+          const fontSize = Number.parseFloat(style.fontSize);
+          const lineHeight =
+            style.lineHeight === "normal" ? fontSize * 1.25 : Number.parseFloat(style.lineHeight);
+          const rowGap = Number.parseFloat(style.rowGap);
+          const isHelpText = element.matches(
+            ".settings-switch-help, .settings-kicker, legend, .system-label"
+          );
+          const maxFontSize = isHelpText ? 13.2 : 14.5;
+          return (
+            !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+            fontSize > maxFontSize ||
+            (Number.isFinite(lineHeight) && lineHeight > 21) ||
+            (Number.isFinite(rowGap) && rowGap > 8)
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
       oversizedFilterBars: visibleMatches(".admin-filter-bar")
         .filter((element) => {
           const rect = element.getBoundingClientRect();
@@ -2256,6 +2318,21 @@ async function auditMediaPicker(
       route: `/edit/${articleSlug}`,
       detail: modal
     });
+  }
+  const metrics = await readRouteMetricsWithRetry(
+    page,
+    browserName,
+    sizeName,
+    `/edit/${articleSlug}`
+  );
+  if (metrics) {
+    recordElementFailures(
+      "form_label_typography_mismatch",
+      metrics.formLabelTypographyMismatches,
+      browserName,
+      sizeName,
+      `/edit/${articleSlug}`
+    );
   }
 }
 

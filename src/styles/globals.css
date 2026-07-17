@@ -1948,6 +1948,16 @@ pre.citation-block {
   min-width: 0;
 }
 
+.media-picker-detail label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .confirm-dialog {
   width: 100%;
   max-width: 420px;

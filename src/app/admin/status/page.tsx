@@ -44,19 +44,19 @@ export default async function AdminStatusPage() {
         <div className="admin-panel-heading">{messages.system}</div>
         <div className="system-grid">
           <div>
-            <div className="mono muted system-label">{messages.version}</div>
+            <div className="muted system-label">{messages.version}</div>
             <strong>v0.1.0</strong>
           </div>
           <div>
-            <div className="mono muted system-label">{messages.database}</div>
+            <div className="muted system-label">{messages.database}</div>
             <strong>{dbReady ? messages.online : messages.offline}</strong>
           </div>
           <div>
-            <div className="mono muted system-label">{messages.storage}</div>
+            <div className="muted system-label">{messages.storage}</div>
             <strong>{storageReady ? messages.online : messages.offline}</strong>
           </div>
           <div>
-            <div className="mono muted system-label">{messages.migrations}</div>
+            <div className="muted system-label">{messages.migrations}</div>
             <strong>Drizzle</strong>
           </div>
         </div>
