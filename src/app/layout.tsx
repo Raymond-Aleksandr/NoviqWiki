@@ -68,6 +68,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               initialLocale={locale === "zh-CN" ? "zh-CN" : "en"}
               messages={messages}
             />
+            {!session ? (
+              <Link className="utility-login" href="/login">
+                <LogIn size={17} aria-hidden="true" />
+                {messages.login}
+              </Link>
+            ) : null}
           </div>
           <div className="shell site-shell">
             <aside className="sidebar" aria-label={messages.siteNavigation}>
@@ -93,28 +99,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </div>
             </aside>
             <div className="main">
-              <header className="topbar">
-                <div className="topbar-fill" aria-hidden="true" />
-                {session ? (
-                  <>
-                    <span className="topbar-user">
-                      <UserRound size={16} aria-hidden="true" /> {session.user.displayName}
-                    </span>
-                    <form action="/logout" method="post">
-                      <button aria-label={messages.logout}>
-                        <LogOut size={17} aria-hidden="true" />
-                        <span className="topbar-button-label">{messages.logout}</span>
-                      </button>
-                    </form>
-                  </>
-                ) : (
-                  <Link className="button" href="/login">
-                    <LogIn size={17} aria-hidden="true" />
-                    {messages.login}
-                  </Link>
-                )}
-                {session ? <TopbarSettingsLink label={messages.siteSettings} /> : null}
-              </header>
+              {session ? (
+                <header className="topbar topbar-authenticated">
+                  <div className="topbar-fill" aria-hidden="true" />
+                  <span className="topbar-user">
+                    <UserRound size={16} aria-hidden="true" /> {session.user.displayName}
+                  </span>
+                  <form action="/logout" method="post">
+                    <button aria-label={messages.logout}>
+                      <LogOut size={17} aria-hidden="true" />
+                      <span className="topbar-button-label">{messages.logout}</span>
+                    </button>
+                  </form>
+                  <TopbarSettingsLink label={messages.siteSettings} />
+                </header>
+              ) : null}
               <main id="content" className="content">
                 {children}
               </main>

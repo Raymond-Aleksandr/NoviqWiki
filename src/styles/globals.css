@@ -287,6 +287,7 @@ input[type="radio"]:disabled {
 }
 
 .nw-app {
+  --design-utility-height: 61px;
   min-height: 100vh;
   max-width: 100%;
   overflow-x: hidden;
@@ -306,30 +307,68 @@ input[type="radio"]:disabled {
 }
 
 .design-utility {
+  box-sizing: border-box;
   position: sticky;
   top: 0;
   z-index: 80;
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 42px;
+  block-size: var(--design-utility-height);
+  min-height: var(--design-utility-height);
   padding: 9px 18px;
+  overflow: hidden;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   box-shadow: var(--sh-sm);
 }
 
 .design-utility > span {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-faint);
   font-family: var(--nw-font-mono);
   font-size: 11px;
   letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .preference-controls {
   display: flex;
+  flex: 0 0 auto;
   gap: 12px;
   margin-left: auto;
+}
+
+.utility-login {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  gap: 8px;
+  min-block-size: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 7px 12px;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: var(--sh-sm);
+}
+
+.utility-login:visited {
+  color: var(--text);
+}
+
+.utility-login:hover,
+.utility-login:focus-visible {
+  color: var(--text);
+  border-color: var(--border-strong);
 }
 
 .segmented-control {
@@ -365,7 +404,7 @@ input[type="radio"]:disabled {
 .shell {
   display: grid;
   grid-template-columns: 206px minmax(0, 1fr);
-  min-height: calc(100vh - 42px);
+  min-height: calc(100vh - var(--design-utility-height));
   background: var(--bg);
 }
 
@@ -477,7 +516,7 @@ input[type="radio"]:disabled {
 
 .topbar {
   position: sticky;
-  top: 42px;
+  top: var(--design-utility-height);
   z-index: 60;
   display: flex;
   align-items: center;
@@ -1394,6 +1433,10 @@ textarea {
   border-radius: 12px;
   background: var(--surface);
   box-shadow: var(--sh-sm);
+}
+
+.page-index-filter .admin-filter-search {
+  max-width: none;
 }
 
 .page-index-panel {
@@ -3364,7 +3407,7 @@ pre.citation-block {
 .setup-hero::after {
   content: "";
   position: absolute;
-  inset: 0 0 0 60%;
+  inset: 0;
   background: repeating-linear-gradient(
     135deg,
     var(--stripe),
@@ -5197,11 +5240,17 @@ pre.citation-block {
   .design-utility {
     position: static;
     flex-wrap: wrap;
+    block-size: auto;
+    min-height: var(--design-utility-height);
+    overflow: visible;
   }
 
   .preference-controls {
-    width: 100%;
     margin-left: 0;
+  }
+
+  .utility-login {
+    margin-left: auto;
   }
 
   .shell {
@@ -5519,6 +5568,12 @@ pre.citation-block {
   .admin-filter-bar:not(:has(.admin-filter-select)) .admin-filter-search {
     flex-basis: min(260px, calc(100vw - 150px));
     width: min(260px, calc(100vw - 150px));
+  }
+
+  .page-index-filter .admin-filter-search {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
   }
 
   .admin-filter-select {
