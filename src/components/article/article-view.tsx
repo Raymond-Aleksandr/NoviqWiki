@@ -72,6 +72,7 @@ export function ArticleView({
     },
     { label: messages.pageLength, value: `${revision.plainText.length} ${messages.chars}` }
   ];
+  const coverImage = extractFirstImage(articleHtml);
 
   return (
     <div className="article-page article-shell">
@@ -139,9 +140,15 @@ export function ArticleView({
             aria-label={messages.pageInformation}
           >
             <div className="article-info-heading">{messages.pageInformation}</div>
-            <div className="article-info-cover" aria-hidden="true">
-              <span>page · {page.id.slice(0, 8)}</span>
-            </div>
+            {coverImage ? (
+              <div className="article-info-cover">
+                <img src={coverImage.src} alt={coverImage.alt || page.title} loading="lazy" />
+              </div>
+            ) : (
+              <div className="article-info-id">
+                <span>page · {page.id.slice(0, 8)}</span>
+              </div>
+            )}
             <dl className="article-facts">
               {articleFacts.map((fact) => (
                 <div key={fact.label}>
@@ -246,6 +253,26 @@ export function ArticleView({
       </div>
     </div>
   );
+}
+
+function extractFirstImage(html: string) {
+  const match = /<img\s+[^>]*>/i.exec(html);
+  if (!match) {
+    return null;
+  }
+  const src = extractHtmlAttribute(match[0], "src");
+  if (!src) {
+    return null;
+  }
+  return {
+    src,
+    alt: extractHtmlAttribute(match[0], "alt") ?? ""
+  };
+}
+
+function extractHtmlAttribute(tag: string, name: string) {
+  const match = new RegExp(`${name}="([^"]*)"`, "i").exec(tag);
+  return match?.[1]?.replace(/&quot;/g, '"').replace(/&amp;/g, "&") ?? null;
 }
 
 function pageStatusLabel(status: string, messages: Messages) {

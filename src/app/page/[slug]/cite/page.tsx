@@ -4,6 +4,7 @@ import { ArrowLeft, History, Link2, Quote } from "lucide-react";
 import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
+import { decodeRouteParam } from "@/lib/route-params";
 import { buildPageCitations } from "@/modules/pages/citations";
 import { getRevisionById } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
@@ -18,7 +19,8 @@ export default async function CitePage({ params }: Props) {
     redirect("/setup");
   }
   await requirePageReadAccess(site.site.id);
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = decodeRouteParam(rawSlug);
   const resolved = await resolvePageBySlug({
     siteId: site.site.id,
     slug,

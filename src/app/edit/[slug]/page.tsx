@@ -6,6 +6,7 @@ import { MarkdownEditor, type EditorMediaItem } from "@/components/editor/markdo
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
+import { decodeRouteParam } from "@/lib/route-params";
 import { getCurrentSession } from "@/modules/auth/session";
 import { requirePermission } from "@/modules/authorization/permissions";
 import { listMedia } from "@/modules/media/service";
@@ -26,7 +27,8 @@ export default async function EditPage({ params }: Props) {
     redirect("/login");
   }
   await requirePermission(session.user.id, site.site.id, "page.edit");
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = decodeRouteParam(rawSlug);
   const resolved = await resolvePageBySlug({
     siteId: site.site.id,
     slug,

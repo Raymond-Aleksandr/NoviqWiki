@@ -6,7 +6,7 @@ import { getPrimarySiteWithSettings } from "@/db/site";
 import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
 import { listCategories } from "@/modules/categories/service";
-import { listPages, listPagesBySlugs } from "@/modules/pages/service";
+import { getRevisionById, listPages, listPagesBySlugs } from "@/modules/pages/service";
 import { listRecentChangesWithTargets } from "@/modules/activity/service";
 import { collectHomepageContributions } from "@/modules/plugins/registry";
 import { normalizeHomepageSections, prioritizeCategories } from "@/modules/settings/homepage";
@@ -31,6 +31,7 @@ export default async function HomePage() {
   ]);
   const { locale, messages } = await getRequestI18n(settings?.defaultLocale);
   const featuredPages = configuredPages.length > 0 ? configuredPages : recentPages.slice(0, 3);
+  const featuredCoverByPageId = await getFeaturedCoverByPageId(featuredPages);
   const featuredCategories = prioritizeCategories(
     categories,
     settings?.homepageFeaturedCategories ?? []
@@ -84,9 +85,15 @@ export default async function HomePage() {
             ) : (
               featuredPages.slice(0, 3).map((page) => (
                 <Link className="feature-card" key={page.id} href={`/page/${page.slug}`}>
-                  <span className="feature-card-media" aria-hidden="true">
-                    {messages.article}
-                  </span>
+                  {featuredCoverByPageId.get(page.id) ? (
+                    <span className="feature-card-media">
+                      <img
+                        src={featuredCoverByPageId.get(page.id)?.src}
+                        alt={featuredCoverByPageId.get(page.id)?.alt || page.title}
+                        loading="lazy"
+                      />
+                    </span>
+                  ) : null}
                   <span className="feature-card-body">
                     <span className="badge info">{messages.article}</span>
                     <strong>{page.title}</strong>
@@ -200,6 +207,34 @@ export default async function HomePage() {
       ) : null}
     </section>
   );
+}
+
+async function getFeaturedCoverByPageId(
+  featuredPages: Array<{ id: string; title: string; currentRevisionId: string | null }>
+) {
+  const entries = await Promise.all(
+    featuredPages.map(async (page) => {
+      if (!page.currentRevisionId) {
+        return [page.id, null] as const;
+      }
+      const revision = await getRevisionById(page.currentRevisionId).catch(() => null);
+      return [page.id, revision ? extractFirstMarkdownImage(revision.markdown) : null] as const;
+    })
+  );
+  return new Map(
+    entries.filter((entry): entry is [string, { src: string; alt: string }] => Boolean(entry[1]))
+  );
+}
+
+function extractFirstMarkdownImage(markdown: string) {
+  const match = /!\[([^\]]*)\]\((\/media\/[^)\s]+)\)/.exec(markdown);
+  if (!match?.[2]) {
+    return null;
+  }
+  return {
+    alt: match[1] ?? "",
+    src: match[2]
+  };
 }
 
 function badgeForAction(action: string) {

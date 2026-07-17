@@ -8,6 +8,7 @@ import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { formatRevisionSummary, formatRollbackRevisionSummary } from "@/i18n/revisions";
 import { getRequestI18n } from "@/i18n/server";
+import { decodeRouteParam } from "@/lib/route-params";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { listRevisions } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
@@ -22,7 +23,8 @@ export default async function HistoryPage({ params }: Props) {
     redirect("/setup");
   }
   const session = await requirePageReadAccess(site.site.id);
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = decodeRouteParam(rawSlug);
   const resolved = await resolvePageBySlug({
     siteId: site.site.id,
     slug,

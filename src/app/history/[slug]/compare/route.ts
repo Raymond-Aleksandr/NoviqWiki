@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import { decodeRouteParam } from "@/lib/route-params";
 import { redirectWithinRequestHost } from "@/lib/request-url";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { getCurrentSession } from "@/modules/auth/session";
@@ -27,7 +28,7 @@ export async function GET(request: Request, { params }: Props) {
     parsedParams !== null &&
     "slug" in parsedParams &&
     typeof parsedParams.slug === "string"
-      ? parsedParams.slug
+      ? decodeRouteParam(parsedParams.slug)
       : "";
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");

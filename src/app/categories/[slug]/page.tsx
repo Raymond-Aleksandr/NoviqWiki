@@ -4,6 +4,7 @@ import { ChevronRight, FileText } from "lucide-react";
 import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
+import { decodeRouteParam } from "@/lib/route-params";
 import { getCategoryWithPages } from "@/modules/categories/service";
 
 type Props = {
@@ -16,7 +17,8 @@ export default async function CategoryPage({ params }: Props) {
     redirect("/setup");
   }
   await requirePageReadAccess(site.site.id);
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = decodeRouteParam(rawSlug);
   const [result, i18n] = await Promise.all([
     getCategoryWithPages({ siteId: site.site.id, slug }),
     getRequestI18n(site.settings?.defaultLocale)

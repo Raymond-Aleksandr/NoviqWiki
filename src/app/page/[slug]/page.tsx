@@ -4,6 +4,7 @@ import { ArticleView } from "@/components/article/article-view";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { slugifyTitle } from "@/lib/normalize";
+import { decodeRouteParam } from "@/lib/route-params";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { isPageWatched } from "@/modules/watchlist/service";
 import {
@@ -27,7 +28,8 @@ export default async function ArticlePage({ params, searchParams }: Props) {
     redirect("/setup");
   }
   const session = await requirePageReadAccess(site.site.id);
-  const { slug } = await params;
+  const { slug: rawSlug } = await params;
+  const slug = decodeRouteParam(rawSlug);
   const { revision: revisionParam, redirect: redirectMode } = await searchParams;
   const resolved = await resolvePageBySlug({
     siteId: site.site.id,
