@@ -11,6 +11,7 @@ export type SpecialPageIcon =
   | "orphaned"
   | "pages"
   | "protected"
+  | "random"
   | "redirects"
   | "roles"
   | "search"
@@ -50,6 +51,12 @@ export function getSpecialPageSections(
           title: messages.search,
           description: messages.specialSearchDescription,
           icon: "search"
+        },
+        {
+          href: "/random",
+          title: messages.randomPage,
+          description: messages.randomPageDescription,
+          icon: "random"
         },
         {
           href: "/pages",

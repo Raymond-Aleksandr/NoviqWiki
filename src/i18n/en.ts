@@ -211,6 +211,8 @@ export const en = {
   specialPageGroupAdministration: "Administration",
   specialPageGroupAdministrationDescription: "Manage site configuration and operations.",
   specialSearchDescription: "Search titles, aliases, page text, and categories.",
+  randomPage: "Random page",
+  randomPageDescription: "Open a readable published article selected at random.",
   specialAdminDashboardDescription: "Review counts, activity, storage, and migration status.",
   specialAdminPagesDescription: "Moderate page state, protection, redirects, and revisions.",
   specialAdminUsersDescription: "Create accounts, review status, and reset sessions.",

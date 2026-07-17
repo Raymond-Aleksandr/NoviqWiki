@@ -207,6 +207,8 @@ export const zhCN = {
   specialPageGroupAdministration: "管理",
   specialPageGroupAdministrationDescription: "管理站点配置和运行状态。",
   specialSearchDescription: "搜索标题、别名、页面正文和分类。",
+  randomPage: "随机页面",
+  randomPageDescription: "随机打开一个适合阅读的已发布条目。",
   specialAdminDashboardDescription: "查看页面数量、活动、存储和迁移状态。",
   specialAdminPagesDescription: "管理页面状态、保护、重定向和修订。",
   specialAdminUsersDescription: "创建账号、检查状态并重置会话。",

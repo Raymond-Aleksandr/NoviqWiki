@@ -9,6 +9,7 @@ describe("special pages", () => {
     expect(sections.map((section) => section.id)).toEqual(["browse", "maintenance"]);
     expect(sections.flatMap((section) => section.links.map((link) => link.href))).toEqual([
       "/search",
+      "/random",
       "/pages",
       "/recent",
       "/categories",

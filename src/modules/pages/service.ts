@@ -533,6 +533,12 @@ export type PublishedPageIndexEntry = {
   updatedAt: Date;
 };
 
+export type RandomPublishedPage = {
+  pageId: string;
+  title: string;
+  slug: string;
+};
+
 export async function listPageOutboundLinks(
   input: { siteId: string; pageId: string },
   database: Database = db
@@ -808,6 +814,37 @@ export async function listPublishedPageIndex(
       .where(where)
   ]);
   return { rows, count };
+}
+
+export async function getRandomPublishedPage(
+  input: { siteId: string },
+  database: Database = db
+): Promise<RandomPublishedPage | null> {
+  const rows = await database
+    .select({
+      pageId: pages.id,
+      title: pages.title,
+      slug: pages.slug,
+      markdown: pageRevisions.markdown
+    })
+    .from(pages)
+    .innerJoin(pageRevisions, eq(pageRevisions.id, pages.currentRevisionId))
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt),
+        sql`${pageRevisions.markdown} !~* ${"^[[:space:]]*#(redirect|重定向)[[:space:]]*\\[\\["}`
+      )
+    )
+    .orderBy(sql`random()`)
+    .limit(1);
+  const row = rows.find((candidate) => !parseRedirectDirective(candidate.markdown));
+  if (!row) {
+    return null;
+  }
+  const { markdown: _markdown, ...page } = row;
+  return page;
 }
 
 export async function compareRevisions(
