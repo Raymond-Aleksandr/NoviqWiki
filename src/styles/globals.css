@@ -1085,12 +1085,17 @@ textarea {
   align-items: center;
   justify-content: center;
   gap: 5px;
+  width: fit-content;
+  max-width: 100%;
   border-radius: 5px;
   background: var(--primary-soft);
   color: var(--primary);
+  font-family: var(--nw-font-body);
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.15;
   padding: 2px 8px;
+  white-space: normal;
 }
 
 .badge.success {
@@ -1111,6 +1116,10 @@ textarea {
 .badge.info {
   background: var(--info-bg);
   color: var(--info);
+}
+
+.badge.mono {
+  font-family: var(--nw-font-body);
 }
 
 .page-frame {
@@ -2519,6 +2528,8 @@ pre.citation-block {
   display: block;
   width: auto;
   inline-size: auto;
+  min-width: 0;
+  min-inline-size: 0;
   max-width: 100%;
   max-inline-size: min(100%, var(--article-media-max-inline-size));
   max-width: min(100%, var(--article-media-max-inline-size));
@@ -2558,10 +2569,15 @@ pre.citation-block {
   align-items: center;
   justify-content: center;
   width: 100%;
+  inline-size: min(
+    100%,
+    calc(var(--article-media-max-inline-size) + (var(--article-media-padding) * 2))
+  );
   min-width: 0;
   min-inline-size: 0;
   max-width: 100%;
   max-inline-size: 100%;
+  margin-inline: auto;
   padding: var(--article-media-padding);
   overflow: hidden;
   border: 1px solid var(--border);
@@ -2573,7 +2589,8 @@ pre.citation-block {
 .article-body p:has(> a:only-child > img:only-child) > a {
   display: flex;
   justify-content: center;
-  width: 100%;
+  width: fit-content;
+  inline-size: fit-content;
   min-width: 0;
   min-inline-size: 0;
   max-width: 100%;
@@ -2587,6 +2604,8 @@ pre.citation-block {
 .article-body p:has(> a:only-child > img:only-child) > a > img {
   max-inline-size: 100%;
   max-width: 100%;
+  max-block-size: var(--article-media-max-block-size);
+  max-height: var(--article-media-max-block-size);
 }
 
 .article-body p > img:only-child,
@@ -3846,8 +3865,10 @@ pre.citation-block {
 }
 
 .role-permission-summary {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, max-content));
+  align-items: center;
+  justify-content: start;
   gap: 6px;
   min-inline-size: 0;
   max-inline-size: 100%;
@@ -3856,8 +3877,12 @@ pre.citation-block {
 
 .role-permission-summary .badge {
   max-inline-size: 100%;
-  overflow-wrap: anywhere;
-  white-space: normal;
+  min-inline-size: 0;
+  justify-content: center;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .role-edit-form {
@@ -4036,7 +4061,9 @@ pre.citation-block {
   border-radius: 8px;
   background: var(--warning-bg);
   color: var(--warning);
+  font-family: var(--nw-font-body);
   font-size: 12px;
+  line-height: 1.2;
   padding: 6px 11px;
 }
 
@@ -4528,7 +4555,9 @@ pre.citation-block {
   align-items: center;
   gap: 6px;
   color: var(--text-faint);
+  font-family: var(--nw-font-body);
   font-size: 12.5px;
+  line-height: 1.2;
   text-transform: capitalize;
 }
 
@@ -4552,12 +4581,17 @@ pre.citation-block {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  width: fit-content;
+  max-width: 100%;
   border-radius: 5px;
   background: var(--warning-bg);
   color: var(--warning);
+  font-family: var(--nw-font-body);
   font-size: 11px;
   font-weight: 600;
+  line-height: 1.15;
   padding: 2px 9px;
+  white-space: normal;
 }
 
 .user-group-badges {

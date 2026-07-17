@@ -133,6 +133,7 @@ export function MarkdownEditor({
         </button>
         <button
           className="editor-tool-button"
+          data-editor-command="image"
           type="button"
           title={messages.image}
           onClick={() => setMediaOpen(true)}

@@ -70,6 +70,7 @@ type RouteMetrics = {
   buttonIconSizeMismatches: ElementSummary[];
   buttonIconSpacingMismatches: ElementSummary[];
   commandButtonSizeMismatches: ElementSummary[];
+  badgeRhythmMismatches: ElementSummary[];
   oversizedText: ElementSummary[];
   overlappingActivityRows: ElementSummary[];
   duplicateTimelineActions: ElementSummary[];
@@ -969,7 +970,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, control or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge rhythm drift, control or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1381,6 +1382,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "command_button_size_mismatch",
     metrics.commandButtonSizeMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "badge_rhythm_mismatch",
+    metrics.badgeRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -1897,6 +1905,62 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       })
       .map(summarize)
       .slice(0, 12);
+    const badgeRhythmMismatches = visibleMatches(
+      ".badge, .role-badge, .status-badge, .unsaved-badge"
+    )
+      .filter((element) => {
+        if (element.closest(".cm-editor") || element.closest(".article-body")) {
+          return false;
+        }
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        const fontSize = Number.parseFloat(style.fontSize);
+        const radius = Number.parseFloat(style.borderTopLeftRadius);
+        const columnGap = Number.parseFloat(style.columnGap);
+        const shorthandGap = Number.parseFloat(style.gap);
+        const gap = Number.isFinite(columnGap) ? columnGap : shorthandGap;
+        const usesDesignFont = /Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily);
+        const usesFlexDisplay = style.display === "inline-flex" || style.display === "flex";
+        const compactHeight = rect.height >= 14 && rect.height <= 36;
+        const compactFont = Number.isFinite(fontSize) && fontSize >= 10 && fontSize <= 13;
+        const compactGap = !Number.isFinite(gap) || (gap >= 4 && gap <= 8);
+        if (element.classList.contains("status-badge")) {
+          const before = getComputedStyle(element, "::before");
+          const dotWidth = Number.parseFloat(before.width);
+          const dotHeight = Number.parseFloat(before.height);
+          return (
+            !usesFlexDisplay ||
+            style.alignItems !== "center" ||
+            !usesDesignFont ||
+            !compactHeight ||
+            !compactFont ||
+            !compactGap ||
+            !Number.isFinite(dotWidth) ||
+            !Number.isFinite(dotHeight) ||
+            dotWidth < 5 ||
+            dotWidth > 9 ||
+            dotHeight < 5 ||
+            dotHeight > 9
+          );
+        }
+        const hasBackground =
+          style.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+            style.backgroundColor !== "transparent";
+        return (
+          !usesFlexDisplay ||
+          style.alignItems !== "center" ||
+          !usesDesignFont ||
+          !compactHeight ||
+          !compactFont ||
+          !compactGap ||
+          !Number.isFinite(radius) ||
+          radius < 4 ||
+          radius > 10 ||
+          !hasBackground
+        );
+      })
+      .map(summarize)
+      .slice(0, 12);
 
     const smallTargetSelectors = [
       "button",
@@ -2252,6 +2316,7 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       buttonIconSizeMismatches,
       buttonIconSpacingMismatches,
       commandButtonSizeMismatches,
+      badgeRhythmMismatches,
       oversizedText,
       overlappingActivityRows: visibleMatches(".activity-row, .timeline-row:not(.timeline-footer)")
         .filter((element) => {
@@ -2479,19 +2544,62 @@ async function auditMediaPicker(
   browserName: string,
   sizeName: string
 ) {
-  const response = await page.goto(`${baseUrl}/edit/${articleSlug}`, {
-    waitUntil: "domcontentloaded"
-  });
+  const route = `/edit/${articleSlug}`;
+  const response = await page
+    .goto(`${baseUrl}${route}`, {
+      waitUntil: "domcontentloaded",
+      timeout: 45000
+    })
+    .catch((error: unknown) => {
+      addFailure({
+        kind: "navigation_error",
+        browserName,
+        sizeName,
+        route,
+        detail: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    });
+  if (!response) {
+    return;
+  }
   if (response?.status() === 404) {
     return;
   }
   await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => null);
-  const buttons = page.locator(".editor-toolbar .editor-tool-button");
-  const count = await buttons.count();
+  const mediaButton = page.locator(
+    '.editor-toolbar .editor-tool-button[data-editor-command="image"]'
+  );
+  const count = await mediaButton.count();
   if (count === 0) {
     return;
   }
-  await buttons.nth(count - 1).click();
+  if (count > 1) {
+    addFailure({
+      kind: "media_picker_modal_mismatch",
+      browserName,
+      sizeName,
+      route,
+      detail: { duplicateImageButtons: count }
+    });
+    return;
+  }
+  const clicked = await mediaButton.click({ timeout: 5000 }).then(
+    () => true,
+    (error: unknown) => {
+      addFailure({
+        kind: "media_picker_modal_mismatch",
+        browserName,
+        sizeName,
+        route,
+        detail: error instanceof Error ? error.message : String(error)
+      });
+      return false;
+    }
+  );
+  if (!clicked) {
+    return;
+  }
   await waitForModal(page, ".media-picker-dialog[role='dialog']");
   const modal = await readModalMetrics(page, ".media-picker-dialog[role='dialog']");
   if (!modal.hasBackdrop || !modal.hasDialog || modal.radius !== "14px" || modal.overflow) {
@@ -2499,23 +2607,18 @@ async function auditMediaPicker(
       kind: "media_picker_modal_mismatch",
       browserName,
       sizeName,
-      route: `/edit/${articleSlug}`,
+      route,
       detail: modal
     });
   }
-  const metrics = await readRouteMetricsWithRetry(
-    page,
-    browserName,
-    sizeName,
-    `/edit/${articleSlug}`
-  );
+  const metrics = await readRouteMetricsWithRetry(page, browserName, sizeName, route);
   if (metrics) {
     recordElementFailures(
       "form_label_typography_mismatch",
       metrics.formLabelTypographyMismatches,
       browserName,
       sizeName,
-      `/edit/${articleSlug}`
+      route
     );
   }
 }
