@@ -258,6 +258,20 @@ async function auditSourceForInlineStyles() {
   });
 }
 
+async function auditSourceForHardcodedVisibleText() {
+  const matches = [
+    ...(await findUnexpectedHardcodedVisibleTextMatches(path.join(process.cwd(), "src/app"))),
+    ...(await findUnexpectedHardcodedVisibleTextMatches(path.join(process.cwd(), "src/components")))
+  ];
+  if (matches.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "hardcoded_visible_text",
+    detail: matches.slice(0, 20)
+  });
+}
+
 async function findNativeDialogMatches(directory: string): Promise<SourceMatch[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const matches: SourceMatch[] = [];
@@ -320,6 +334,94 @@ async function findUnexpectedInlineStyleMatches(directory: string): Promise<Sour
   }
 
   return matches;
+}
+
+async function findUnexpectedHardcodedVisibleTextMatches(
+  directory: string
+): Promise<SourceMatch[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const matches: SourceMatch[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      matches.push(...(await findUnexpectedHardcodedVisibleTextMatches(entryPath)));
+      continue;
+    }
+    if (!entry.isFile() || path.extname(entry.name) !== ".tsx") {
+      continue;
+    }
+    const source = await readFile(entryPath, "utf8");
+    const relativePath = path.relative(process.cwd(), entryPath);
+    const lines = source.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      for (const match of hardcodedVisibleTextMatches(line)) {
+        if (isAllowedHardcodedVisibleText(relativePath, match.text)) {
+          continue;
+        }
+        matches.push({
+          file: relativePath,
+          line: index + 1,
+          pattern: match.pattern,
+          text: line.trim().slice(0, 160)
+        });
+      }
+    });
+  }
+
+  return matches;
+}
+
+function hardcodedVisibleTextMatches(line: string): Array<{ pattern: string; text: string }> {
+  if (isNonJsxSourceLine(line)) {
+    return [];
+  }
+
+  const matches: Array<{ pattern: string; text: string }> = [];
+  const jsxTextPatterns: Array<{ pattern: string; regex: RegExp }> = [
+    { pattern: "JSX text node", regex: /<[A-Za-z][^>]*>\s*([^<{}`]*[A-Za-z][^<{}`]*)\s*<\//g },
+    { pattern: "JSX text after icon", regex: /<[A-Za-z][^>]*\/>\s*([^<{}`]*[A-Za-z][^<{}`]*)$/g },
+    {
+      pattern: "literal accessibility text",
+      regex: /\b(?:aria-label|placeholder|title)\s*=\s*["']([^"']*[A-Za-z][^"']*)["']/g
+    }
+  ];
+
+  for (const { pattern, regex } of jsxTextPatterns) {
+    for (const match of line.matchAll(regex)) {
+      const text = normalizeHardcodedVisibleText(match[1] ?? "");
+      if (!text || isAllowedLiteralExample(text)) {
+        continue;
+      }
+      matches.push({ pattern, text });
+    }
+  }
+
+  return matches;
+}
+
+function isNonJsxSourceLine(line: string) {
+  const trimmed = line.trim();
+  return (
+    trimmed.startsWith("import ") ||
+    trimmed.startsWith("type ") ||
+    trimmed.startsWith("export type ") ||
+    trimmed.startsWith("interface ") ||
+    trimmed.includes("=> Promise<") ||
+    trimmed.includes("?:")
+  );
+}
+
+function normalizeHardcodedVisibleText(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function isAllowedLiteralExample(value: string) {
+  return value.startsWith("/") || value.startsWith("#") || value.startsWith(".");
+}
+
+function isAllowedHardcodedVisibleText(_relativePath: string, value: string) {
+  return ["Drizzle", "v0.1.0", "NoviqWiki"].includes(value);
 }
 
 function isAllowedInlineStyle(relativePath: string, line: string) {
@@ -399,6 +501,7 @@ async function main() {
   await auditSourceForNativeDialogs();
   await auditSourceForActiveTransforms();
   await auditSourceForInlineStyles();
+  await auditSourceForHardcodedVisibleText();
   const storageState = credentials ? await createAuthState(credentials) : undefined;
   const articleSlug =
     process.env.UI_AUDIT_ARTICLE_SLUG ?? (await discoverArticleSlug(storageState));
@@ -469,7 +572,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, hardcoded visible text, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
