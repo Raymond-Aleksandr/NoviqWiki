@@ -56,6 +56,7 @@ type RouteMetrics = {
   oversizedFilterBars: ElementSummary[];
   badFileInputs: ElementSummary[];
   controlTextOverflow: ElementSummary[];
+  articleContainerOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
   articleMediaTooTall: ElementSummary[];
   visibleDialogs: ElementSummary[];
@@ -362,6 +363,17 @@ async function auditSourceForHardcodedVisibleText() {
   });
 }
 
+async function auditSourceForI18nDefaultLocaleDrift() {
+  const matches = await findI18nDefaultLocaleDriftMatches(path.join(process.cwd(), "src/app"));
+  if (matches.length === 0) {
+    return;
+  }
+  addFailure({
+    kind: "i18n_default_locale_source_drift",
+    detail: matches.slice(0, 20)
+  });
+}
+
 async function auditSourceForPageRouteCoverage() {
   const routes = await findAppPageRoutes(path.join(process.cwd(), "src/app"));
   const missingRoutes = routes.filter((route) => !auditedPageRoutes.has(route));
@@ -532,6 +544,47 @@ function isAllowedRawColorLine(line: string) {
   return trimmed.startsWith("--") || trimmed.includes("data:image/");
 }
 
+async function findI18nDefaultLocaleDriftMatches(directory: string): Promise<SourceMatch[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const matches: SourceMatch[] = [];
+
+  for (const entry of entries) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) {
+      matches.push(...(await findI18nDefaultLocaleDriftMatches(entryPath)));
+      continue;
+    }
+    if (!entry.isFile() || !["actions.ts", "page.tsx"].includes(entry.name)) {
+      continue;
+    }
+
+    const relativePath = path.relative(process.cwd(), entryPath);
+    if (isAllowedBareRequestI18nPage(relativePath)) {
+      continue;
+    }
+
+    const source = await readFile(entryPath, "utf8");
+    const lines = source.split(/\r?\n/);
+    lines.forEach((line, index) => {
+      if (!/\bgetRequestI18n\s*\(\s*\)/.test(line)) {
+        return;
+      }
+      matches.push({
+        file: relativePath,
+        line: index + 1,
+        pattern: "bare getRequestI18n()",
+        text: line.trim().slice(0, 160)
+      });
+    });
+  }
+
+  return matches;
+}
+
+function isAllowedBareRequestI18nPage(relativePath: string) {
+  return relativePath === "src/app/setup/page.tsx";
+}
+
 async function findUnexpectedHardcodedVisibleTextMatches(
   directory: string
 ): Promise<SourceMatch[]> {
@@ -700,6 +753,7 @@ async function main() {
   await auditSourceForTypographyDrift();
   await auditSourceForColorDrift();
   await auditSourceForHardcodedVisibleText();
+  await auditSourceForI18nDefaultLocaleDrift();
   await auditSourceForPageRouteCoverage();
   const storageState = credentials ? await createAuthState(credentials) : undefined;
   const articleSlug =
@@ -771,7 +825,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1090,6 +1144,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "control_text_overflow",
     metrics.controlTextOverflow,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "article_container_overflow",
+    metrics.articleContainerOverflow,
     browserName,
     sizeName,
     route
@@ -1588,6 +1649,19 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
               element.closest(".admin-tabs") ||
               element.closest(".article-tabs"));
           return horizontalOverflow || wrappedCompactControl;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      articleContainerOverflow: visibleMatches(
+        ".article-page, .article-layout, .article, .article-body"
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const viewportWidth = document.documentElement.clientWidth;
+          const isCompact = viewportWidth <= 560;
+          const scrollOverflow = isCompact && element.scrollWidth > element.clientWidth + 2;
+          const viewportOverflow = rect.left < -1 || rect.right > viewportWidth + 1;
+          return scrollOverflow || viewportOverflow;
         })
         .map(summarize)
         .slice(0, 12),

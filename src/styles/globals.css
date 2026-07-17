@@ -2305,7 +2305,11 @@ pre.citation-block {
 }
 
 .article-page {
+  width: 100%;
+  min-width: 0;
+  min-inline-size: 0;
   max-width: 1140px;
+  max-inline-size: 1140px;
   margin: 0 auto;
 }
 
@@ -2314,10 +2318,19 @@ pre.citation-block {
   grid-template-columns: minmax(0, 1fr) 210px;
   gap: 30px;
   align-items: start;
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
 }
 
 .article {
   min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
@@ -2407,8 +2420,12 @@ pre.citation-block {
   font-family: var(--nw-font-serif);
   font-size: 18px;
   line-height: 1.72;
+  min-width: 0;
   min-inline-size: 0;
+  max-width: 100%;
   max-inline-size: 100%;
+  overflow-x: hidden;
+  overflow-x: clip;
   overflow-wrap: anywhere;
 }
 
@@ -2476,13 +2493,16 @@ pre.citation-block {
 .article-body :where(img, video, iframe, svg) {
   box-sizing: border-box;
   display: block;
+  width: auto;
   inline-size: auto;
+  max-width: 100%;
   max-inline-size: min(100%, var(--article-media-max-inline-size));
   max-width: min(100%, var(--article-media-max-inline-size));
+  max-height: 520px;
   max-block-size: var(--article-media-max-block-size);
   max-height: var(--article-media-max-block-size);
-  block-size: auto;
   height: auto;
+  block-size: auto;
   object-fit: contain;
 }
 
@@ -2502,6 +2522,10 @@ pre.citation-block {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
   max-inline-size: 100%;
   padding: var(--article-media-padding);
   overflow: hidden;
@@ -2514,7 +2538,10 @@ pre.citation-block {
 .article-body p:has(> a:only-child > img:only-child) > a {
   display: flex;
   justify-content: center;
+  width: 100%;
+  min-width: 0;
   min-inline-size: 0;
+  max-width: 100%;
   max-inline-size: 100%;
   overflow: hidden;
 }
@@ -2592,6 +2619,10 @@ pre.citation-block {
   display: flex;
   flex-direction: column;
   gap: 22px;
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
   font-size: 13px;
 }
 
@@ -2690,6 +2721,10 @@ pre.citation-block {
   display: flex;
   flex-direction: column;
   gap: 11px;
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
 }
 
 .aside-actions strong {
@@ -4749,6 +4784,12 @@ pre.citation-block {
 
   .article-aside {
     position: static;
+  }
+
+  .aside-actions a,
+  .aside-action-form button {
+    width: 100%;
+    margin-inline: 0;
   }
 
   .media-detail {

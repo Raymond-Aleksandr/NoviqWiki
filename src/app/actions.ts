@@ -106,7 +106,7 @@ export async function requestPasswordResetAction(
   try {
     const parsed = passwordResetRequestSchema.parse(Object.fromEntries(formData.entries()));
     await requestPasswordReset(parsed.identifier);
-    const { messages } = await getRequestI18n();
+    const messages = await getActionMessages();
     return {
       ok: true,
       message: messages.passwordResetSentGeneric
@@ -171,7 +171,7 @@ export async function createPageAction(
     return actionError(error);
   }
   if (!target) {
-    const { messages } = await getRequestI18n();
+    const messages = await getActionMessages();
     return { ok: false, message: messages.pageNotCreated };
   }
   redirect(target);
@@ -261,7 +261,7 @@ export async function rollbackAction(
     return actionError(error);
   }
   if (!target) {
-    const { messages } = await getRequestI18n();
+    const messages = await getActionMessages();
     return { ok: false, message: messages.rollbackNotCompleted };
   }
   redirect(target);
@@ -751,7 +751,7 @@ export type ActionState = {
 async function requireSession() {
   const session = await getCurrentSession();
   if (!session) {
-    const { messages } = await getRequestI18n();
+    const messages = await getActionMessages();
     throw new ForbiddenError(messages.loginToContinue);
   }
   return session;
@@ -760,7 +760,7 @@ async function requireSession() {
 async function requireSite() {
   const site = await getPrimarySiteWithSettings(db);
   if (!site) {
-    const { messages } = await getRequestI18n();
+    const messages = await getActionMessages();
     throw new AppError(messages.setupRequired, "setup_required", 503);
   }
   return site;
@@ -848,9 +848,15 @@ function permissionListValue(formData: FormData) {
 }
 
 async function actionError(error: unknown): Promise<ActionState> {
-  const { messages } = await getRequestI18n();
+  const messages = await getActionMessages();
   if (error instanceof AppError || error instanceof ZodError || error instanceof Error) {
     return { ok: false, message: localizeErrorMessage(error, messages) };
   }
   return { ok: false, message: localizeErrorMessage(error, messages) };
+}
+
+async function getActionMessages(defaultLocale?: string | null) {
+  const site = defaultLocale ? null : await getPrimarySiteWithSettings(db).catch(() => null);
+  const { messages } = await getRequestI18n(defaultLocale ?? site?.settings?.defaultLocale);
+  return messages;
 }

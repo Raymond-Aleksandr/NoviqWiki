@@ -6,6 +6,7 @@ import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getRequestI18n } from "@/i18n/server";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { compareRevisionsForRead } from "@/modules/pages/service";
+import { getSiteSettings } from "@/modules/settings/service";
 
 type Props = {
   params: Promise<{ from: string; to: string }>;
@@ -18,10 +19,11 @@ export default async function DiffPage({ params }: Props) {
     toRevisionId: to
   });
   const session = await requirePageReadAccess(page.siteId);
-  const [canRollback, i18n] = await Promise.all([
+  const [canRollback, settings] = await Promise.all([
     hasPermission(session?.user.id, page.siteId, "page.rollback"),
-    getRequestI18n()
+    getSiteSettings(page.siteId)
   ]);
+  const i18n = await getRequestI18n(settings?.defaultLocale);
   const { messages } = i18n;
   const added = diff.lines.filter((line) => line.type === "add").length;
   const removed = diff.lines.filter((line) => line.type === "remove").length;
