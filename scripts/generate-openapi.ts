@@ -129,7 +129,16 @@ const spec = {
       patch: { summary: "Update custom role", responses: { "200": { description: "Role" } } }
     },
     "/admin/audit": {
-      get: { summary: "List audit logs", responses: { "200": { description: "Audit logs" } } }
+      get: {
+        summary: "List and filter audit logs",
+        parameters: [
+          { name: "q", in: "query", schema: { type: "string" } },
+          { name: "action", in: "query", schema: { type: "string" } },
+          { name: "page", in: "query", schema: { type: "integer", minimum: 1 } },
+          { name: "pageSize", in: "query", schema: { type: "integer", minimum: 1, maximum: 100 } }
+        ],
+        responses: { "200": { description: "Audit logs" } }
+      }
     }
   }
 };

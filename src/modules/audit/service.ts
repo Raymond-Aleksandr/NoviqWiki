@@ -1,8 +1,14 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
-import { auditLogs, type auditActionEnum } from "@/db/schema";
+import { auditActionEnum, auditLogs } from "@/db/schema";
 
-type AuditAction = (typeof auditActionEnum.enumValues)[number];
+export type AuditAction = (typeof auditActionEnum.enumValues)[number];
+
+export const auditActionValues = auditActionEnum.enumValues;
+
+export function auditActionValue(value: string | null | undefined): AuditAction | undefined {
+  return auditActionValues.includes(value as AuditAction) ? (value as AuditAction) : undefined;
+}
 
 export async function writeAuditLog(
   input: {
@@ -38,12 +44,24 @@ export async function writeAuditLog(
 }
 
 export async function listAuditLogs(
-  input: { siteId: string; action?: AuditAction; limit?: number; offset?: number },
+  input: { siteId: string; action?: AuditAction; query?: string; limit?: number; offset?: number },
   database: Database = db
 ) {
-  const where = input.action
-    ? and(eq(auditLogs.siteId, input.siteId), eq(auditLogs.action, input.action))
-    : eq(auditLogs.siteId, input.siteId);
+  const needle = input.query?.trim();
+  const textFilter = needle
+    ? or(
+        ilike(auditLogs.actorDisplayName, `%${needle}%`),
+        sql`${auditLogs.action}::text ilike ${`%${needle}%`}`,
+        ilike(auditLogs.targetType, `%${needle}%`),
+        ilike(auditLogs.targetId, `%${needle}%`),
+        sql`${auditLogs.details}::text ilike ${`%${needle}%`}`
+      )
+    : undefined;
+  const where = and(
+    eq(auditLogs.siteId, input.siteId),
+    input.action ? eq(auditLogs.action, input.action) : undefined,
+    textFilter
+  );
   const rows = await database
     .select()
     .from(auditLogs)

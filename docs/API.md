@@ -124,6 +124,8 @@ GET /api/v1/admin/audit
 
 Admin endpoints require the corresponding server-side permission. User group membership edits, group creation, role assignment, custom role creation, and custom role permission updates are available through both JSON API routes and the server-rendered admin UI; other administrative mutation workflows remain server-action backed in v0.1.0.
 
+`GET /api/v1/admin/audit` accepts `q`, `action`, `page`, and `pageSize` query parameters for permission-protected audit review.
+
 ## Operational Endpoints
 
 ```http
