@@ -66,6 +66,7 @@ type RouteMetrics = {
   commandButtonsWithoutIcons: ElementSummary[];
   iconOnlyControlsWithoutNames: ElementSummary[];
   buttonIconSizeMismatches: ElementSummary[];
+  commandButtonSizeMismatches: ElementSummary[];
   oversizedText: ElementSummary[];
   overlappingActivityRows: ElementSummary[];
   duplicateTimelineActions: ElementSummary[];
@@ -964,7 +965,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, control typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, control typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1348,6 +1349,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "button_icon_size_mismatch",
     metrics.buttonIconSizeMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "command_button_size_mismatch",
+    metrics.commandButtonSizeMismatches,
     browserName,
     sizeName,
     route
@@ -1788,6 +1796,31 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       })
       .map((icon) => summarize(icon.closest("button, a.button, [role='button']") ?? icon))
       .slice(0, 12);
+    const commandButtonSizeMismatches = visibleMatches("button, a.button, [role='button']")
+      .filter((element) => {
+        if (
+          element.closest(".segmented-control") ||
+          element.closest(".setup-stepper") ||
+          element.closest(".home-hero-search") ||
+          element.closest(".media-grid") ||
+          element.closest(".media-picker-grid") ||
+          element.closest(".cm-editor") ||
+          element.closest(".search-filter-list") ||
+          element.classList.contains("editor-tool-button")
+        ) {
+          return false;
+        }
+        const rect = element.getBoundingClientRect();
+        if (element.classList.contains("icon-button")) {
+          return rect.width < 30 || rect.height < 30 || rect.width > 42 || rect.height > 42 || Math.abs(rect.width - rect.height) > 3;
+        }
+        if (element.matches(".compact, .button.compact, button.compact")) {
+          return rect.height < 32 || rect.height > 36;
+        }
+        return rect.height < 32 || rect.height > 48;
+      })
+      .map(summarize)
+      .slice(0, 12);
 
     const smallTargetSelectors = [
       "button",
@@ -2037,6 +2070,7 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       commandButtonsWithoutIcons,
       iconOnlyControlsWithoutNames,
       buttonIconSizeMismatches,
+      commandButtonSizeMismatches,
       oversizedText,
       overlappingActivityRows: visibleMatches(".activity-row, .timeline-row:not(.timeline-footer)")
         .filter((element) => {
