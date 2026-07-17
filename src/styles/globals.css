@@ -2540,6 +2540,7 @@ pre.citation-block {
 .article-body :where(img, video, iframe, svg) {
   box-sizing: border-box;
   display: block;
+  flex: 0 1 auto;
   width: auto;
   inline-size: auto;
   min-width: 0;
@@ -2579,9 +2580,9 @@ pre.citation-block {
 
 .article-body :where(p, figure):has(> :where(img, video, iframe, svg):only-child),
 .article-body p:has(> a:only-child > img:only-child) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
   width: 100%;
   inline-size: min(
     100%,
@@ -2594,6 +2595,7 @@ pre.citation-block {
   margin-inline: auto;
   padding: var(--article-media-padding);
   overflow: hidden;
+  contain: inline-size;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-muted);
@@ -2601,10 +2603,11 @@ pre.citation-block {
 }
 
 .article-body p:has(> a:only-child > img:only-child) > a {
-  display: flex;
-  justify-content: center;
-  width: fit-content;
-  inline-size: fit-content;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  inline-size: 100%;
   min-width: 0;
   min-inline-size: 0;
   max-width: 100%;

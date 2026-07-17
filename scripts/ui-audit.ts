@@ -65,6 +65,7 @@ type RouteMetrics = {
   surfaceRhythmMismatches: ElementSummary[];
   emptyStateRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
+  articleMediaWrapperOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
   articleMediaTooTall: ElementSummary[];
   visibleDialogs: ElementSummary[];
@@ -1372,6 +1373,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     route
   );
   recordElementFailures(
+    "article_media_wrapper_overflow",
+    metrics.articleMediaWrapperOverflow,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
     "article_media_overflow",
     metrics.articleMediaOverflow,
     browserName,
@@ -2506,6 +2514,52 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         })
         .map(summarize)
         .slice(0, 12),
+      articleMediaWrapperOverflow: (() => {
+        const articleBody = document.querySelector(".article-body");
+        if (!articleBody) {
+          return [];
+        }
+        const candidates = new Set();
+        const mediaElements = Array.from(
+          articleBody.querySelectorAll("img, video, iframe, svg")
+        );
+        for (const mediaElement of mediaElements) {
+          const wrapper = mediaElement.closest("p, figure");
+          if (!wrapper || !articleBody.contains(wrapper)) {
+            continue;
+          }
+          const mediaOnly =
+            wrapper.children.length === 1 && wrapper.firstElementChild === mediaElement;
+          const mediaParent = mediaElement.parentElement;
+          const linkWrapper = mediaParent && mediaParent.tagName === "A" ? mediaParent : null;
+          const linkedMediaOnly =
+            linkWrapper !== null &&
+            wrapper.children.length === 1 &&
+            wrapper.firstElementChild === linkWrapper &&
+            linkWrapper.children.length === 1 &&
+            linkWrapper.firstElementChild === mediaElement;
+          if (mediaOnly || linkedMediaOnly) {
+            candidates.add(wrapper);
+          }
+          if (linkedMediaOnly && linkWrapper) {
+            candidates.add(linkWrapper);
+          }
+        }
+        const bodyRect = articleBody.getBoundingClientRect();
+        return Array.from(candidates)
+          .filter((element) => {
+            const rect = element.getBoundingClientRect();
+            const scrollOverflow = element.scrollWidth > element.clientWidth + 2;
+            return (
+              scrollOverflow ||
+              rect.left < bodyRect.left - 1 ||
+              rect.right > bodyRect.right + 1 ||
+              rect.width > bodyRect.width + 1
+            );
+          })
+          .map(summarize)
+          .slice(0, 12);
+      })(),
       articleMediaOverflow: visibleMatches(
         ".article-body img, .article-body video, .article-body iframe, .article-body svg"
       )
