@@ -390,6 +390,8 @@ export const zhCN = {
   rollbackConfirmBody: "回滚会用所选历史内容创建一个新修订，现有历史仍会保留。",
   rollbackRevisionSummary: "回滚到 r{revision}",
   rollbackFromDiffSummary: "从差异回滚到 r{revision}",
+  initialPublicationSummary: "初始发布",
+  updateBodySummary: "更新正文",
   destructiveActionWarning: "此操作会写入审计日志和最近更改。",
   markdownEditor: "Markdown 编辑器",
   markdownPreview: "Markdown 预览",

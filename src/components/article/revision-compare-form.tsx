@@ -1,6 +1,7 @@
 import { GitCompare } from "lucide-react";
 import type { PageRevision } from "@/db/schema";
 import type { Messages } from "@/i18n";
+import { formatRevisionSummary } from "@/i18n/revisions";
 
 type RevisionOption = Pick<
   PageRevision,
@@ -63,6 +64,6 @@ export function RevisionCompareForm({
 }
 
 function revisionOptionLabel(revision: RevisionOption, locale: string, messages: Messages) {
-  const summary = revision.editSummary || messages.noEditSummary;
+  const summary = formatRevisionSummary(revision.editSummary, messages) || messages.noEditSummary;
   return `r${revision.revisionNumber} · ${summary} · ${revision.editorDisplayName} · ${revision.createdAt.toLocaleString(locale)}`;
 }

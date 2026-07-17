@@ -6,7 +6,7 @@ import { rollbackAction } from "@/app/actions";
 import { RevisionCompareForm } from "@/components/article/revision-compare-form";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
-import type { Messages } from "@/i18n";
+import { formatRevisionSummary, formatRollbackRevisionSummary } from "@/i18n/revisions";
 import { getRequestI18n } from "@/i18n/server";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { listRevisions } from "@/modules/pages/service";
@@ -103,7 +103,7 @@ export default async function HistoryPage({ params }: Props) {
                       { name: "targetRevisionId", value: revision.id },
                       {
                         name: "reason",
-                        value: rollbackSummary(messages, revision.revisionNumber)
+                        value: formatRollbackRevisionSummary(messages, revision.revisionNumber)
                       }
                     ]}
                     triggerLabel={messages.rollback}
@@ -124,19 +124,4 @@ export default async function HistoryPage({ params }: Props) {
       </div>
     </section>
   );
-}
-
-function rollbackSummary(messages: Messages, revisionNumber: number) {
-  return messages.rollbackRevisionSummary.replace("{revision}", String(revisionNumber));
-}
-
-function formatRevisionSummary(summary: string, messages: Messages) {
-  const trimmed = summary.trim();
-  const rollbackMatch =
-    trimmed.match(/^rollback (?:from diff )?to revision (\d+)$/i) ??
-    trimmed.match(/^rollback r(\d+)$/i);
-  if (rollbackMatch) {
-    return rollbackSummary(messages, Number(rollbackMatch[1]));
-  }
-  return trimmed;
 }

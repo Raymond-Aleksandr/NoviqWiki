@@ -402,6 +402,8 @@ export const en = {
     "Rollback creates a new revision with the selected historical content. Existing history is preserved.",
   rollbackRevisionSummary: "Roll back to r{revision}",
   rollbackFromDiffSummary: "Roll back from diff to r{revision}",
+  initialPublicationSummary: "Initial publication",
+  updateBodySummary: "Update body",
   destructiveActionWarning: "This action is recorded in the audit log and recent changes.",
   markdownEditor: "Markdown editor",
   markdownPreview: "Markdown preview",

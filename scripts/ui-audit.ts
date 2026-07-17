@@ -70,6 +70,7 @@ type RouteMetrics = {
   adminTabsWithoutIcons: ElementSummary[];
   createAnchors: ElementSummary[];
   rawAuditActions: string[];
+  unlocalizedRevisionSummaries: string[];
 };
 
 type ModalMetrics = {
@@ -465,7 +466,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, unlocalized revision summaries, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -865,6 +866,15 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
       detail: metrics.rawAuditActions
     });
   }
+  if (metrics.unlocalizedRevisionSummaries.length > 0) {
+    addFailure({
+      kind: "unlocalized_revision_summary",
+      browserName,
+      sizeName,
+      route,
+      detail: metrics.unlocalizedRevisionSummaries
+    });
+  }
 
   if (
     new URL(page.url()).pathname.startsWith("/admin") &&
@@ -986,6 +996,21 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
     const rawAuditActions = [
       ...new Set((rawAuditTextNodes.join("\\n").match(${rawAuditActionPattern}) || []).slice(0, 12))
     ];
+    const unlocalizedRevisionSummaries =
+      document.documentElement.lang.startsWith("zh") && location.pathname.startsWith("/history/")
+        ? [
+            ...document.querySelectorAll(
+              ".history-summary-text, .history-compare-form option"
+            )
+          ]
+            .map(labelOf)
+            .filter((text) =>
+              /\\b(?:Rollback(?: to revision| r)|Roll back to r|Initial publication|Initial publish|Update body)\\b/i.test(
+                text
+              )
+            )
+            .slice(0, 12)
+        : [];
 
     const commandButtonsWithoutIcons = visibleMatches("button, a.button, [role='button']")
       .filter(
@@ -1198,7 +1223,8 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       createAnchors: visibleMatches("a[href='#create-group'], a[href='#create-role']").map(
         summarize
       ),
-      rawAuditActions
+      rawAuditActions,
+      unlocalizedRevisionSummaries
     };
   })()`) as Promise<RouteMetrics>;
 }
