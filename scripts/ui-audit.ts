@@ -2914,6 +2914,8 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           ".page-index-row",
           ".page-list-row",
           ".backlink-row",
+          ".special-link-row",
+          ".watchlist-page-row",
           ".citation-meta > div",
           ".article-facts > div",
           ".admin-panel-row",
@@ -2927,10 +2929,10 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           const rect = element.getBoundingClientRect();
           const style = getComputedStyle(element);
           const isGridExpected = element.matches(
-            ".activity-row, .timeline-row, .page-index-row, .citation-meta > div, .admin-status-row"
+            ".activity-row, .timeline-row, .page-index-row, .special-link-row, .citation-meta > div, .admin-status-row"
           );
           const isFlexExpected = element.matches(
-            ".page-list-row, .backlink-row, .article-facts > div, .admin-panel-row, .category-list a"
+            ".page-list-row, .backlink-row, .watchlist-page-row, .article-facts > div, .admin-panel-row, .category-list a"
           );
           const displayMismatch =
             (isGridExpected && style.display !== "grid") ||

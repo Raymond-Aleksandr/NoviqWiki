@@ -1389,6 +1389,9 @@ textarea {
   gap: 12px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   padding: 14px 18px;
   text-decoration: none;
 }
@@ -1575,6 +1578,9 @@ pre.citation-block {
   justify-content: space-between;
   gap: 12px;
   border-bottom: 1px solid var(--border);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   padding: 12px 14px;
 }
 
