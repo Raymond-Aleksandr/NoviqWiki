@@ -8,6 +8,7 @@ import {
   Info,
   Link2,
   Link2Off,
+  ListChecks,
   ListTree,
   Ruler,
   RouteOff,
@@ -165,6 +166,10 @@ export function ArticleView({
             <Link href="/recent">
               <ListTree size={15} aria-hidden="true" />
               {messages.recentChanges}
+            </Link>
+            <Link href="/special">
+              <ListChecks size={15} aria-hidden="true" />
+              {messages.specialPages}
             </Link>
             <Link href="/wanted">
               <FileQuestion size={15} aria-hidden="true" />

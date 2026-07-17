@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Clock3, FileText, ImageIcon, ShieldCheck, Tags } from "lucide-react";
+import { BookOpen, Clock3, FileText, ImageIcon, ListChecks, ShieldCheck, Tags } from "lucide-react";
 
 type Messages = {
   read: string;
@@ -10,6 +10,7 @@ type Messages = {
   pages: string;
   categories: string;
   media: string;
+  specialPages: string;
   admin: string;
 };
 
@@ -45,6 +46,20 @@ export function SiteNav({ messages, showAdmin }: { messages: Messages; showAdmin
       label: messages.media,
       icon: ImageIcon,
       active: pathname.startsWith("/media")
+    },
+    {
+      href: "/special",
+      label: messages.specialPages,
+      icon: ListChecks,
+      active:
+        pathname.startsWith("/special") ||
+        pathname.startsWith("/wanted") ||
+        pathname.startsWith("/orphaned") ||
+        pathname.startsWith("/dead-end") ||
+        pathname.startsWith("/short-pages") ||
+        pathname.startsWith("/protected-pages") ||
+        pathname.startsWith("/uncategorized") ||
+        pathname.startsWith("/redirects")
     },
     {
       href: "/admin",

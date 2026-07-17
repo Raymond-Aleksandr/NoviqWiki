@@ -122,6 +122,7 @@ Last updated: 2026-07-17
 - 2026-07-16: Added a `/short-pages` content-maintenance page for published non-redirect pages below selectable readable-text thresholds (`200`, `600`, or `1200` characters). Integration coverage verifies threshold behavior, long-page exclusion, redirect exclusion, and draft/archived/deleted filtering.
 - 2026-07-16: Tightened the design-package compact control system across filters, ordinary fields, selects, and compact buttons. Chromium/WebKit mobile measurement at `439x734` now shows filter controls and admin form controls at `34px` tall with `13.5px` text, admin filter bars stay in a compact single-row scroller instead of growing into tall panels, and `pnpm test:ui` now fails if visible filter/form controls or filter bars regress into oversized variants.
 - 2026-07-17: Added a `/protected-pages` content-maintenance page for published pages with edit protection enabled. Article page tools now link to the protected-page index, the UI audit covers the route, and integration coverage verifies draft, unprotected, archived, and deleted protected pages are excluded.
+- 2026-07-17: Added a `/special` wiki index that groups public browsing links, content-maintenance reports, and permission-aware administration links. The site navigation and article page tools now expose Special pages, unit coverage locks the section/link model, and the UI audit covers the route.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes
