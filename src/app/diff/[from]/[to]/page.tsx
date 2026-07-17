@@ -46,7 +46,10 @@ export default async function DiffPage({ params }: Props) {
               { name: "targetRevisionId", value: diff.from.id },
               {
                 name: "reason",
-                value: `Rollback from diff to revision ${diff.from.revisionNumber}`
+                value: messages.rollbackFromDiffSummary.replace(
+                  "{revision}",
+                  String(diff.from.revisionNumber)
+                )
               }
             ]}
             triggerLabel={`${messages.rollBackToRevision} r${diff.from.revisionNumber}`}

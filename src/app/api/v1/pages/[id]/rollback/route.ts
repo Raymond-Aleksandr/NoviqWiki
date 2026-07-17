@@ -6,7 +6,7 @@ import { ForbiddenError } from "@/lib/errors";
 
 const rollbackSchema = z.object({
   targetRevisionId: z.string(),
-  reason: z.string().default("Rollback")
+  reason: z.string().default("")
 });
 
 type Props = { params: Promise<{ id: string }> };

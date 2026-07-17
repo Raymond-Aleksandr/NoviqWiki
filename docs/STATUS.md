@@ -31,7 +31,7 @@ Last updated: 2026-07-16
 | `pnpm lint`                    | Passed                                              |
 | `pnpm typecheck`               | Passed                                              |
 | `pnpm test`                    | Passed, 13 unit files / 33 tests                    |
-| `pnpm test:integration`        | Passed, 12 integration files / 18 tests             |
+| `pnpm test:integration`        | Passed, 13 integration files / 19 tests             |
 | `pnpm test:ui`                 | Passed, non-reset Chromium/WebKit UI release audit  |
 | `pnpm build`                   | Passed                                              |
 | `pnpm test:e2e`                | Passed, 2 Playwright tests                          |
@@ -119,6 +119,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Added a `/redirects` content-maintenance page for published redirect pages. It lists source and target pages, flags valid, double, missing, draft, archived, and deleted targets, links maintainers to inspect the redirect source without following it, and offers page creation for missing targets when authorized.
 - 2026-07-16: Added a `/dead-end` content-maintenance page for published pages that do not link to any other published page. Self-links and links to missing, draft, archived, or deleted pages do not count as valid exits; integration coverage verifies each case.
 - 2026-07-16: Added an `/uncategorized` content-maintenance page for published pages with no category membership. The listing excludes drafts, archived pages, and deleted pages, and integration coverage verifies category declarations remove pages from the maintenance queue.
+- 2026-07-16: Added a `/short-pages` content-maintenance page for published non-redirect pages below selectable readable-text thresholds (`200`, `600`, or `1200` characters). Integration coverage verifies threshold behavior, long-page exclusion, redirect exclusion, and draft/archived/deleted filtering.
 - 2026-07-16: Tightened the design-package compact control system across filters, ordinary fields, selects, and compact buttons. Chromium/WebKit mobile measurement at `439x734` now shows filter controls and admin form controls at `34px` tall with `13.5px` text, admin filter bars stay in a compact single-row scroller instead of growing into tall panels, and `pnpm test:ui` now fails if visible filter/form controls or filter bars regress into oversized variants.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 

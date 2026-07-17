@@ -9,6 +9,7 @@ import {
   Link2,
   Link2Off,
   ListTree,
+  Ruler,
   RouteOff,
   Tags
 } from "lucide-react";
@@ -175,6 +176,10 @@ export function ArticleView({
             <Link href="/dead-end">
               <RouteOff size={15} aria-hidden="true" />
               {messages.deadEndPages}
+            </Link>
+            <Link href="/short-pages">
+              <Ruler size={15} aria-hidden="true" />
+              {messages.shortPages}
             </Link>
             <Link href="/uncategorized">
               <Tags size={15} aria-hidden="true" />

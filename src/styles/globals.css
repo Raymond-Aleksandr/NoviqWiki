@@ -483,6 +483,7 @@ input[type="radio"]:disabled {
 
 .button,
 button {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -504,10 +505,14 @@ button {
 
 .button.compact,
 button.compact {
+  block-size: var(--control-height);
+  min-block-size: var(--control-height);
+  max-block-size: var(--control-height);
   border-radius: 7px;
   font-size: var(--control-font-size);
-  min-block-size: var(--control-height);
-  padding: 6px 11px;
+  line-height: 1.2;
+  padding: 0 11px;
+  white-space: nowrap;
 }
 
 .button:visited {
@@ -579,6 +584,7 @@ select {
   padding: 7px var(--control-pad-x);
   appearance: none;
   -webkit-appearance: none;
+  text-align: left;
 }
 
 input.field:not([type="file"]),
@@ -639,6 +645,7 @@ select {
     6px 6px,
     6px 6px;
   padding-inline-end: 38px;
+  text-align-last: left;
 }
 
 textarea {
@@ -2871,6 +2878,7 @@ textarea {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+  min-block-size: calc(var(--control-height) + 27px);
   padding: 13px 16px;
   border-bottom: 1px solid var(--border);
 }
@@ -2880,6 +2888,7 @@ textarea {
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
+  flex-shrink: 0;
   min-width: 0;
   height: var(--control-height);
   min-height: var(--control-height);
@@ -2926,6 +2935,9 @@ textarea {
   padding: 0;
   appearance: none;
   -webkit-appearance: none;
+  text-align: left;
+  text-align-last: left;
+  text-overflow: ellipsis;
 }
 
 .admin-filter-search input::placeholder {
@@ -3718,9 +3730,9 @@ textarea {
   color: var(--text);
   font-family: var(--nw-font-body);
   font-size: 14px;
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.35;
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .history-summary-date {
@@ -4411,12 +4423,13 @@ textarea {
   .admin-grid-row.admin-pages-grid > *,
   .admin-grid-row.admin-audit-grid > *,
   .history-row > * {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(72px, max-content) minmax(0, 1fr);
     align-items: center;
-    justify-content: space-between;
     gap: 14px;
     min-width: 0;
-    text-align: right;
+    justify-content: stretch;
+    text-align: left;
   }
 
   .admin-grid-row.admin-users-grid > div::before,
@@ -4426,11 +4439,18 @@ textarea {
     content: attr(data-label);
     color: var(--text-muted);
     flex: 0 0 auto;
-    margin-right: auto;
     font-family: var(--nw-font-body);
     font-size: 12px;
     font-weight: 600;
     text-align: left;
+  }
+
+  .history-row .history-summary-cell {
+    align-items: start;
+  }
+
+  .history-row .history-summary-date {
+    grid-column: 2;
   }
 
   .admin-grid-row.admin-pages-grid > a,
@@ -4456,6 +4476,7 @@ textarea {
   .admin-grid-row.admin-users-grid .admin-action-list,
   .admin-grid-row.admin-pages-grid .admin-action-list,
   .history-row .history-actions {
+    display: flex;
     justify-content: flex-end;
   }
 

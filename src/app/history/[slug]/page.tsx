@@ -6,6 +6,7 @@ import { rollbackAction } from "@/app/actions";
 import { RevisionCompareForm } from "@/components/article/revision-compare-form";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
+import type { Messages } from "@/i18n";
 import { getRequestI18n } from "@/i18n/server";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { listRevisions } from "@/modules/pages/service";
@@ -64,7 +65,7 @@ export default async function HistoryPage({ params }: Props) {
             </div>
             <div className="history-summary-cell" data-label={messages.summary}>
               <div className="history-summary-text">
-                {revision.editSummary || messages.noEditSummary}
+                {formatRevisionSummary(revision.editSummary, messages) || messages.noEditSummary}
               </div>
               <div className="history-summary-date mono muted">
                 {revision.createdAt.toLocaleString(locale)}
@@ -97,7 +98,10 @@ export default async function HistoryPage({ params }: Props) {
                     { name: "pageId", value: resolved.page.id },
                     { name: "slug", value: resolved.page.slug },
                     { name: "targetRevisionId", value: revision.id },
-                    { name: "reason", value: `Rollback to revision ${revision.revisionNumber}` }
+                    {
+                      name: "reason",
+                      value: rollbackSummary(messages, revision.revisionNumber)
+                    }
                   ]}
                   triggerLabel={messages.rollback}
                   triggerClassName="button compact"
@@ -116,4 +120,19 @@ export default async function HistoryPage({ params }: Props) {
       </div>
     </section>
   );
+}
+
+function rollbackSummary(messages: Messages, revisionNumber: number) {
+  return messages.rollbackRevisionSummary.replace("{revision}", String(revisionNumber));
+}
+
+function formatRevisionSummary(summary: string, messages: Messages) {
+  const trimmed = summary.trim();
+  const rollbackMatch =
+    trimmed.match(/^rollback (?:from diff )?to revision (\d+)$/i) ??
+    trimmed.match(/^rollback r(\d+)$/i);
+  if (rollbackMatch) {
+    return rollbackSummary(messages, Number(rollbackMatch[1]));
+  }
+  return trimmed;
 }

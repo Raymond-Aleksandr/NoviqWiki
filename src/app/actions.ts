@@ -249,7 +249,7 @@ export async function rollbackAction(
     const revision = await rollbackPage({
       pageId: stringValue(formData, "pageId"),
       targetRevisionId: stringValue(formData, "targetRevisionId"),
-      reason: optionalString(formData, "reason") ?? "Rollback",
+      reason: optionalString(formData, "reason") ?? "",
       actorId: session.user.id,
       actorDisplayName: session.user.displayName
     });

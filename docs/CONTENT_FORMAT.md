@@ -48,7 +48,7 @@ Use wiki links for internal page references:
 [[Getting Started|start here]]
 ```
 
-Wiki links resolve to `/page/{slug}` when the target page exists. Missing internal links render with a distinct missing-link state, and users with page creation permission can open a pre-filled new-page form from the missing link. The `/wanted` maintenance page lists missing targets that are linked from published visible pages and removes them automatically once the target page is published. The `/orphaned` maintenance page lists published pages that currently have no inbound links from other published pages. The `/dead-end` maintenance page lists published pages that currently do not link to another published page. The `/uncategorized` maintenance page lists published pages without any category membership.
+Wiki links resolve to `/page/{slug}` when the target page exists. Missing internal links render with a distinct missing-link state, and users with page creation permission can open a pre-filled new-page form from the missing link. The `/wanted` maintenance page lists missing targets that are linked from published visible pages and removes them automatically once the target page is published. The `/orphaned` maintenance page lists published pages that currently have no inbound links from other published pages. The `/dead-end` maintenance page lists published pages that currently do not link to another published page. The `/short-pages` maintenance page lists published non-redirect pages below a selected readable-text length threshold. The `/uncategorized` maintenance page lists published pages without any category membership.
 
 Categories are declared with wiki-link category declarations:
 

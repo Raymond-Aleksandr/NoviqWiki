@@ -18,6 +18,7 @@ import { writeAuditLog } from "@/modules/audit/service";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { renderMarkdown } from "@/modules/rendering/markdown";
 import { assertNoRedirectLoopForRevision } from "@/modules/redirects/service";
+import { parseRedirectDirective } from "@/modules/redirects/directive";
 import {
   createSideBySideDiff,
   createUnifiedDiff,
@@ -510,6 +511,14 @@ export type UncategorizedPage = {
   updatedAt: Date;
 };
 
+export type ShortPage = {
+  pageId: string;
+  title: string;
+  slug: string;
+  plainTextLength: number;
+  updatedAt: Date;
+};
+
 export type PublishedPageIndexEntry = {
   pageId: string;
   title: string;
@@ -705,6 +714,44 @@ export async function listUncategorizedPages(
     .offset(input.offset ?? 0);
 }
 
+export async function listShortPages(
+  input: { siteId: string; maxLength?: number; limit?: number; offset?: number },
+  database: Database = db
+): Promise<ShortPage[]> {
+  const limit = input.limit ?? 100;
+  const offset = input.offset ?? 0;
+  const maxLength = Math.max(1, Math.min(input.maxLength ?? 600, 5000));
+  const rows = await database
+    .select({
+      pageId: pages.id,
+      title: pages.title,
+      slug: pages.slug,
+      updatedAt: pages.updatedAt,
+      plainTextLength: sql<number>`char_length(trim(${pageRevisions.plainText}))::int`,
+      markdown: pageRevisions.markdown
+    })
+    .from(pages)
+    .innerJoin(pageRevisions, eq(pageRevisions.id, pages.currentRevisionId))
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt),
+        sql`char_length(trim(${pageRevisions.plainText})) <= ${maxLength}`
+      )
+    )
+    .orderBy(
+      asc(sql<number>`char_length(trim(${pageRevisions.plainText}))::int`),
+      desc(pages.updatedAt),
+      asc(pages.title)
+    );
+
+  return rows
+    .filter((row) => !parseRedirectDirective(row.markdown))
+    .slice(offset, offset + limit)
+    .map(({ markdown: _markdown, ...row }) => row);
+}
+
 export async function listPublishedPageIndex(
   input: { siteId: string; query?: string; prefix?: string; limit?: number; offset?: number },
   database: Database = db
@@ -803,7 +850,7 @@ export async function rollbackPage(
         revisionNumber: await getNextRevisionNumber(page.id, tx),
         actorId: input.actorId,
         actorDisplayName: input.actorDisplayName,
-        editSummary: input.reason || `Rollback to revision ${target.revisionNumber}`,
+        editSummary: input.reason || `Rollback r${target.revisionNumber}`,
         state: "published"
       },
       tx
