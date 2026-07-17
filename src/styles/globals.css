@@ -4513,10 +4513,13 @@ pre.citation-block {
 .diff-summary {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 20px;
   margin-top: 14px;
   color: var(--text-muted);
+  font-family: var(--nw-font-body);
   font-size: 12.5px;
+  line-height: 1.25;
 }
 
 .diff-count {
@@ -4838,11 +4841,16 @@ pre.citation-block {
   font-family: var(--nw-font-mono);
   font-size: 13px;
   line-height: 1.8;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .diff-line {
+  min-width: 0;
   padding: 4px 16px;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .diff-add {

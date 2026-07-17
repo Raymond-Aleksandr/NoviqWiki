@@ -70,6 +70,7 @@ type RouteMetrics = {
   keyValueRhythmMismatches: ElementSummary[];
   permissionMatrixRhythmMismatches: ElementSummary[];
   adminSummaryRhythmMismatches: ElementSummary[];
+  diffRhythmMismatches: ElementSummary[];
   editorToolbarRhythmMismatches: ElementSummary[];
   mediaPickerRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
@@ -996,7 +997,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, permission-matrix, admin-summary, editor-toolbar, media-picker, or history-action rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, unsafe article media sizing, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, filter-navigation, empty-state, form-layout, page-header, content-row, key-value, permission-matrix, admin-summary, diff, editor-toolbar, media-picker, or history-action rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1032,7 +1033,10 @@ function buildRoutes({
 
 async function createAuthState(credentials: Credentials): Promise<AuditStorageState> {
   const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 1280, height: 820 } });
+  const context = await browser.newContext({
+    extraHTTPHeaders: { "x-forwarded-for": `ui-audit-${Date.now()}` },
+    viewport: { width: 1280, height: 820 }
+  });
   const page = await context.newPage();
   await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded" });
   await page.locator('input[name="identifier"]').fill(credentials.username);
@@ -1414,6 +1418,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "admin_summary_rhythm_mismatch",
     metrics.adminSummaryRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "diff_rhythm_mismatch",
+    metrics.diffRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -3332,6 +3343,186 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             !fitsViewport ||
             element.scrollWidth > element.clientWidth + 2
           );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      diffRhythmMismatches: visibleMatches(
+        [
+          ".diff-summary",
+          ".diff-count",
+          ".side-by-side-diff",
+          ".side-by-side-diff-header",
+          ".side-by-side-diff-row",
+          ".side-by-side-cell",
+          ".side-by-side-cell code",
+          ".diff.diff-panel",
+          ".diff-line"
+        ].join(",")
+      )
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const isMobile = document.documentElement.clientWidth <= 560;
+          const fitsViewport =
+            !isMobile ||
+            (rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1);
+          const scrollOverflow = element.scrollWidth > element.clientWidth + 2;
+          const childOverflow = [...element.children].filter(visible).some((child) => {
+            const childRect = child.getBoundingClientRect();
+            return (
+              childRect.left < rect.left - 1 ||
+              childRect.right > rect.right + 1 ||
+              childRect.top < rect.top - 1 ||
+              childRect.bottom > rect.bottom + 1
+            );
+          });
+
+          if (element.matches(".diff-summary")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const lineHeight = Number.parseFloat(style.lineHeight);
+            const rowGap = Number.parseFloat(style.rowGap);
+            const columnGap = Number.parseFloat(style.columnGap);
+            return (
+              style.display !== "flex" ||
+              style.flexWrap !== "wrap" ||
+              style.alignItems !== "center" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12 ||
+              fontSize > 13.5 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight > 20 ||
+              !Number.isFinite(rowGap) ||
+              rowGap < 6 ||
+              rowGap > 22 ||
+              !Number.isFinite(columnGap) ||
+              columnGap < 6 ||
+              columnGap > 22 ||
+              !fitsViewport ||
+              childOverflow
+            );
+          }
+
+          if (element.matches(".diff-count")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const paddingTop = Number.parseFloat(style.paddingTop);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            return (
+              !["flex", "inline-flex"].includes(style.display) ||
+              style.alignItems !== "center" ||
+              !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12 ||
+              fontSize > 13.5 ||
+              !Number.isFinite(paddingTop) ||
+              paddingTop < 3 ||
+              paddingTop > 6 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 7 ||
+              paddingInline > 11 ||
+              !fitsViewport ||
+              scrollOverflow
+            );
+          }
+
+          if (element.matches(".side-by-side-diff, .diff.diff-panel")) {
+            const radius = Number.parseFloat(style.borderTopLeftRadius);
+            const borderWidth = Number.parseFloat(style.borderTopWidth);
+            const fontSize = Number.parseFloat(style.fontSize);
+            const lineHeight = Number.parseFloat(style.lineHeight);
+            const isUnified = element.matches(".diff.diff-panel");
+            return (
+              borderWidth < 1 ||
+              style.borderTopStyle === "none" ||
+              style.backgroundColor === "rgba(0, 0, 0, 0)" ||
+              !Number.isFinite(radius) ||
+              radius < 8 ||
+              radius > 16 ||
+              !/JetBrains Mono|SFMono|Menlo|monospace/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 11 ||
+              fontSize > 13.5 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight < 16 ||
+              lineHeight > 24 ||
+              !fitsViewport ||
+              (isUnified && scrollOverflow) ||
+              childOverflow
+            );
+          }
+
+          if (element.matches(".side-by-side-diff-header, .side-by-side-diff-row")) {
+            const gridTracks = style.gridTemplateColumns
+              .split(" ")
+              .filter((track) => track.trim().length > 0);
+            return (
+              style.display !== "grid" ||
+              gridTracks.length !== 2 ||
+              !fitsViewport ||
+              scrollOverflow ||
+              childOverflow
+            );
+          }
+
+          if (element.matches(".side-by-side-cell")) {
+            const gridTracks = style.gridTemplateColumns
+              .split(" ")
+              .filter((track) => track.trim().length > 0);
+            const fontSize = Number.parseFloat(style.fontSize);
+            const gap = Number.parseFloat(style.columnGap || style.gap);
+            return (
+              style.display !== "grid" ||
+              gridTracks.length !== 2 ||
+              !/JetBrains Mono|SFMono|Menlo|monospace/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 11 ||
+              fontSize > 13 ||
+              !Number.isFinite(gap) ||
+              gap < 6 ||
+              gap > 12 ||
+              !fitsViewport ||
+              scrollOverflow ||
+              childOverflow
+            );
+          }
+
+          if (element.matches(".side-by-side-cell code")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            return (
+              !/JetBrains Mono|SFMono|Menlo|monospace/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 11 ||
+              fontSize > 13 ||
+              !["anywhere", "break-word"].includes(style.overflowWrap) ||
+              style.whiteSpace !== "pre-wrap" ||
+              !fitsViewport ||
+              scrollOverflow
+            );
+          }
+
+          if (element.matches(".diff-line")) {
+            const fontSize = Number.parseFloat(style.fontSize);
+            const lineHeight = Number.parseFloat(style.lineHeight);
+            const paddingInline = Number.parseFloat(style.paddingLeft);
+            return (
+              !/JetBrains Mono|SFMono|Menlo|monospace/i.test(style.fontFamily) ||
+              !Number.isFinite(fontSize) ||
+              fontSize < 12 ||
+              fontSize > 13.5 ||
+              !Number.isFinite(lineHeight) ||
+              lineHeight < 18 ||
+              lineHeight > 24 ||
+              !Number.isFinite(paddingInline) ||
+              paddingInline < 12 ||
+              paddingInline > 18 ||
+              !["anywhere", "break-word"].includes(style.overflowWrap) ||
+              style.whiteSpace !== "pre-wrap" ||
+              !fitsViewport ||
+              scrollOverflow
+            );
+          }
+
+          return false;
         })
         .map(summarize)
         .slice(0, 12),
