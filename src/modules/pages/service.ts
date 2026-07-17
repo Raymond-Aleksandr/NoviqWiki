@@ -489,6 +489,13 @@ export type WantedPage = {
   updatedAt: Date;
 };
 
+export type OrphanedPage = {
+  pageId: string;
+  title: string;
+  slug: string;
+  updatedAt: Date;
+};
+
 export async function listPageOutboundLinks(
   input: { siteId: string; pageId: string },
   database: Database = db
@@ -568,6 +575,44 @@ export async function listWantedPages(
       desc(sql<number>`count(distinct ${pageLinks.sourcePageId})::int`),
       asc(sql<string>`min(${pageLinks.targetTitle})`)
     )
+    .limit(input.limit ?? 100)
+    .offset(input.offset ?? 0);
+}
+
+export async function listOrphanedPages(
+  input: { siteId: string; limit?: number; offset?: number },
+  database: Database = db
+): Promise<OrphanedPage[]> {
+  return database
+    .select({
+      pageId: pages.id,
+      title: pages.title,
+      slug: pages.slug,
+      updatedAt: pages.updatedAt
+    })
+    .from(pages)
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt),
+        sql`not exists (
+          select 1
+          from ${pageLinks}
+          inner join ${pages} as orphan_source_pages
+            on orphan_source_pages.id = ${pageLinks.sourcePageId}
+          where orphan_source_pages.site_id = ${input.siteId}
+            and orphan_source_pages.status = 'published'
+            and orphan_source_pages.deleted_at is null
+            and orphan_source_pages.id <> ${pages.id}
+            and (
+              ${pageLinks.targetPageId} = ${pages.id}
+              or ${pageLinks.targetNormalizedTitle} = ${pages.normalizedTitle}
+            )
+        )`
+      )
+    )
+    .orderBy(desc(pages.updatedAt), asc(pages.title))
     .limit(input.limit ?? 100)
     .offset(input.offset ?? 0);
 }

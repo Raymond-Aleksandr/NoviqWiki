@@ -114,6 +114,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Rechecked mobile control consistency after live review. `/admin/pages` filter search, status select, search button, and create action now measure `34px` tall at `439x734` with no horizontal overflow; `/history/e2e-article` summary rows stay left-aligned and readable at the same viewport. `pnpm test:ui` passed after the fix.
 - 2026-07-16: Made recent changes navigable as a real wiki activity surface. Page and media activity rows now resolve same-site targets through the activity service, link to readable pages or live media files, and intentionally suppress links for deleted page/media targets while preserving labels for audit clarity.
 - 2026-07-16: Added a `/wanted` content-maintenance page for missing internal wiki-link targets. The list is computed from published visible source pages, ignores draft/archived/deleted sources, removes entries automatically once a target page is published, and offers authorized users a pre-filled page-creation action.
+- 2026-07-16: Added an `/orphaned` content-maintenance page for published pages that currently have no inbound links from other published pages. The query uses the same resolved-link semantics as backlinks, so links created before the target page existed are counted once the target is published.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes
