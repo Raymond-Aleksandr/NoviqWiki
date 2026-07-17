@@ -85,6 +85,7 @@ Last updated: 2026-07-16
 - 2026-07-16: Removed the duplicated global topbar search from every route. Search entry now flows through the homepage hero action or the dedicated `/search` page form, while `/search` remains fully functional on mobile and desktop.
 - 2026-07-16: Fixed the mobile Safari/search-page navigation regression by preventing the mobile shell grid from stretching short pages and forcing compact content-width sidebar nav items. WebKit mobile verification shows the sidebar at 59px tall and the `阅读` nav item at 36px tall on empty and populated search pages.
 - 2026-07-16: Improved PostgreSQL search recall with prefix full-text matching and safe substring fallback across title, aliases, categories, and plain text. Live verification confirmed `/api/v1/search?q=test` and `/search?q=test` return the `Testing` category article, and integration coverage now locks `test` matching `Testing`.
+- 2026-07-16: Completed the JSON page lifecycle API by adding `PATCH /api/v1/pages/{id}` restore support through `{"action":"restore"}`. Page draft/delete/restore audit writes now use the caller-provided database connection, and integration coverage verifies soft-delete removes pages from search while restore reindexes them.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

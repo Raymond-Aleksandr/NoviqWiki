@@ -5,11 +5,13 @@ import {
   getPageWithCurrentRevision,
   publishPage,
   renamePage,
+  restorePage,
   softDeletePage
 } from "@/modules/pages/service";
 import { ForbiddenError } from "@/lib/errors";
 
 const patchSchema = z.object({
+  action: z.enum(["restore"]).optional(),
   title: z.string().optional(),
   slug: z.string().optional(),
   markdown: z.string().optional(),
@@ -31,11 +33,21 @@ export async function GET(_request: Request, { params }: Props) {
 
 export async function PATCH(request: Request, { params }: Props) {
   try {
-    const { site, session } = await requireApiContext("page.edit");
+    const { site, session } = await requireApiContext();
     if (!session) throw new ForbiddenError("Authentication required.");
     const { id } = await params;
     const body = patchSchema.parse(await request.json());
+    if (body.action === "restore") {
+      await requireApiContext("page.restore");
+      const page = await restorePage({
+        pageId: id,
+        actorId: session.user.id,
+        actorDisplayName: session.user.displayName
+      });
+      return ok({ page });
+    }
     if (body.title) {
+      await requireApiContext("page.edit");
       await requireApiContext("page.rename");
       const page = await renamePage({
         pageId: id,
@@ -48,6 +60,7 @@ export async function PATCH(request: Request, { params }: Props) {
       return ok({ page });
     }
     if (typeof body.markdown === "string") {
+      await requireApiContext("page.edit");
       await requireApiContext("page.publish");
       const revision = await publishPage({
         pageId: id,

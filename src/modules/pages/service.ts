@@ -168,15 +168,18 @@ export async function saveDraft(
       }
     })
     .returning();
-  await writeAuditLog({
-    siteId: page.siteId,
-    actorId: input.actorId,
-    actorDisplayName: input.actorDisplayName,
-    action: "page.draft_saved",
-    targetType: "page",
-    targetId: page.id,
-    details: { draftId: draft.id }
-  });
+  await writeAuditLog(
+    {
+      siteId: page.siteId,
+      actorId: input.actorId,
+      actorDisplayName: input.actorDisplayName,
+      action: "page.draft_saved",
+      targetType: "page",
+      targetId: page.id,
+      details: { draftId: draft.id }
+    },
+    database
+  );
   return draft;
 }
 
@@ -551,15 +554,18 @@ export async function softDeletePage(
     .where(eq(pages.id, input.pageId))
     .returning();
   await removeSearchIndex(input.pageId, database);
-  await writeAuditLog({
-    siteId: page.siteId,
-    actorId: input.actorId,
-    actorDisplayName: input.actorDisplayName,
-    action: "page.deleted",
-    targetType: "page",
-    targetId: page.id,
-    details: { title: page.title }
-  });
+  await writeAuditLog(
+    {
+      siteId: page.siteId,
+      actorId: input.actorId,
+      actorDisplayName: input.actorDisplayName,
+      action: "page.deleted",
+      targetType: "page",
+      targetId: page.id,
+      details: { title: page.title }
+    },
+    database
+  );
   return updated;
 }
 
@@ -590,15 +596,18 @@ export async function restorePage(
       database
     );
   }
-  await writeAuditLog({
-    siteId: page.siteId,
-    actorId: input.actorId,
-    actorDisplayName: input.actorDisplayName,
-    action: "page.restored",
-    targetType: "page",
-    targetId: page.id,
-    details: { title: page.title }
-  });
+  await writeAuditLog(
+    {
+      siteId: page.siteId,
+      actorId: input.actorId,
+      actorDisplayName: input.actorDisplayName,
+      action: "page.restored",
+      targetType: "page",
+      targetId: page.id,
+      details: { title: page.title }
+    },
+    database
+  );
   return updated;
 }
 

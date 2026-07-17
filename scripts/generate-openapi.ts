@@ -14,7 +14,36 @@ const spec = {
     },
     "/pages/{id}": {
       get: { summary: "Get page", responses: { "200": { description: "Page" } } },
-      patch: { summary: "Update page", responses: { "200": { description: "Updated" } } },
+      patch: {
+        summary: "Update, rename, publish, or restore page",
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                oneOf: [
+                  { type: "object", properties: { action: { const: "restore" } } },
+                  {
+                    type: "object",
+                    properties: {
+                      title: { type: "string" },
+                      slug: { type: "string" }
+                    }
+                  },
+                  {
+                    type: "object",
+                    properties: {
+                      markdown: { type: "string" },
+                      editSummary: { type: "string" },
+                      baseRevisionId: { type: ["string", "null"] }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        responses: { "200": { description: "Updated" } }
+      },
       delete: { summary: "Soft-delete page", responses: { "204": { description: "Deleted" } } }
     },
     "/pages/{id}/revisions": {

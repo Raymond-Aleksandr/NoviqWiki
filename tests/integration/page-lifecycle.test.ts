@@ -8,7 +8,9 @@ import {
   listRevisions,
   publishPage,
   renamePage,
-  rollbackPage
+  restorePage,
+  rollbackPage,
+  softDeletePage
 } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
 import { searchPages } from "@/modules/search/service";
@@ -141,5 +143,36 @@ describe("page lifecycle integration", () => {
     expect(rollback.revisionNumber).toBe(3);
     const revisions = await listRevisions(page.id, test.executor);
     expect(revisions).toHaveLength(3);
+
+    await softDeletePage(
+      {
+        pageId: page.id,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    const deletedSearch = await searchPages(
+      { siteId: setup.site.id, query: "test" },
+      test.executor
+    );
+    expect(deletedSearch.rows).not.toContainEqual(expect.objectContaining({ pageId: page.id }));
+
+    const restored = await restorePage(
+      {
+        pageId: page.id,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    expect(restored.status).toBe("published");
+    const restoredSearch = await searchPages(
+      { siteId: setup.site.id, query: "test" },
+      test.executor
+    );
+    expect(restoredSearch.rows).toContainEqual(
+      expect.objectContaining({ title: "Moved Topic", slug: "moved-topic" })
+    );
   });
 });

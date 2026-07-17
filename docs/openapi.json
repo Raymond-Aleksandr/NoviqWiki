@@ -38,7 +38,50 @@
         }
       },
       "patch": {
-        "summary": "Update page",
+        "summary": "Update, rename, publish, or restore page",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "const": "restore"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "slug": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "markdown": {
+                        "type": "string"
+                      },
+                      "editSummary": {
+                        "type": "string"
+                      },
+                      "baseRevisionId": {
+                        "type": ["string", "null"]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Updated"
