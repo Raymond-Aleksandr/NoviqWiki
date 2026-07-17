@@ -2058,8 +2058,8 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
           const rect = element.getBoundingClientRect();
           const isMobile = document.documentElement.clientWidth <= 560;
           const maxAllowedHeight = isMobile
-            ? Math.min(window.innerHeight * 0.46, 340)
-            : Math.min(window.innerHeight * 0.64, 520);
+            ? Math.min(window.innerHeight * 0.38, 260)
+            : Math.min(window.innerHeight * 0.56, 460);
           return rect.height > maxAllowedHeight + 2;
         })
         .map(summarize)

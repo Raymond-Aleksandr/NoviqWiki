@@ -46,7 +46,7 @@ html[data-theme="light"] {
   --modal-backdrop-bg: rgb(15 18 20 / 0.55);
   --selection-bg: var(--primary-soft);
   --article-media-max-inline-size: 720px;
-  --article-media-max-block-size: min(64vh, 520px);
+  --article-media-max-block-size: min(56vh, 460px);
   --article-media-padding: 12px;
   --stripe: #e3e7ec;
   --frame: #d0d5db;
@@ -125,7 +125,7 @@ html[data-theme="dark"] {
   --modal-backdrop-bg: rgb(0 0 0 / 0.62);
   --selection-bg: var(--primary-soft);
   --article-media-max-inline-size: 720px;
-  --article-media-max-block-size: min(64vh, 520px);
+  --article-media-max-block-size: min(56vh, 460px);
   --article-media-padding: 12px;
   --stripe: #282d30;
   --frame: #0c0d0e;
@@ -2459,6 +2459,15 @@ pre.citation-block {
   margin-bottom: 18px;
 }
 
+.article-body p,
+.article-body figure,
+.article-body a {
+  min-width: 0;
+  min-inline-size: 0;
+  max-width: 100%;
+  max-inline-size: 100%;
+}
+
 .article-body blockquote {
   border-left: 3px solid var(--primary);
   color: var(--text-muted);
@@ -2509,6 +2518,17 @@ pre.citation-block {
   height: auto;
   block-size: auto;
   object-fit: contain;
+}
+
+.article-body :where(p, figure) > :where(img, video, iframe, svg),
+.article-body p > a > img,
+.article-body figure > a > img {
+  width: auto;
+  inline-size: auto;
+  max-width: 100%;
+  max-inline-size: 100%;
+  max-height: var(--article-media-max-block-size);
+  max-block-size: var(--article-media-max-block-size);
 }
 
 .article-body :where(img, video) {
@@ -5367,7 +5387,7 @@ pre.citation-block {
   }
 
   .article-body {
-    --article-media-max-block-size: min(46vh, 340px);
+    --article-media-max-block-size: min(38vh, 260px);
     --article-media-padding: 8px;
   }
 
