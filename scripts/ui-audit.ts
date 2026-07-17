@@ -66,6 +66,7 @@ type RouteMetrics = {
   emptyStateRhythmMismatches: ElementSummary[];
   formLayoutRhythmMismatches: ElementSummary[];
   pageHeaderRhythmMismatches: ElementSummary[];
+  contentRowRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
   articleMediaWrapperOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
@@ -987,7 +988,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, form-layout, or page-header rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, form-layout, page-header, or content-row rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1377,6 +1378,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "page_header_rhythm_mismatch",
     metrics.pageHeaderRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "content_row_rhythm_mismatch",
+    metrics.contentRowRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -2718,6 +2726,83 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             descriptionMismatch ||
             viewportMismatch ||
             childOverflow
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      contentRowRhythmMismatches: visibleMatches(
+        [
+          ".activity-row",
+          ".timeline-row:not(.timeline-footer)",
+          ".page-index-row",
+          ".page-list-row",
+          ".backlink-row",
+          ".citation-meta > div",
+          ".article-facts > div",
+          ".admin-panel-row",
+          ".category-list a"
+        ].join(",")
+      )
+        .filter((element) => {
+          if (element.closest(".cm-editor, .article-body")) {
+            return false;
+          }
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const isGridExpected = element.matches(
+            ".activity-row, .timeline-row, .page-index-row, .citation-meta > div, .admin-status-row"
+          );
+          const isFlexExpected = element.matches(
+            ".page-list-row, .backlink-row, .article-facts > div, .admin-panel-row, .category-list a"
+          );
+          const displayMismatch =
+            (isGridExpected && style.display !== "grid") ||
+            (isFlexExpected &&
+              !element.matches(".admin-status-row") &&
+              style.display !== "flex" &&
+              style.display !== "grid");
+          const fontSize = Number.parseFloat(style.fontSize);
+          const lineHeight =
+            style.lineHeight === "normal" ? fontSize * 1.35 : Number.parseFloat(style.lineHeight);
+          const fontMismatch =
+            !/Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily) ||
+            !Number.isFinite(fontSize) ||
+            fontSize < 11.5 ||
+            fontSize > 15.5 ||
+            (Number.isFinite(lineHeight) && lineHeight > 23);
+          const rowGap = Number.parseFloat(style.rowGap);
+          const columnGap = Number.parseFloat(style.columnGap);
+          const gapValues = [rowGap, columnGap].filter((value) => Number.isFinite(value));
+          const gapMismatch =
+            element.children.length > 1 &&
+            (gapValues.length === 0 ||
+              gapValues.some((value) => value < 5 || value > 18));
+          const paddingTop = Number.parseFloat(style.paddingTop);
+          const paddingInline = Number.parseFloat(style.paddingLeft);
+          const paddingMismatch =
+            !Number.isFinite(paddingTop) ||
+            !Number.isFinite(paddingInline) ||
+            paddingTop < 5 ||
+            paddingTop > 18 ||
+            paddingInline < 9 ||
+            paddingInline > 20;
+          const isMobile = document.documentElement.clientWidth <= 560;
+          const viewportMismatch =
+            isMobile &&
+            (rect.left < -1 || rect.right > document.documentElement.clientWidth + 1);
+          const childOverflow = [...element.children].filter(visible).some((child) => {
+            const childRect = child.getBoundingClientRect();
+            return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+          });
+          const excessiveRowHeight = rect.height > (isMobile ? 190 : 160);
+          return (
+            displayMismatch ||
+            fontMismatch ||
+            gapMismatch ||
+            paddingMismatch ||
+            viewportMismatch ||
+            childOverflow ||
+            excessiveRowHeight
           );
         })
         .map(summarize)

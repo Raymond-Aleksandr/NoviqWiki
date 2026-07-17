@@ -1035,6 +1035,9 @@ textarea {
   margin: 0;
   padding: 12px 18px;
   border-bottom: 1px solid var(--border);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
 }
 
 .activity-row:last-child {
@@ -1233,6 +1236,9 @@ textarea {
   gap: 14px;
   padding: 14px 18px;
   border-bottom: 1px solid var(--border);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
 }
 
 .timeline-row:last-child {
@@ -1302,6 +1308,9 @@ textarea {
   gap: 14px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   padding: 13px 18px;
   text-decoration: none;
 }
@@ -1444,6 +1453,9 @@ textarea {
   grid-template-columns: 180px minmax(0, 1fr);
   gap: 12px;
   border-bottom: 1px solid var(--border);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   padding: 13px 18px;
 }
 
@@ -1663,6 +1675,9 @@ pre.citation-block {
   padding: 13px 18px;
   border-bottom: 1px solid var(--border);
   color: var(--link);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   text-decoration: none;
 }
 
@@ -2274,6 +2289,9 @@ pre.citation-block {
   border: 1px solid var(--border);
   border-radius: 9px;
   color: var(--text);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   padding: 9px 10px;
   text-decoration: none;
 }
@@ -2855,6 +2873,9 @@ pre.citation-block {
   gap: 10px;
   border-bottom: 1px solid var(--border);
   color: var(--text);
+  font-family: var(--nw-font-body);
+  font-size: 13.5px;
+  line-height: 1.35;
   padding: 13px 18px;
   text-decoration: none;
 }
