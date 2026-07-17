@@ -14,7 +14,7 @@ describe("localized errors", () => {
         new ConflictError("A page with this title or slug already exists."),
         zhCN
       )
-    ).toBe("已有页面使用该标题或 slug。");
+    ).toBe("已有页面使用该标题或路径名。");
     expect(localizeErrorMessage(new NotFoundError("Media asset not found."), zhCN)).toBe(
       "未找到媒体文件。"
     );

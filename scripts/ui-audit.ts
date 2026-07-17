@@ -72,6 +72,7 @@ type RouteMetrics = {
   rawAuditActions: string[];
   unlocalizedRevisionSummaries: string[];
   unlocalizedAuthorizationLabels: ElementSummary[];
+  unlocalizedFieldTerms: ElementSummary[];
 };
 
 type ModalMetrics = {
@@ -467,7 +468,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, unlocalized revision summaries, unlocalized authorization labels, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, unlocalized revision summaries, unlocalized authorization labels, unlocalized field terms, design token drift, page/control/media overflow, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -883,6 +884,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
     sizeName,
     route
   );
+  recordElementFailures(
+    "unlocalized_field_terms",
+    metrics.unlocalizedFieldTerms,
+    browserName,
+    sizeName,
+    route
+  );
 
   if (
     new URL(page.url()).pathname.startsWith("/admin") &&
@@ -1040,6 +1048,29 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             .map(summarize)
             .slice(0, 12)
         : [];
+    const unlocalizedFieldTerms = document.documentElement.lang.startsWith("zh")
+      ? visibleMatches(
+          [
+            "label",
+            "legend",
+            "button",
+            "a.button",
+            "option",
+            ".settings-kicker",
+            ".confirm-dialog",
+            ".notice",
+            ".error",
+            ".media-detail-label"
+          ].join(",")
+        )
+          .filter((element) =>
+            /\\b(?:Slug|slug|Logo URL|Favicon URL|Public URL|Media URL|Canonical URL)\\b/.test(
+              labelOf(element)
+            )
+          )
+          .map(summarize)
+          .slice(0, 12)
+      : [];
 
     const commandButtonsWithoutIcons = visibleMatches("button, a.button, [role='button']")
       .filter(
@@ -1254,7 +1285,8 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       ),
       rawAuditActions,
       unlocalizedRevisionSummaries,
-      unlocalizedAuthorizationLabels
+      unlocalizedAuthorizationLabels,
+      unlocalizedFieldTerms
     };
   })()`) as Promise<RouteMetrics>;
 }
