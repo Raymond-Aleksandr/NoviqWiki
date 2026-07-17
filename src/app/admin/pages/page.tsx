@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ChevronDown, History, Pencil, Plus, RotateCcw, Search } from "lucide-react";
 import {
+  archivePageAction,
   deletePageAction,
   renamePageAction,
   restorePageAction,
@@ -52,7 +53,7 @@ export default async function AdminPagesPage() {
             </div>
             <div className="page-status-stack" data-label={messages.status}>
               <span
-                className={`badge ${page.status === "published" ? "success" : page.status === "deleted" ? "danger" : "warning"}`}
+                className={`badge ${page.status === "published" ? "success" : page.status === "deleted" ? "danger" : page.status === "archived" ? "info" : "warning"}`}
               >
                 {pageStatusLabel(page.status, messages)}
               </span>
@@ -139,19 +140,35 @@ export default async function AdminPagesPage() {
                 cancelLabel={messages.cancel}
                 pendingLabel={messages.working}
               />
-              {page.status === "deleted" ? (
+              {page.status !== "deleted" && page.status !== "archived" ? (
+                <ConfirmActionForm
+                  action={archivePageAction}
+                  hiddenFields={[{ name: "pageId", value: page.id }]}
+                  triggerLabel={messages.archive}
+                  triggerClassName="button compact"
+                  icon="archive"
+                  title={`${messages.archivePage} · ${page.title}`}
+                  body={messages.archivePageConfirmBody}
+                  confirmLabel={messages.archive}
+                  cancelLabel={messages.cancel}
+                  pendingLabel={messages.working}
+                />
+              ) : null}
+              {page.status === "deleted" || page.status === "archived" ? (
                 <ActionForm
                   action={restorePageAction}
                   className="inline-form"
                   pendingLabel={messages.working}
                 >
                   <input type="hidden" name="pageId" value={page.id} />
+                  <input type="hidden" name="slug" value={page.slug} />
                   <button>
                     <RotateCcw size={14} aria-hidden="true" />
-                    {messages.restore}
+                    {page.status === "archived" ? messages.unarchive : messages.restore}
                   </button>
                 </ActionForm>
-              ) : (
+              ) : null}
+              {page.status !== "deleted" ? (
                 <ConfirmActionForm
                   action={deletePageAction}
                   hiddenFields={[{ name: "pageId", value: page.id }]}
@@ -166,7 +183,7 @@ export default async function AdminPagesPage() {
                   pendingLabel={messages.working}
                   danger
                 />
-              )}
+              ) : null}
             </div>
           </article>
         ))}

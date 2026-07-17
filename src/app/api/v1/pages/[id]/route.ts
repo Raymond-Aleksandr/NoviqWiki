@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ok, empty, apiError } from "@/modules/api/responses";
 import { requireApiContext } from "@/modules/api/auth";
 import {
+  archivePage,
   assertPageVisibleForRead,
   getPageWithCurrentRevision,
   publishPage,
@@ -13,7 +14,7 @@ import {
 import { ForbiddenError } from "@/lib/errors";
 
 const patchSchema = z.object({
-  action: z.enum(["restore"]).optional(),
+  action: z.enum(["archive", "restore"]).optional(),
   title: z.string().optional(),
   slug: z.string().optional(),
   markdown: z.string().optional(),
@@ -42,6 +43,15 @@ export async function PATCH(request: Request, { params }: Props) {
     if (!session) throw new ForbiddenError("Authentication required.");
     const { id } = await params;
     const body = patchSchema.parse(await request.json());
+    if (body.action === "archive") {
+      await requireApiContext("page.delete");
+      const page = await archivePage({
+        pageId: id,
+        actorId: session.user.id,
+        actorDisplayName: session.user.displayName
+      });
+      return ok({ page });
+    }
     if (body.action === "restore") {
       await requireApiContext("page.restore");
       const page = await restorePage({

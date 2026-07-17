@@ -228,7 +228,12 @@ export async function publishPage(
     );
     await tx
       .update(pages)
-      .set({ currentRevisionId: revision.id, status: "published", updatedAt: new Date() })
+      .set({
+        currentRevisionId: revision.id,
+        status: "published",
+        archivedAt: null,
+        updatedAt: new Date()
+      })
       .where(eq(pages.id, page.id));
     await tx
       .delete(pageDrafts)
@@ -557,7 +562,12 @@ export async function rollbackPage(
     );
     await tx
       .update(pages)
-      .set({ currentRevisionId: revision.id, status: "published", updatedAt: new Date() })
+      .set({
+        currentRevisionId: revision.id,
+        status: "published",
+        archivedAt: null,
+        updatedAt: new Date()
+      })
       .where(eq(pages.id, page.id));
     await updateRelationships(page.id, page.siteId, revision, tx);
     await upsertSearchIndex(
@@ -598,6 +608,7 @@ export async function softDeletePage(
       status: "deleted",
       deletedAt: new Date(),
       deletedById: input.actorId,
+      archivedAt: null,
       updatedAt: new Date()
     })
     .where(eq(pages.id, input.pageId))
@@ -618,6 +629,41 @@ export async function softDeletePage(
   return updated;
 }
 
+export async function archivePage(
+  input: { pageId: string; actorId: string; actorDisplayName: string },
+  database: RootDatabase = db
+) {
+  return database.transaction(async (tx) => {
+    const page = await getPageById(input.pageId, tx);
+    if (page.deletedAt || page.status === "deleted") {
+      throw new ConflictError("Deleted pages must be restored before archiving.");
+    }
+    await assertProtectedWriteAllowed(page, input.actorId, tx);
+    if (page.status === "archived") {
+      return page;
+    }
+    const [updated] = await tx
+      .update(pages)
+      .set({ status: "archived", archivedAt: new Date(), updatedAt: new Date() })
+      .where(eq(pages.id, input.pageId))
+      .returning();
+    await removeSearchIndex(input.pageId, tx);
+    await writeAuditLog(
+      {
+        siteId: page.siteId,
+        actorId: input.actorId,
+        actorDisplayName: input.actorDisplayName,
+        action: "page.updated",
+        targetType: "page",
+        targetId: page.id,
+        details: { title: page.title, previousStatus: page.status, status: "archived" }
+      },
+      tx
+    );
+    return updated;
+  });
+}
+
 export async function restorePage(
   input: { pageId: string; actorId: string; actorDisplayName: string },
   database: Database = db
@@ -630,6 +676,7 @@ export async function restorePage(
       status: revision ? "published" : "draft",
       deletedAt: null,
       deletedById: null,
+      archivedAt: null,
       updatedAt: new Date()
     })
     .where(eq(pages.id, input.pageId))

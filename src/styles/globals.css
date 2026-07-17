@@ -3198,7 +3198,7 @@ textarea {
   font-family: var(--nw-font-body);
 }
 
-.history-title {
+.page-title.history-title {
   margin-bottom: 18px;
   font-family: var(--nw-font-body);
   font-size: 34px;
@@ -3737,7 +3737,7 @@ textarea {
     justify-content: flex-end;
   }
 
-  .history-title {
+  .page-title.history-title {
     font-size: 30px;
   }
 
@@ -3754,18 +3754,35 @@ textarea {
   }
 
   .history-row .history-summary-cell {
-    align-items: flex-start;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    justify-content: initial;
+    column-gap: 12px;
+    row-gap: 2px;
+    text-align: left;
+  }
+
+  .history-row .history-summary-cell::before {
+    grid-row: 1 / span 2;
   }
 
   .history-summary-text {
-    max-width: 14rem;
-    font-size: 14px;
+    justify-self: end;
+    max-width: none;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.25;
     text-align: right;
   }
 
   .history-summary-date {
-    max-width: 14rem;
+    grid-column: 2;
+    justify-self: end;
+    max-width: none;
+    margin-top: 0;
     text-align: right;
+    white-space: nowrap;
   }
 
   .inline-form {

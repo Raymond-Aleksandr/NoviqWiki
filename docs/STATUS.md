@@ -30,8 +30,8 @@ Last updated: 2026-07-16
 | `pnpm format`                  | Passed                                              |
 | `pnpm lint`                    | Passed                                              |
 | `pnpm typecheck`               | Passed                                              |
-| `pnpm test`                    | Passed, 8 unit files / 18 tests                     |
-| `pnpm test:integration`        | Passed, 2 integration files / 3 tests               |
+| `pnpm test`                    | Passed, 9 unit files / 19 tests                     |
+| `pnpm test:integration`        | Passed, 3 integration files / 5 tests               |
 | `pnpm test:ui`                 | Passed, non-reset Chromium/WebKit UI release audit  |
 | `pnpm build`                   | Passed                                              |
 | `pnpm test:e2e`                | Passed, 2 Playwright tests                          |
@@ -91,6 +91,8 @@ Last updated: 2026-07-16
 - 2026-07-16: Completed global private wiki read enforcement. `publicMode=false` now removes anonymous read permissions for site/page/revision/media reads, public content routes redirect unauthenticated visitors to login, direct media file URLs fail closed, `/api/v1` read endpoints inherit the same permission check, and integration coverage verifies anonymous access flips from allowed to denied while Owner access remains intact.
 - 2026-07-16: Improved redirect transparency on article pages. Pages resolved through an alias now show a design-package notice with the original `/page/{slug}` source, while the existing alias resolution and redirect-loop protections remain service-layer behavior. SSR unit coverage verifies the redirect origin is rendered.
 - 2026-07-16: Hardened page slug and alias integrity. Page creation and rename now reject slugs already reserved by another page alias, while allowing a page to move back to its own previous slug and clearing the self-alias. Integration coverage verifies aliases cannot be shadowed by new pages or other page renames.
+- 2026-07-16: Completed the page archive lifecycle. Admin pages now expose a design-package archive confirmation flow, archived pages keep revision history and direct URLs, archive removes pages from the search index, restore clears `archivedAt` and reindexes published content, `/api/v1/pages/{id}` accepts `{"action":"archive"}`, and integration coverage verifies archive/restore search behavior plus protected-page enforcement.
+- 2026-07-16: Tightened mobile history typography after live Safari review. History summary rows now use a dedicated label/summary/date grid so edit summaries such as `Rollback to revision 1` stay readable instead of being squeezed into centered multi-line text; browser verification at `439x734` showed no horizontal overflow.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

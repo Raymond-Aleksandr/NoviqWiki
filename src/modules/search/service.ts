@@ -129,6 +129,7 @@ function escapeLikePattern(value: string) {
 }
 
 export async function rebuildSearchIndex(siteId: string, database: Database = db) {
+  await database.delete(searchIndex).where(eq(searchIndex.siteId, siteId));
   const current = await database
     .select({
       pageId: pages.id,

@@ -10,6 +10,7 @@ import { getPrimarySiteWithSettings } from "@/db/site";
 import { completeSetup } from "@/modules/setup/service";
 import { createUser } from "@/modules/users/service";
 import {
+  archivePage,
   createPage,
   compareRevisionsForRead,
   getRevisionForRead,
@@ -228,6 +229,42 @@ describe("page lifecycle integration", () => {
     const revisions = await listRevisions(page.id, test.executor);
     expect(revisions).toHaveLength(3);
 
+    const archived = await archivePage(
+      {
+        pageId: page.id,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    expect(archived.status).toBe("archived");
+    expect(archived.archivedAt).toBeInstanceOf(Date);
+    const archivedSearch = await searchPages(
+      { siteId: setup.site.id, query: "test" },
+      test.executor
+    );
+    expect(archivedSearch.rows).not.toContainEqual(expect.objectContaining({ pageId: page.id }));
+    const archivedRevisions = await listRevisions(page.id, test.executor);
+    expect(archivedRevisions).toHaveLength(3);
+
+    const restoredFromArchive = await restorePage(
+      {
+        pageId: page.id,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    expect(restoredFromArchive.status).toBe("published");
+    expect(restoredFromArchive.archivedAt).toBeNull();
+    const restoredFromArchiveSearch = await searchPages(
+      { siteId: setup.site.id, query: "test" },
+      test.executor
+    );
+    expect(restoredFromArchiveSearch.rows).toContainEqual(
+      expect.objectContaining({ title: "Moved Topic", slug: "moved-topic" })
+    );
+
     await softDeletePage(
       {
         pageId: page.id,
@@ -441,6 +478,17 @@ describe("page lifecycle integration", () => {
           actorDisplayName: editor.displayName
         },
         test.executor
+      )
+    ).rejects.toThrow("This page is protected.");
+
+    await expect(
+      archivePage(
+        {
+          pageId: page.id,
+          actorId: editor.id,
+          actorDisplayName: editor.displayName
+        },
+        test.db
       )
     ).rejects.toThrow("This page is protected.");
 

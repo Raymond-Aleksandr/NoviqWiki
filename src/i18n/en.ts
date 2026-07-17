@@ -304,6 +304,8 @@ export const en = {
   newTitle: "New title",
   newSlug: "New slug",
   keepPreviousSlugAsRedirect: "Keep the previous slug as a redirect",
+  archivePageConfirmBody:
+    "Archive this page. It keeps its revisions and direct URL, but removes the page from search until it is restored.",
   deletePageConfirmBody:
     "This soft-deletes the page and hides it from public browsing until an authorized user restores it.",
   deleteMediaConfirmBody:
@@ -335,11 +337,14 @@ export const en = {
   statusAll: "Status: All",
   updatedColumn: "Updated",
   revisions: "Revisions",
+  archive: "Archive",
+  unarchive: "Unarchive",
   restore: "Restore",
   protect: "Protect",
   unprotect: "Unprotect",
   protectPage: "Protect page",
   unprotectPage: "Unprotect page",
+  archivePage: "Archive page",
   pageProtected: "Protected",
   protectPageConfirmBody:
     "Protected pages require the page.protect permission before users can save drafts, publish, rename, delete, restore, or roll back the page.",
@@ -429,6 +434,7 @@ export const en = {
   rollbackNotCompleted: "Rollback was not completed.",
   pageDeleted: "Page deleted.",
   pageRestored: "Page restored.",
+  pageArchived: "Page archived.",
   pageRenamed: "Page renamed.",
   pageProtectionUpdated: "Page protection updated.",
   settingsUpdated: "Settings updated.",

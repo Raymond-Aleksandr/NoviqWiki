@@ -32,6 +32,7 @@ import {
 } from "@/modules/auth/session";
 import { deleteMedia, uploadMedia } from "@/modules/media/service";
 import {
+  archivePage,
   createPage,
   publishPage,
   renamePage,
@@ -283,6 +284,30 @@ export async function deletePageAction(
   }
 }
 
+export async function archivePageAction(
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    const session = await requireSession();
+    const site = await requireSite();
+    await requirePermission(session.user.id, site.site.id, "page.delete");
+    const page = await archivePage({
+      pageId: stringValue(formData, "pageId"),
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
+    });
+    revalidatePath("/admin/pages");
+    revalidatePath(`/page/${page.slug}`);
+    revalidatePath(`/history/${page.slug}`);
+    revalidatePath("/search");
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.pageArchived };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export async function restorePageAction(
   _state: ActionState,
   formData: FormData
@@ -297,6 +322,12 @@ export async function restorePageAction(
       actorDisplayName: session.user.displayName
     });
     revalidatePath("/admin/pages");
+    const slug = optionalString(formData, "slug");
+    if (slug) {
+      revalidatePath(`/page/${slug}`);
+      revalidatePath(`/history/${slug}`);
+    }
+    revalidatePath("/search");
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
     return { ok: true, message: messages.pageRestored };
   } catch (error) {

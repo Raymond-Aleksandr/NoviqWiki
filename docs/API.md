@@ -68,7 +68,7 @@ GET /api/v1/pages/{id}/revisions
 GET /api/v1/pages/{id}/backlinks
 ```
 
-The API delegates to the same page services as the server-rendered UI. `POST` and `PATCH` require page permissions and validate title, Markdown, summary, publish intent, and optimistic concurrency fields. `PATCH /api/v1/pages/{id}` accepts `{"action":"restore"}` to restore a soft-deleted page when the actor has `page.restore`, and `{"protectionLevel":"protected"}` or `{"protectionLevel":"none"}` to toggle page protection when the actor has `page.protect`. Protected pages require `page.protect` before server-side write operations such as draft saving, publication, rollback, rename, delete, or restore are applied.
+The API delegates to the same page services as the server-rendered UI. `POST` and `PATCH` require page permissions and validate title, Markdown, summary, publish intent, and optimistic concurrency fields. `PATCH /api/v1/pages/{id}` accepts `{"action":"archive"}` to archive a page and remove it from search when the actor has `page.delete`, `{"action":"restore"}` to restore a soft-deleted or archived page when the actor has `page.restore`, and `{"protectionLevel":"protected"}` or `{"protectionLevel":"none"}` to toggle page protection when the actor has `page.protect`. Protected pages require `page.protect` before server-side write operations such as draft saving, publication, rollback, rename, delete, archive, or restore are applied.
 
 Backlinks return published, non-deleted source pages that link to the requested page through stored wiki-link relationships.
 

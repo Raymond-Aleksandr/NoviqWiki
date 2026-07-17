@@ -2,7 +2,16 @@
 
 import { useActionState, useEffect, useId, useState } from "react";
 import type { ReactNode } from "react";
-import { AlertTriangle, Pencil, RotateCcw, ShieldCheck, ShieldOff, Trash2, X } from "lucide-react";
+import {
+  AlertTriangle,
+  Archive,
+  Pencil,
+  RotateCcw,
+  ShieldCheck,
+  ShieldOff,
+  Trash2,
+  X
+} from "lucide-react";
 import type { ActionState } from "@/app/actions";
 
 type HiddenField = {
@@ -10,7 +19,8 @@ type HiddenField = {
   value: string;
 };
 
-type ActionIconName = "trash" | "rollback" | "reset" | "rename" | "protect" | "unprotect";
+type ActionIconName =
+  "archive" | "trash" | "rollback" | "reset" | "rename" | "protect" | "unprotect";
 
 type Props = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
@@ -54,7 +64,7 @@ export function ConfirmActionForm({
   const [state, formAction, pending] = useActionState(action, initialState);
   const iconTone = danger
     ? "danger"
-    : icon === "rename" || icon === "unprotect"
+    : icon === "archive" || icon === "rename" || icon === "unprotect"
       ? "neutral"
       : "warning";
 
@@ -92,6 +102,8 @@ export function ConfirmActionForm({
               <span className={`confirm-dialog-icon ${iconTone}`}>
                 {icon === "rename" ? (
                   <Pencil size={19} aria-hidden="true" />
+                ) : icon === "archive" ? (
+                  <Archive size={19} aria-hidden="true" />
                 ) : icon === "protect" ? (
                   <ShieldCheck size={19} aria-hidden="true" />
                 ) : icon === "unprotect" ? (
@@ -135,6 +147,9 @@ export function ConfirmActionForm({
 }
 
 function ActionIcon({ icon, size }: { icon?: ActionIconName; size: number }) {
+  if (icon === "archive") {
+    return <Archive size={size} aria-hidden="true" />;
+  }
   if (icon === "trash") {
     return <Trash2 size={size} aria-hidden="true" />;
   }
