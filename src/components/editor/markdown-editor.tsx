@@ -227,7 +227,7 @@ export function MarkdownEditor({
                 <label>
                   {messages.mediaUrl}
                   <input
-                    className="field mono"
+                    className="field"
                     value={selectedMedia?.publicUrl ?? manualUrl}
                     onChange={(event) => {
                       setSelectedMediaId("");

@@ -130,7 +130,7 @@ export default async function AdminPagesPage({ searchParams }: Props) {
                     </label>
                     <label>
                       <span>{messages.newSlug}</span>
-                      <input className="field mono" name="newSlug" defaultValue={page.slug} />
+                      <input className="field" name="newSlug" defaultValue={page.slug} />
                     </label>
                     <label className="checkbox-row">
                       <input type="checkbox" name="createAlias" defaultChecked />

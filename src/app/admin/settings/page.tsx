@@ -36,12 +36,12 @@ export default async function AdminSettingsPage() {
           </label>
           <label>
             {messages.baseUrl}
-            <input className="field mono" name="baseUrl" defaultValue={settings.baseUrl} />
+            <input className="field" name="baseUrl" defaultValue={settings.baseUrl} />
           </label>
           <label>
             {messages.logoUrl}
             <input
-              className="field mono"
+              className="field"
               name="logoUrl"
               defaultValue={settings.logoUrl ?? ""}
               placeholder="/media/site-logo.png"
@@ -50,7 +50,7 @@ export default async function AdminSettingsPage() {
           <label>
             {messages.faviconUrl}
             <input
-              className="field mono"
+              className="field"
               name="faviconUrl"
               defaultValue={settings.faviconUrl ?? ""}
               placeholder="/favicon.ico"
@@ -136,7 +136,6 @@ export default async function AdminSettingsPage() {
           <label>
             {messages.featuredPageSlugs}
             <textarea
-              className="mono"
               name="homepageFeaturedPages"
               defaultValue={settings.homepageFeaturedPages.join(", ")}
               placeholder={messages.commaSeparatedSlugs}
@@ -145,7 +144,6 @@ export default async function AdminSettingsPage() {
           <label>
             {messages.featuredCategorySlugs}
             <textarea
-              className="mono"
               name="homepageFeaturedCategories"
               defaultValue={settings.homepageFeaturedCategories.join(", ")}
               placeholder={messages.commaSeparatedSlugs}
@@ -200,7 +198,6 @@ export default async function AdminSettingsPage() {
           <label>
             {messages.allowedMediaTypes}
             <textarea
-              className="mono"
               name="allowedMediaTypes"
               defaultValue={settings.allowedMediaTypes.join("\n")}
             />
