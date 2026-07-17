@@ -63,6 +63,7 @@ type RouteMetrics = {
   visibleDialogs: ElementSummary[];
   commandButtonsWithoutIcons: ElementSummary[];
   iconOnlyControlsWithoutNames: ElementSummary[];
+  buttonIconSizeMismatches: ElementSummary[];
   oversizedText: ElementSummary[];
   overlappingActivityRows: ElementSummary[];
   duplicateTimelineActions: ElementSummary[];
@@ -901,7 +902,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, unnamed icon-only controls, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1264,6 +1265,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "icon_only_controls_without_names",
     metrics.iconOnlyControlsWithoutNames,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "button_icon_size_mismatch",
+    metrics.buttonIconSizeMismatches,
     browserName,
     sizeName,
     route
@@ -1688,6 +1696,22 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       })
       .map(summarize)
       .slice(0, 12);
+    const buttonIconSizeMismatches = visibleMatches("button svg, a.button svg, [role='button'] svg")
+      .filter((icon) => {
+        const control = icon.closest("button, a.button, [role='button']");
+        if (
+          !control ||
+          control.closest(".media-grid") ||
+          control.closest(".media-picker-grid") ||
+          control.closest(".cm-editor")
+        ) {
+          return false;
+        }
+        const rect = icon.getBoundingClientRect();
+        return rect.width < 12 || rect.height < 12 || rect.width > 24 || rect.height > 24;
+      })
+      .map((icon) => summarize(icon.closest("button, a.button, [role='button']") ?? icon))
+      .slice(0, 12);
 
     const smallTargetSelectors = [
       "button",
@@ -1908,6 +1932,7 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
         .slice(0, 12),
       commandButtonsWithoutIcons,
       iconOnlyControlsWithoutNames,
+      buttonIconSizeMismatches,
       oversizedText,
       overlappingActivityRows: visibleMatches(".activity-row, .timeline-row:not(.timeline-footer)")
         .filter((element) => {
