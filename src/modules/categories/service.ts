@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import { categories, pageCategories, pages } from "@/db/schema";
 import { NotFoundError } from "@/lib/errors";
@@ -10,10 +10,18 @@ export async function listCategories(siteId: string, database: Database = db) {
       name: categories.name,
       slug: categories.slug,
       description: categories.description,
-      pageCount: sql<number>`count(${pageCategories.pageId})::int`
+      pageCount: sql<number>`count(${pages.id})::int`
     })
     .from(categories)
     .leftJoin(pageCategories, eq(pageCategories.categoryId, categories.id))
+    .leftJoin(
+      pages,
+      and(
+        eq(pages.id, pageCategories.pageId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt)
+      )
+    )
     .where(eq(categories.siteId, siteId))
     .groupBy(categories.id)
     .orderBy(categories.name);
@@ -35,7 +43,13 @@ export async function getCategoryWithPages(
     .select({ page: pages })
     .from(pageCategories)
     .innerJoin(pages, eq(pages.id, pageCategories.pageId))
-    .where(and(eq(pageCategories.categoryId, category.id), eq(pages.status, "published")))
+    .where(
+      and(
+        eq(pageCategories.categoryId, category.id),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt)
+      )
+    )
     .limit(input.limit ?? 50)
     .offset(input.offset ?? 0);
   return { category, pages: rows.map((row) => row.page) };

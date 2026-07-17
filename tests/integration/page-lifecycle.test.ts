@@ -33,6 +33,7 @@ import {
   softDeletePage,
   setPageProtection
 } from "@/modules/pages/service";
+import { getCategoryWithPages, listCategories } from "@/modules/categories/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
 import { searchPages } from "@/modules/search/service";
 import { createTestDatabase } from "../helpers/test-db";
@@ -214,6 +215,83 @@ describe("page lifecycle integration", () => {
     expect(search.rows[0]?.title).toBe("Lifecycle");
     const prefixSearch = await searchPages({ siteId: setup.site.id, query: "test" }, test.executor);
     expect(prefixSearch.rows).toContainEqual(expect.objectContaining({ title: "Lifecycle" }));
+
+    const machineLearning = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Machine Learning Notes",
+        markdown:
+          "# Machine Learning Notes\n\nSearchable neural body.\n\n[[Category:Machine Learning]]",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Add machine learning notes"
+      },
+      test.db
+    );
+    const unrelatedCategory = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Searchable Other Notes",
+        markdown: "# Searchable Other Notes\n\nSearchable neural body.\n\n[[Category:Other Topic]]",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Add other notes"
+      },
+      test.db
+    );
+    const archivedCategoryPage = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Archived Machine Learning Notes",
+        markdown:
+          "# Archived Machine Learning Notes\n\nSearchable archived body.\n\n[[Category:Machine Learning]]",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName,
+        editSummary: "Add archived category note"
+      },
+      test.db
+    );
+    await archivePage(
+      {
+        pageId: archivedCategoryPage.page.id,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    const categoryFilteredSearch = await searchPages(
+      { siteId: setup.site.id, query: "searchable", category: "machine-learning" },
+      test.executor
+    );
+    expect(categoryFilteredSearch.rows).toContainEqual(
+      expect.objectContaining({ title: "Machine Learning Notes" })
+    );
+    expect(categoryFilteredSearch.rows).not.toContainEqual(
+      expect.objectContaining({ title: "Searchable Other Notes" })
+    );
+    expect(categoryFilteredSearch.rows).not.toContainEqual(
+      expect.objectContaining({ title: "Archived Machine Learning Notes" })
+    );
+    const categories = await listCategories(setup.site.id, test.executor);
+    expect(categories).toContainEqual(
+      expect.objectContaining({ slug: "machine-learning", pageCount: 1 })
+    );
+    const machineLearningCategory = await getCategoryWithPages(
+      { siteId: setup.site.id, slug: "machine-learning" },
+      test.executor
+    );
+    expect(machineLearningCategory.pages.map((categoryPage) => categoryPage.id)).toContain(
+      machineLearning.page.id
+    );
+    expect(machineLearningCategory.pages.map((categoryPage) => categoryPage.id)).not.toContain(
+      archivedCategoryPage.page.id
+    );
+    expect(machineLearningCategory.pages.map((categoryPage) => categoryPage.id)).not.toContain(
+      unrelatedCategory.page.id
+    );
 
     const renamed = await renamePage(
       {

@@ -1,6 +1,13 @@
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
-import { pageAliases, pageRevisions, pages, searchIndex } from "@/db/schema";
+import {
+  categories,
+  pageAliases,
+  pageCategories,
+  pageRevisions,
+  pages,
+  searchIndex
+} from "@/db/schema";
 
 export async function upsertSearchIndex(
   input: {
@@ -64,7 +71,14 @@ export async function searchPages(
   const likePattern = `%${escapeLikePattern(trimmed)}%`;
   const startsWithPattern = `${escapeLikePattern(trimmed)}%`;
   const categoryWhere = input.category
-    ? ilike(searchIndex.categories, `%${input.category}%`)
+    ? sql`exists (
+        select 1
+        from ${pageCategories}
+        inner join ${categories} on ${categories.id} = ${pageCategories.categoryId}
+        where ${pageCategories.pageId} = ${searchIndex.pageId}
+          and ${categories.siteId} = ${input.siteId}
+          and ${categories.slug} = ${input.category}
+      )`
     : undefined;
   const visibility = input.includeDeleted
     ? undefined
@@ -140,7 +154,9 @@ export async function rebuildSearchIndex(siteId: string, database: Database = db
     })
     .from(pages)
     .innerJoin(pageRevisions, eq(pages.currentRevisionId, pageRevisions.id))
-    .where(and(eq(pages.siteId, siteId), eq(pages.status, "published")));
+    .where(
+      and(eq(pages.siteId, siteId), eq(pages.status, "published"), sql`${pages.deletedAt} is null`)
+    );
   for (const row of current) {
     await upsertSearchIndex(
       {
