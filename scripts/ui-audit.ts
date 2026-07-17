@@ -64,6 +64,7 @@ type RouteMetrics = {
   textContentOverflow: ElementSummary[];
   surfaceRhythmMismatches: ElementSummary[];
   emptyStateRhythmMismatches: ElementSummary[];
+  formLayoutRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
   articleMediaWrapperOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
@@ -985,7 +986,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, or empty-state rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge, navigation, empty-state, or form-layout rhythm drift, control, placeholder, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1361,6 +1362,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "empty_state_rhythm_mismatch",
     metrics.emptyStateRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "form_layout_rhythm_mismatch",
+    metrics.formLayoutRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -2497,6 +2505,134 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
             !hasBackground ||
             !hasRadius ||
             !fitsMobile
+          );
+        })
+        .map(summarize)
+        .slice(0, 12),
+      formLayoutRhythmMismatches: visibleMatches(
+        [
+          ".form",
+          ".admin-form-grid",
+          ".admin-filter-bar",
+          ".settings-card",
+          ".group-edit-form",
+          ".role-edit-form",
+          ".editor-footer",
+          ".history-compare-form",
+          ".confirm-actions",
+          ".confirm-field-grid",
+          ".settings-actions",
+          ".homepage-section-toggles",
+          ".setup-fields",
+          ".setup-actions",
+          ".media-actions",
+          ".page-header-actions",
+          ".filter-pills",
+          ".auth-links",
+          ".search-form-main"
+        ].join(",")
+      )
+        .filter((element) => {
+          if (element.closest(".cm-editor, .article-body")) {
+            return false;
+          }
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const display = style.display;
+          const rowGap = Number.parseFloat(style.rowGap);
+          const columnGap = Number.parseFloat(style.columnGap);
+          const children = [...element.children].filter(visible);
+          const isGridExpected = element.matches(
+            [
+              ".form",
+              ".admin-form-grid",
+              ".settings-card",
+              ".group-edit-form",
+              ".role-edit-form",
+              ".history-compare-form",
+              ".confirm-field-grid",
+              ".homepage-section-toggles",
+              ".setup-fields"
+            ].join(",")
+          );
+          const isFlexExpected = element.matches(
+            [
+              ".admin-filter-bar",
+              ".editor-footer",
+              ".confirm-actions",
+              ".settings-actions",
+              ".setup-actions",
+              ".media-actions",
+              ".page-header-actions",
+              ".filter-pills",
+              ".auth-links",
+              ".search-form-main"
+            ].join(",")
+          );
+          const displayMismatch =
+            (isGridExpected && display !== "grid") ||
+            (isFlexExpected && display !== "flex" && display !== "grid");
+          const gapValues = [rowGap, columnGap].filter((value) => Number.isFinite(value));
+          const hasMeasuredGap = gapValues.length > 0;
+          const minGap = element.matches(".homepage-section-toggles") ? 6 : 4;
+          const maxGap = element.matches(".setup-actions")
+            ? 24
+            : element.matches(".settings-card, .form, .admin-form-grid")
+              ? 18
+              : 16;
+          const gapMismatch =
+            children.length > 1 &&
+            (!hasMeasuredGap ||
+              gapValues.some((value) => value < minGap || value > maxGap));
+          const isMobile = document.documentElement.clientWidth <= 560;
+          const isScrollableRow = element.matches(".admin-filter-bar, .filter-pills");
+          const viewportMismatch =
+            !isScrollableRow &&
+            isMobile &&
+            (rect.left < -1 || rect.right > document.documentElement.clientWidth + 1);
+          const childOverflow =
+            !isScrollableRow &&
+            children.some((child) => {
+              const childRect = child.getBoundingClientRect();
+              return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
+            });
+          const paddingTop = Number.parseFloat(style.paddingTop);
+          const paddingInline = Number.parseFloat(style.paddingLeft);
+          const adminFilterPaddingMismatch =
+            element.matches(".admin-filter-bar") &&
+            (!Number.isFinite(paddingTop) ||
+              !Number.isFinite(paddingInline) ||
+              paddingTop < 8 ||
+              paddingTop > 16 ||
+              paddingInline < 10 ||
+              paddingInline > 20);
+          const settingsPaddingMismatch =
+            element.matches(".settings-card") &&
+            (!Number.isFinite(paddingTop) ||
+              !Number.isFinite(paddingInline) ||
+              paddingTop < 16 ||
+              paddingTop > 26 ||
+              paddingInline < 14 ||
+              paddingInline > 26);
+          const togglePaddingMismatch =
+            element.matches(".homepage-section-toggles") &&
+            (!Number.isFinite(paddingTop) ||
+              !Number.isFinite(paddingInline) ||
+              paddingTop < 10 ||
+              paddingTop > 14 ||
+              paddingInline < 10 ||
+              paddingInline > 14);
+          const compactFilterHeightMismatch =
+            element.matches(".admin-filter-bar") && isMobile && rect.height > 58;
+          return (
+            displayMismatch ||
+            gapMismatch ||
+            viewportMismatch ||
+            childOverflow ||
+            adminFilterPaddingMismatch ||
+            settingsPaddingMismatch ||
+            togglePaddingMismatch ||
+            compactFilterHeightMismatch
           );
         })
         .map(summarize)
