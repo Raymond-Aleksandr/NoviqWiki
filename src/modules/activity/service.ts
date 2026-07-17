@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
-import { auditLogs, pages, type AuditLog } from "@/db/schema";
+import { auditLogs, mediaAssets, pages, type AuditLog } from "@/db/schema";
 
 const publicRecentChangeActions = [
   "page.created",
@@ -53,6 +53,7 @@ type ListRecentChangesInput = {
 };
 
 export type RecentChangeWithTarget = AuditLog & {
+  targetHref: string | null;
   targetLabel: string;
 };
 
@@ -104,16 +105,71 @@ export async function listRecentChangesWithTargets(
   const pageRows =
     pageIds.length > 0
       ? await database
-          .select({ id: pages.id, title: pages.title })
+          .select({
+            id: pages.id,
+            title: pages.title,
+            slug: pages.slug,
+            status: pages.status,
+            deletedAt: pages.deletedAt
+          })
           .from(pages)
-          .where(inArray(pages.id, pageIds))
+          .where(and(eq(pages.siteId, input.siteId), inArray(pages.id, pageIds)))
       : [];
-  const pageTitles = new Map(pageRows.map((page) => [page.id, page.title]));
+  const pageTargets = new Map(
+    pageRows.map((page) => [
+      page.id,
+      {
+        href: page.status === "deleted" || page.deletedAt ? null : `/page/${page.slug}`,
+        label: page.title
+      }
+    ])
+  );
 
-  return changes.map((change) => ({
-    ...change,
-    targetLabel: recentChangeTargetLabel(change, pageTitles.get(change.targetId ?? ""))
-  }));
+  const mediaIds = [
+    ...new Set(
+      changes
+        .filter(
+          (change) =>
+            change.targetType === "media" && change.targetId && uuidPattern.test(change.targetId)
+        )
+        .map((change) => change.targetId as string)
+    )
+  ];
+  const mediaRows =
+    mediaIds.length > 0
+      ? await database
+          .select({
+            id: mediaAssets.id,
+            safeFilename: mediaAssets.safeFilename,
+            publicUrl: mediaAssets.publicUrl,
+            deletedAt: mediaAssets.deletedAt
+          })
+          .from(mediaAssets)
+          .where(and(eq(mediaAssets.siteId, input.siteId), inArray(mediaAssets.id, mediaIds)))
+      : [];
+  const mediaTargets = new Map(
+    mediaRows.map((asset) => [
+      asset.id,
+      {
+        href: asset.deletedAt ? null : asset.publicUrl,
+        label: asset.safeFilename
+      }
+    ])
+  );
+
+  return changes.map((change) => {
+    const target =
+      change.targetType === "page"
+        ? pageTargets.get(change.targetId ?? "")
+        : change.targetType === "media"
+          ? mediaTargets.get(change.targetId ?? "")
+          : undefined;
+    return {
+      ...change,
+      targetHref: target?.href ?? null,
+      targetLabel: recentChangeTargetLabel(change, target?.label)
+    };
+  });
 }
 
 function recentChangeTargetLabel(change: AuditLog, pageTitle?: string) {

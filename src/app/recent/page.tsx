@@ -79,7 +79,13 @@ export default async function RecentChangesPage({ searchParams }: Props) {
                 {auditActionLabel(change.action, messages)}
               </span>
               <span className="timeline-title">
-                <strong>{change.targetLabel}</strong>
+                {change.targetHref ? (
+                  <Link href={change.targetHref}>
+                    <strong>{change.targetLabel}</strong>
+                  </Link>
+                ) : (
+                  <strong>{change.targetLabel}</strong>
+                )}
                 <span className="muted">{auditActionLabel(change.action, messages)}</span>
               </span>
               <span className="timeline-meta">

@@ -1140,6 +1140,23 @@ textarea {
   flex: 1;
 }
 
+.timeline-title a {
+  display: block;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.timeline-title a:hover,
+.timeline-title a:focus-visible {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.timeline-title a:hover strong,
+.timeline-title a:focus-visible strong {
+  color: var(--primary);
+}
+
 .timeline-title strong {
   display: block;
   overflow: hidden;
