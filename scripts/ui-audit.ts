@@ -72,6 +72,7 @@ type RouteMetrics = {
   buttonIconSpacingMismatches: ElementSummary[];
   commandButtonSizeMismatches: ElementSummary[];
   badgeRhythmMismatches: ElementSummary[];
+  navigationRhythmMismatches: ElementSummary[];
   oversizedText: ElementSummary[];
   overlappingActivityRows: ElementSummary[];
   duplicateTimelineActions: ElementSummary[];
@@ -971,7 +972,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge rhythm drift, control, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, mobile admin grid label drift, stray dialogs, tiny or oversized controls, badge or navigation rhythm drift, control, heading, or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1397,6 +1398,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "badge_rhythm_mismatch",
     metrics.badgeRhythmMismatches,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "navigation_rhythm_mismatch",
+    metrics.navigationRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -1969,6 +1977,43 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       })
       .map(summarize)
       .slice(0, 12);
+    const navigationRhythmMismatches = visibleMatches(
+      ".nav-list a, .admin-tabs a, .article-tabs .button, .article-tabs button"
+    )
+      .filter((element) => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        const fontSize = Number.parseFloat(style.fontSize);
+        const columnGap = Number.parseFloat(style.columnGap);
+        const shorthandGap = Number.parseFloat(style.gap);
+        const gap = Number.isFinite(columnGap) ? columnGap : shorthandGap;
+        const usesFlexDisplay = style.display === "inline-flex" || style.display === "flex";
+        const usesBodyFont = /Hanken Grotesk|Noto Sans SC/i.test(style.fontFamily);
+        const icon = element.querySelector("svg");
+        const iconRect = icon?.getBoundingClientRect();
+        const iconSized =
+          iconRect
+            ? iconRect.width >= 14 &&
+              iconRect.width <= 20 &&
+              iconRect.height >= 14 &&
+              iconRect.height <= 20
+            : false;
+        const compactHeight = rect.height >= 30 && rect.height <= 44;
+        const compactFont = Number.isFinite(fontSize) && fontSize >= 12.5 && fontSize <= 15.5;
+        const compactGap = Number.isFinite(gap) && gap >= 6 && gap <= 14;
+        return (
+          !usesFlexDisplay ||
+          style.alignItems !== "center" ||
+          !usesBodyFont ||
+          !compactHeight ||
+          !compactFont ||
+          !compactGap ||
+          !icon ||
+          !iconSized
+        );
+      })
+      .map(summarize)
+      .slice(0, 12);
 
     const smallTargetSelectors = [
       "button",
@@ -2374,6 +2419,7 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
       buttonIconSpacingMismatches,
       commandButtonSizeMismatches,
       badgeRhythmMismatches,
+      navigationRhythmMismatches,
       oversizedText,
       overlappingActivityRows: visibleMatches(".activity-row, .timeline-row:not(.timeline-footer)")
         .filter((element) => {
