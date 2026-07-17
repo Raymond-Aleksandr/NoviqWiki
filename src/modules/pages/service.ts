@@ -503,6 +503,13 @@ export type DeadEndPage = {
   updatedAt: Date;
 };
 
+export type UncategorizedPage = {
+  pageId: string;
+  title: string;
+  slug: string;
+  updatedAt: Date;
+};
+
 export type PublishedPageIndexEntry = {
   pageId: string;
   title: string;
@@ -661,6 +668,35 @@ export async function listDeadEndPages(
               or ${pageLinks.targetNormalizedTitle} = dead_target_pages.normalized_title
             )
           where ${pageLinks.sourcePageId} = ${pages.id}
+        )`
+      )
+    )
+    .orderBy(desc(pages.updatedAt), asc(pages.title))
+    .limit(input.limit ?? 100)
+    .offset(input.offset ?? 0);
+}
+
+export async function listUncategorizedPages(
+  input: { siteId: string; limit?: number; offset?: number },
+  database: Database = db
+): Promise<UncategorizedPage[]> {
+  return database
+    .select({
+      pageId: pages.id,
+      title: pages.title,
+      slug: pages.slug,
+      updatedAt: pages.updatedAt
+    })
+    .from(pages)
+    .where(
+      and(
+        eq(pages.siteId, input.siteId),
+        eq(pages.status, "published"),
+        isNull(pages.deletedAt),
+        sql`not exists (
+          select 1
+          from ${pageCategories}
+          where ${pageCategories.pageId} = ${pages.id}
         )`
       )
     )
