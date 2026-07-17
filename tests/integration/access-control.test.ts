@@ -7,9 +7,11 @@ import {
   createGroup,
   createRole,
   getGroupSummaries,
+  getUserGroupMemberships,
   hasPermission,
   updateGroup,
-  updateRole
+  updateRole,
+  updateUserGroups
 } from "@/modules/authorization/permissions";
 import { updateSiteSettings } from "@/modules/settings/service";
 import { completeSetup } from "@/modules/setup/service";
@@ -258,6 +260,116 @@ describe("site visibility access control", () => {
     await expect(
       hasPermission(setup.owner.id, setup.site.id, "backup.create", test.executor)
     ).resolves.toBe(true);
+    await expect(
+      hasPermission(setup.owner.id, setup.site.id, "role.manage", test.executor)
+    ).resolves.toBe(true);
+  });
+
+  it("updates user group memberships while preserving the final Owner invariant", async () => {
+    const test = await createTestDatabase();
+    const setup = await completeSetup(
+      {
+        siteName: "User Groups Wiki",
+        tagline: "Test",
+        baseUrl: "http://localhost:3000",
+        registrationMode: "closed",
+        mediaDriver: "local",
+        ownerUsername: "owner",
+        ownerEmail: "owner-user-groups@example.test",
+        ownerPassword: "OwnerPassword123"
+      },
+      test.db
+    );
+    const member = await createUser(
+      {
+        username: "member",
+        email: "member-user-groups@example.test",
+        password: "MemberPassword123",
+        displayName: "Member"
+      },
+      test.executor
+    );
+    const [readerGroup] = await test.executor
+      .select()
+      .from(groups)
+      .where(and(eq(groups.siteId, setup.site.id), eq(groups.normalizedName, "readers")))
+      .limit(1);
+    const [editorRole] = await test.executor
+      .select({ id: roles.id })
+      .from(roles)
+      .where(and(eq(roles.siteId, setup.site.id), eq(roles.normalizedName, "editor")))
+      .limit(1);
+    if (!readerGroup || !editorRole) {
+      throw new Error("Expected setup to create reader group and editor role.");
+    }
+    const editorGroup = await createGroup(
+      { siteId: setup.site.id, name: "Article editors" },
+      test.executor
+    );
+    await updateGroup(
+      {
+        siteId: setup.site.id,
+        groupId: editorGroup.id,
+        name: editorGroup.name,
+        description: editorGroup.description,
+        roleIds: [editorRole.id],
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+
+    await updateUserGroups(
+      {
+        siteId: setup.site.id,
+        userId: member.id,
+        groupIds: [readerGroup.id],
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    await expect(hasPermission(member.id, setup.site.id, "page.read", test.executor)).resolves.toBe(
+      true
+    );
+    await expect(
+      hasPermission(member.id, setup.site.id, "page.publish", test.executor)
+    ).resolves.toBe(false);
+
+    const memberships = await updateUserGroups(
+      {
+        siteId: setup.site.id,
+        userId: member.id,
+        groupIds: [editorGroup.id],
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    expect(memberships.map((membership) => membership.groupName)).toEqual(["Article editors"]);
+    await expect(
+      hasPermission(member.id, setup.site.id, "page.publish", test.executor)
+    ).resolves.toBe(true);
+    await expect(
+      getUserGroupMemberships(setup.site.id, [member.id], test.executor)
+    ).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ groupId: editorGroup.id, groupName: "Article editors" })
+      ])
+    );
+
+    await expect(
+      updateUserGroups(
+        {
+          siteId: setup.site.id,
+          userId: setup.owner.id,
+          groupIds: [],
+          actorId: setup.owner.id,
+          actorDisplayName: setup.owner.displayName
+        },
+        test.db
+      )
+    ).rejects.toThrow("The final active Owner cannot be suspended or demoted.");
     await expect(
       hasPermission(setup.owner.id, setup.site.id, "role.manage", test.executor)
     ).resolves.toBe(true);

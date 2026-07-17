@@ -24,6 +24,7 @@ const exactMessageKeys: Record<string, MessageKey> = {
   "The final active Owner cannot be suspended or demoted.": "finalOwnerInvariant",
   "Group name is required.": "groupNameRequired",
   "A group with that name already exists.": "groupAlreadyExists",
+  "Group not found.": "groupNotFound",
   "Built-in groups cannot be renamed.": "builtInGroupRenameDenied",
   "Role name is required.": "roleNameRequired",
   "A role with that name already exists.": "roleAlreadyExists",

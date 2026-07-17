@@ -92,6 +92,28 @@ const spec = {
     "/admin/users": {
       get: { summary: "List users", responses: { "200": { description: "Users" } } }
     },
+    "/admin/users/{id}": {
+      patch: {
+        summary: "Update user group memberships",
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  groupIds: {
+                    type: "array",
+                    items: { type: "string", format: "uuid" }
+                  }
+                },
+                required: ["groupIds"]
+              }
+            }
+          }
+        },
+        responses: { "200": { description: "User groups" } }
+      }
+    },
     "/admin/groups": {
       get: { summary: "List groups", responses: { "200": { description: "Groups" } } },
       post: { summary: "Create group", responses: { "201": { description: "Group" } } }

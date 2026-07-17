@@ -1,42 +1,43 @@
-import { eq, inArray } from "drizzle-orm";
-import { Pause, Play, Plus } from "lucide-react";
-import { createUserAction, resetUserSessionsAction, updateUserStatusAction } from "@/app/actions";
+import { Pause, Play, Plus, Save, UsersRound } from "lucide-react";
+import {
+  createUserAction,
+  resetUserSessionsAction,
+  updateUserGroupsAction,
+  updateUserStatusAction
+} from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
-import { db } from "@/db/client";
-import { groupRoles, groups, roles, userGroups } from "@/db/schema";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
+import { getGroupSummaries, getUserGroupMemberships } from "@/modules/authorization/permissions";
 import { listUsers } from "@/modules/users/service";
 
 export default async function AdminUsersPage() {
   const site = await getPrimarySiteWithSettings();
   const rows = await listUsers({ limit: 200 });
-  const groupRows = await db
-    .select()
-    .from(groups)
-    .where(eq(groups.siteId, site!.site.id))
-    .orderBy(groups.name);
-  const roleRows =
-    rows.length > 0
-      ? await db
-          .select({
-            userId: userGroups.userId,
-            roleName: roles.name
-          })
-          .from(userGroups)
-          .innerJoin(groupRoles, eq(groupRoles.groupId, userGroups.groupId))
-          .innerJoin(roles, eq(roles.id, groupRoles.roleId))
-          .where(
-            inArray(
-              userGroups.userId,
-              rows.map((user) => user.id)
-            )
-          )
-      : [];
-  const roleMap = new Map<string, string[]>();
-  for (const row of roleRows) {
-    roleMap.set(row.userId, [...(roleMap.get(row.userId) ?? []), row.roleName]);
+  const groupRows = await getGroupSummaries(site!.site.id);
+  const memberships = await getUserGroupMemberships(
+    site!.site.id,
+    rows.map((user) => user.id)
+  );
+  const roleMap = new Map<string, Set<string>>();
+  const groupMap = new Map<string, { id: string; name: string }[]>();
+  const groupSeenMap = new Map<string, Set<string>>();
+  for (const row of memberships) {
+    const seenGroups = groupSeenMap.get(row.userId) ?? new Set<string>();
+    if (!seenGroups.has(row.groupId)) {
+      groupMap.set(row.userId, [
+        ...(groupMap.get(row.userId) ?? []),
+        { id: row.groupId, name: row.groupName }
+      ]);
+      seenGroups.add(row.groupId);
+      groupSeenMap.set(row.userId, seenGroups);
+    }
+    if (row.roleName) {
+      const roles = roleMap.get(row.userId) ?? new Set<string>();
+      roles.add(row.roleName);
+      roleMap.set(row.userId, roles);
+    }
   }
   const { locale, messages } = await getRequestI18n(site!.settings?.defaultLocale);
   return (
@@ -86,6 +87,7 @@ export default async function AdminUsersPage() {
         <div className="admin-grid-header admin-users-grid admin-grid-users">
           <div>{messages.user}</div>
           <div>{messages.email}</div>
+          <div>{messages.groups}</div>
           <div>{messages.role}</div>
           <div>{messages.status}</div>
           <div>{messages.lastLogin}</div>
@@ -102,8 +104,21 @@ export default async function AdminUsersPage() {
             <div className="mono muted" data-label={messages.email}>
               {user.email}
             </div>
+            <div className="user-group-badges" data-label={messages.groups}>
+              {(groupMap.get(user.id) ?? []).length > 0 ? (
+                groupMap.get(user.id)?.map((group) => (
+                  <span className="badge info" key={group.id}>
+                    {group.name}
+                  </span>
+                ))
+              ) : (
+                <span className="muted">{messages.noGroup}</span>
+              )}
+            </div>
             <div data-label={messages.role}>
-              <span className="role-badge">{roleMap.get(user.id)?.join(", ") ?? "-"}</span>
+              <span className="role-badge">
+                {[...(roleMap.get(user.id) ?? new Set<string>())].join(", ") || "-"}
+              </span>
             </div>
             <div data-label={messages.status}>
               <span className={`status-badge ${user.status}`}>
@@ -114,6 +129,45 @@ export default async function AdminUsersPage() {
               {user.lastLoginAt?.toLocaleString(locale) ?? messages.never}
             </div>
             <div className="admin-action-list" data-label={messages.actions}>
+              <details className="user-group-editor">
+                <summary className="button compact">
+                  <UsersRound size={14} aria-hidden="true" />
+                  {messages.groups}
+                </summary>
+                <ActionForm
+                  action={updateUserGroupsAction}
+                  className="user-group-form"
+                  pendingLabel={messages.working}
+                  statusMode="compact"
+                >
+                  <input type="hidden" name="userId" value={user.id} />
+                  <fieldset>
+                    <legend>{messages.groups}</legend>
+                    <div className="user-group-checkboxes">
+                      {groupRows.map((group) => {
+                        const userGroupIds = new Set(
+                          (groupMap.get(user.id) ?? []).map((membership) => membership.id)
+                        );
+                        return (
+                          <label className="checkbox-row" key={`${user.id}-${group.id}`}>
+                            <input
+                              type="checkbox"
+                              name="groupId"
+                              value={group.id}
+                              defaultChecked={userGroupIds.has(group.id)}
+                            />
+                            <span>{group.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                  <button className="button compact primary">
+                    <Save size={14} aria-hidden="true" />
+                    {messages.saveChanges}
+                  </button>
+                </ActionForm>
+              </details>
               <ActionForm
                 action={updateUserStatusAction}
                 className="inline-form"

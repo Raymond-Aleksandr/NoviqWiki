@@ -517,6 +517,105 @@ export async function assignRoleToGroup(groupId: string, roleId: string, databas
   await database.insert(groupRoles).values({ groupId, roleId }).onConflictDoNothing();
 }
 
+export async function getUserGroupMemberships(
+  siteId: string,
+  userIds: string[],
+  database: Database = db
+) {
+  const uniqueUserIds = Array.from(new Set(userIds));
+  if (uniqueUserIds.length === 0) {
+    return [];
+  }
+  return database
+    .select({
+      userId: userGroups.userId,
+      groupId: groups.id,
+      groupName: groups.name,
+      roleName: roles.name
+    })
+    .from(userGroups)
+    .innerJoin(groups, eq(groups.id, userGroups.groupId))
+    .leftJoin(groupRoles, eq(groupRoles.groupId, groups.id))
+    .leftJoin(roles, eq(roles.id, groupRoles.roleId))
+    .where(and(eq(groups.siteId, siteId), inArray(userGroups.userId, uniqueUserIds)))
+    .orderBy(groups.name, roles.name);
+}
+
+export async function updateUserGroups(
+  input: {
+    siteId: string;
+    userId: string;
+    groupIds: string[];
+    actorId?: string;
+    actorDisplayName?: string;
+  },
+  database: RootDatabase = db
+) {
+  return database.transaction(async (tx) => {
+    const [user] = await tx.select().from(users).where(eq(users.id, input.userId)).limit(1);
+    if (!user) {
+      throw new NotFoundError("User not found.");
+    }
+
+    const siteGroups = await tx
+      .select({ id: groups.id, name: groups.name })
+      .from(groups)
+      .where(eq(groups.siteId, input.siteId));
+    const siteGroupIds = new Set(siteGroups.map((group) => group.id));
+    const selectedGroupIds = Array.from(new Set(input.groupIds.filter((id) => id.trim() !== "")));
+    const invalidGroup = selectedGroupIds.find((groupId) => !siteGroupIds.has(groupId));
+    if (invalidGroup) {
+      throw new NotFoundError("Group not found.");
+    }
+
+    if (siteGroups.length > 0) {
+      await tx.delete(userGroups).where(
+        and(
+          eq(userGroups.userId, input.userId),
+          inArray(
+            userGroups.groupId,
+            siteGroups.map((group) => group.id)
+          )
+        )
+      );
+    }
+
+    if (selectedGroupIds.length > 0) {
+      await tx
+        .insert(userGroups)
+        .values(selectedGroupIds.map((groupId) => ({ userId: input.userId, groupId })))
+        .onConflictDoNothing();
+    }
+
+    if ((await countActiveOwners(input.siteId, tx)) < 1) {
+      throw new ForbiddenError("The final active Owner cannot be suspended or demoted.");
+    }
+
+    if (input.actorId) {
+      await writeAuditLog(
+        {
+          siteId: input.siteId,
+          actorId: input.actorId,
+          actorDisplayName: input.actorDisplayName,
+          action: "user.updated",
+          targetType: "user",
+          targetId: user.id,
+          details: {
+            username: user.username,
+            groupIds: selectedGroupIds,
+            groupNames: siteGroups
+              .filter((group) => selectedGroupIds.includes(group.id))
+              .map((group) => group.name)
+          }
+        },
+        tx
+      );
+    }
+
+    return getUserGroupMemberships(input.siteId, [input.userId], tx);
+  });
+}
+
 export async function getUserPermissions(userId: string, siteId: string, database: Database = db) {
   const rows = await database
     .select({ key: rolePermissions.permissionKey })

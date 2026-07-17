@@ -50,7 +50,8 @@ import {
   createRole,
   permissionKeys,
   updateGroup,
-  updateRole
+  updateRole,
+  updateUserGroups
 } from "@/modules/authorization/permissions";
 import { createUser, setUserStatus } from "@/modules/users/service";
 
@@ -563,6 +564,33 @@ export async function resetUserSessionsAction(
     revalidatePath("/admin/users");
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
     return { ok: true, message: messages.sessionsResetMessage };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function updateUserGroupsAction(
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    const session = await requireSession();
+    const site = await requireSite();
+    await requirePermission(session.user.id, site.site.id, "user.manage");
+    const groupIds = formData
+      .getAll("groupId")
+      .filter((value): value is string => typeof value === "string" && value.trim() !== "");
+    await updateUserGroups({
+      siteId: site.site.id,
+      userId: stringValue(formData, "userId"),
+      groupIds,
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
+    });
+    revalidatePath("/admin/users");
+    revalidatePath("/admin/groups");
+    const { messages } = await getRequestI18n(site.settings?.defaultLocale);
+    return { ok: true, message: messages.userGroupsUpdated };
   } catch (error) {
     return actionError(error);
   }

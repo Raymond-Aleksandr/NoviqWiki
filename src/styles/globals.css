@@ -2841,7 +2841,7 @@ textarea {
 }
 
 .admin-users-grid {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.8fr) 96px 104px 104px 150px;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.55fr) minmax(0, 1.2fr) 96px 104px 104px 210px;
 }
 
 .admin-audit-grid {
@@ -3770,6 +3770,57 @@ textarea {
   font-size: 11px;
   font-weight: 600;
   padding: 2px 9px;
+}
+
+.user-group-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.user-group-editor {
+  position: relative;
+}
+
+.user-group-editor > summary {
+  list-style: none;
+}
+
+.user-group-editor > summary::-webkit-details-marker {
+  display: none;
+}
+
+.user-group-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  width: min(320px, calc(100vw - 40px));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--sh-lg);
+  padding: 12px;
+  text-align: left;
+}
+
+.user-group-form fieldset {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 11px;
+}
+
+.user-group-form legend {
+  padding: 0 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.user-group-checkboxes {
+  display: grid;
+  gap: 6px;
 }
 
 .inline-form {
