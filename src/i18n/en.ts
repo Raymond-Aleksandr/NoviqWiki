@@ -134,6 +134,8 @@ export const en = {
   backlinksDescriptionPrefix: "Published pages that link to",
   noBacklinksYet: "No backlinks yet.",
   noBacklinksBody: "When another published page links to this article, it will appear here.",
+  redirected: "Redirected",
+  redirectedFrom: "Redirected from",
   updated: "Updated",
   firstRunSetup: "First-run setup",
   setupTitle: "Set up NoviqWiki",

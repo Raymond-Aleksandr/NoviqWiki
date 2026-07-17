@@ -8,6 +8,7 @@ export function ArticleView({
   page,
   revision,
   canEdit = false,
+  redirectedFrom = null,
   categories = [],
   outboundLinks = [],
   backlinkCount = 0,
@@ -18,6 +19,7 @@ export function ArticleView({
   page: Page;
   revision: PageRevision;
   canEdit?: boolean;
+  redirectedFrom?: string | null;
   categories?: Array<{ name: string; slug: string }>;
   outboundLinks?: PageOutboundLink[];
   backlinkCount?: number;
@@ -66,6 +68,14 @@ export function ArticleView({
               {messages.history}
             </Link>
           </div>
+          {redirectedFrom ? (
+            <div className="redirect-notice">
+              <span className="badge info">{messages.redirected}</span>
+              <span>
+                {messages.redirectedFrom} <code>/page/{redirectedFrom}</code>
+              </span>
+            </div>
+          ) : null}
           <h1>{page.title}</h1>
           <p className="meta">
             {messages.revisionLabel} {revision.revisionNumber} {messages.by}{" "}

@@ -52,6 +52,7 @@ export default async function ArticlePage({ params, searchParams }: Props) {
       page={resolved.page}
       revision={currentRevision}
       canEdit={canEdit}
+      redirectedFrom={resolved.redirectedFrom}
       categories={currentRevision.categories.map((name) => ({ name, slug: slugifyTitle(name) }))}
       outboundLinks={outboundLinks}
       backlinkCount={backlinks.length}

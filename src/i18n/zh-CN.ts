@@ -134,6 +134,8 @@ export const zhCN = {
   backlinksDescriptionPrefix: "以下已发布页面链接到",
   noBacklinksYet: "暂无链入页面。",
   noBacklinksBody: "当其他已发布页面链接到这篇条目时，会显示在这里。",
+  redirected: "已跳转",
+  redirectedFrom: "跳转来源",
   updated: "更新于",
   firstRunSetup: "首次设置",
   setupTitle: "设置 NoviqWiki",

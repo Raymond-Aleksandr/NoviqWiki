@@ -1905,6 +1905,26 @@ textarea {
   box-shadow: var(--sh-sm);
 }
 
+.redirect-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 18px;
+  padding: 8px 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.redirect-notice code {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
 .article h1 {
   margin: 0 0 10px;
   font-size: 42px;
