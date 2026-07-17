@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import { auditLogs, pages, type AuditLog } from "@/db/schema";
 
@@ -13,6 +13,8 @@ const publicRecentChangeActions = [
   "media.uploaded",
   "media.deleted"
 ] as const;
+
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export type RecentChangeFilter = "all" | "created" | "edited" | "published" | "rollback" | "media";
 
@@ -55,26 +57,33 @@ export type RecentChangeWithTarget = AuditLog & {
 };
 
 export async function listRecentChanges(input: ListRecentChangesInput, database: Database = db) {
-  const actionFilter = input.actions?.length
-    ? inArray(auditLogs.action, [...input.actions])
-    : input.action
-      ? eq(auditLogs.action, input.action)
-      : undefined;
-
   const query = database
     .select()
     .from(auditLogs)
-    .where(
-      and(
-        eq(auditLogs.siteId, input.siteId),
-        actionFilter,
-        input.publicOnly ? inArray(auditLogs.action, [...publicRecentChangeActions]) : undefined
-      )
-    )
+    .where(recentChangesWhere(input))
     .orderBy(desc(auditLogs.createdAt))
     .limit(input.limit ?? 50)
     .offset(input.offset ?? 0);
   return query;
+}
+
+export async function countRecentChanges(input: ListRecentChangesInput, database: Database = db) {
+  const [{ count }] = await database
+    .select({ count: sql<number>`count(*)::int` })
+    .from(auditLogs)
+    .where(recentChangesWhere(input));
+  return count;
+}
+
+export async function listRecentChangesPage(
+  input: ListRecentChangesInput,
+  database: Database = db
+) {
+  const [rows, count] = await Promise.all([
+    listRecentChangesWithTargets(input, database),
+    countRecentChanges(input, database)
+  ]);
+  return { rows, count };
 }
 
 export async function listRecentChangesWithTargets(
@@ -85,7 +94,10 @@ export async function listRecentChangesWithTargets(
   const pageIds = [
     ...new Set(
       changes
-        .filter((change) => change.targetType === "page" && change.targetId)
+        .filter(
+          (change) =>
+            change.targetType === "page" && change.targetId && uuidPattern.test(change.targetId)
+        )
         .map((change) => change.targetId as string)
     )
   ];
@@ -119,4 +131,17 @@ function recentChangeTargetLabel(change: AuditLog, pageTitle?: string) {
 function detailString(details: Record<string, unknown>, key: string) {
   const value = details[key];
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function recentChangesWhere(input: ListRecentChangesInput) {
+  const actionFilter = input.actions?.length
+    ? inArray(auditLogs.action, [...input.actions])
+    : input.action
+      ? eq(auditLogs.action, input.action)
+      : undefined;
+  return and(
+    eq(auditLogs.siteId, input.siteId),
+    actionFilter,
+    input.publicOnly ? inArray(auditLogs.action, [...publicRecentChangeActions]) : undefined
+  );
 }

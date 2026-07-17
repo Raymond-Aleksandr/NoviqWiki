@@ -197,6 +197,7 @@ export const zhCN = {
   modernSelfHostedWiki: "现代自托管 wiki",
   recentChangesDescription: "页面创建、编辑、发布、回滚、删除、恢复和媒体活动。",
   recentChangesFilters: "最近更改筛选",
+  recentChangesPagination: "最近更改分页",
   auditActionSetupComplete: "设置完成",
   auditActionAuthLogin: "登录",
   auditActionAuthLogout: "退出",

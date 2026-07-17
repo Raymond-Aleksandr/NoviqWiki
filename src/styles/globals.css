@@ -1159,6 +1159,15 @@ textarea {
   font-size: 12.5px;
 }
 
+.timeline-pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
 .mono {
   font-family: var(--nw-font-mono);
 }
@@ -2724,14 +2733,18 @@ textarea {
 }
 
 .admin-filter-control {
-  display: flex;
+  display: grid;
   align-items: center;
   gap: 8px;
   box-sizing: border-box;
   min-width: 0;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  max-height: var(--control-height);
   block-size: var(--control-height);
   min-block-size: var(--control-height);
   max-block-size: var(--control-height);
+  overflow: hidden;
   border: 1px solid var(--border-strong);
   border-radius: var(--control-radius);
   background: var(--bg);
@@ -2742,6 +2755,7 @@ textarea {
 }
 
 .admin-filter-search {
+  grid-template-columns: auto minmax(0, 1fr);
   flex: 1 1 220px;
   max-width: 340px;
 }
@@ -2751,8 +2765,11 @@ textarea {
   display: block;
   min-width: 0;
   width: 100%;
+  height: calc(var(--control-height) - 2px);
+  min-height: 0;
+  max-height: calc(var(--control-height) - 2px);
   block-size: calc(var(--control-height) - 2px);
-  min-block-size: calc(var(--control-height) - 2px);
+  min-block-size: 0;
   max-block-size: calc(var(--control-height) - 2px);
   border: 0;
   border-radius: 0;
@@ -2773,6 +2790,7 @@ textarea {
 }
 
 .admin-filter-select {
+  grid-template-columns: minmax(0, 1fr) auto;
   flex: 0 0 auto;
   min-width: 0;
 }
@@ -2787,6 +2805,9 @@ textarea {
 
 .admin-filter-bar > .button,
 .admin-filter-bar > button {
+  height: var(--control-height);
+  min-height: var(--control-height);
+  max-height: var(--control-height);
   block-size: var(--control-height);
   min-block-size: var(--control-height);
   max-block-size: var(--control-height);
@@ -2794,6 +2815,7 @@ textarea {
   font-size: var(--control-font-size);
   line-height: 1.2;
   padding-block: 0;
+  white-space: nowrap;
 }
 
 .admin-filter-spacer {
@@ -4111,9 +4133,14 @@ textarea {
 
   .timeline-row,
   .timeline-meta,
+  .timeline-pagination,
   .editor-footer {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .timeline-pagination {
+    margin-left: 0;
   }
 
   .timeline-action {
@@ -4160,7 +4187,7 @@ textarea {
   }
 
   .admin-filter-control {
-    --control-height: 32px;
+    --control-height: 34px;
     --control-font-size: 13px;
   }
 
@@ -4186,7 +4213,7 @@ textarea {
 
   .admin-filter-bar > .button,
   .admin-filter-bar > button {
-    --control-height: 32px;
+    --control-height: 34px;
     --control-font-size: 13px;
     width: max-content;
     white-space: nowrap;
@@ -4298,6 +4325,11 @@ textarea {
     font-size: 30px;
   }
 
+  .history-panel .history-row {
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
   .history-row .history-revision-cell {
     display: flex;
     align-items: center;
@@ -4325,20 +4357,21 @@ textarea {
   }
 
   .history-summary-text {
-    justify-self: end;
+    justify-self: start;
     max-width: none;
     font-size: 13px;
-    font-weight: 500;
+    font-weight: 600;
     line-height: 1.25;
-    text-align: right;
+    text-align: left;
+    word-break: normal;
   }
 
   .history-summary-date {
     grid-column: 2;
-    justify-self: end;
+    justify-self: start;
     max-width: none;
     margin-top: 0;
-    text-align: right;
+    text-align: left;
     white-space: nowrap;
   }
 

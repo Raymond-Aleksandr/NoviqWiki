@@ -110,6 +110,8 @@ Last updated: 2026-07-16
 - 2026-07-16: Completed admin user search. `/admin/users` now supports the design-package filter bar, `?q=` username/email filtering, clear-filter navigation, and an empty state while reusing the existing permission-protected `listUsers` query path.
 - 2026-07-16: Completed audit log filtering and pagination. `/admin/audit` now supports action and text filters, clear-filter navigation, paginated results, localized event labels, and empty states; `/api/v1/admin/audit` exposes the same `q`, `action`, `page`, and `pageSize` query boundary.
 - 2026-07-16: Completed upload allowlist administration. `/admin/settings` now exposes safe MIME type allowlist editing, settings actions normalize and reject invalid or SVG MIME entries, and media upload validation reads the configured allowlist from site settings.
+- 2026-07-16: Completed real recent-changes pagination. `/recent` now accepts `page=`, keeps active type filters across pagination links, shows total matching public activity count, and uses service-level count queries instead of a fixed page marker.
+- 2026-07-16: Rechecked mobile control consistency after live review. `/admin/pages` filter search, status select, search button, and create action now measure `34px` tall at `439x734` with no horizontal overflow; `/history/e2e-article` summary rows stay left-aligned and readable at the same viewport. `pnpm test:ui` passed after the fix.
 - The browser plugin emitted external Statsig networking noise unrelated to NoviqWiki; application routes and quality gates were clean.
 
 ## Notes

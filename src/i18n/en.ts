@@ -200,6 +200,7 @@ export const en = {
   recentChangesDescription:
     "Created pages, edits, publications, rollbacks, deletions, restores, and media activity.",
   recentChangesFilters: "Recent changes filters",
+  recentChangesPagination: "Recent changes pages",
   auditActionSetupComplete: "Setup completed",
   auditActionAuthLogin: "Login",
   auditActionAuthLogout: "Logout",

@@ -1,19 +1,22 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
 import {
   actionsForRecentChangeFilter,
-  listRecentChangesWithTargets,
+  listRecentChangesPage,
   recentChangeFilterValue,
   type RecentChangeFilter
 } from "@/modules/activity/service";
 
 type Props = {
-  searchParams: Promise<{ type?: string }>;
+  searchParams: Promise<{ page?: string; type?: string }>;
 };
+
+const pageSize = 50;
 
 const recentChangeFilters: RecentChangeFilter[] = [
   "all",
@@ -32,16 +35,19 @@ export default async function RecentChangesPage({ searchParams }: Props) {
   await requirePageReadAccess(site.site.id);
   const params = await searchParams;
   const activeFilter = recentChangeFilterValue(params.type);
-  const [changes, i18n] = await Promise.all([
-    listRecentChangesWithTargets({
+  const page = Math.max(1, Number(params.page) || 1);
+  const [{ rows: changes, count }, i18n] = await Promise.all([
+    listRecentChangesPage({
       siteId: site.site.id,
-      limit: 100,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
       publicOnly: true,
       actions: actionsForRecentChangeFilter(activeFilter)
     }),
     getRequestI18n(site.settings?.defaultLocale)
   ]);
   const { locale, messages } = i18n;
+  const totalPages = Math.max(1, Math.ceil(count / pageSize));
   return (
     <section className="page-frame">
       <header className="page-header stack">
@@ -53,7 +59,7 @@ export default async function RecentChangesPage({ searchParams }: Props) {
           <Link
             aria-current={activeFilter === filter ? "page" : undefined}
             className={`filter-pill ${activeFilter === filter ? "active" : ""}`}
-            href={filter === "all" ? "/recent" : `/recent?type=${filter}`}
+            href={recentHref({ type: filter })}
             key={filter}
           >
             {filterLabel(filter, messages)}
@@ -85,15 +91,49 @@ export default async function RecentChangesPage({ searchParams }: Props) {
         )}
         <footer className="timeline-row">
           <span className="muted">
-            {changes.length} {messages.changes}
+            {count} {messages.changes}
           </span>
-          <span className="timeline-meta">
-            <span className="filter-pill active">1</span>
-          </span>
+          <nav className="timeline-pagination" aria-label={messages.recentChangesPagination}>
+            <Link
+              aria-disabled={page <= 1}
+              className={`button compact ${page <= 1 ? "disabled-link" : ""}`}
+              href={
+                page <= 1
+                  ? recentHref({ type: activeFilter, page })
+                  : recentHref({ type: activeFilter, page: page - 1 })
+              }
+            >
+              <ChevronLeft size={14} aria-hidden="true" />
+              {messages.previousPage}
+            </Link>
+            <span className="filter-pill active">
+              {messages.page} {page} / {totalPages}
+            </span>
+            <Link
+              aria-disabled={page >= totalPages}
+              className={`button compact ${page >= totalPages ? "disabled-link" : ""}`}
+              href={
+                page >= totalPages
+                  ? recentHref({ type: activeFilter, page })
+                  : recentHref({ type: activeFilter, page: page + 1 })
+              }
+            >
+              {messages.nextPage}
+              <ChevronRight size={14} aria-hidden="true" />
+            </Link>
+          </nav>
         </footer>
       </div>
     </section>
   );
+}
+
+function recentHref({ page, type }: { page?: number; type: RecentChangeFilter }) {
+  const params = new URLSearchParams();
+  if (type !== "all") params.set("type", type);
+  if (page && page > 1) params.set("page", String(page));
+  const query = params.toString();
+  return query ? `/recent?${query}` : "/recent";
 }
 
 function filterLabel(
