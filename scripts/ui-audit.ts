@@ -60,6 +60,7 @@ type RouteMetrics = {
   badFileInputs: ElementSummary[];
   controlTextOverflow: ElementSummary[];
   textContentOverflow: ElementSummary[];
+  surfaceRhythmMismatches: ElementSummary[];
   articleContainerOverflow: ElementSummary[];
   articleMediaOverflow: ElementSummary[];
   articleMediaTooTall: ElementSummary[];
@@ -967,7 +968,7 @@ async function main() {
   }
 
   console.log(
-    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, control or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
+    "UI audit passed: no native browser dialogs, unexpected inline styles, typography source drift, color source drift, visual effect source drift, hardcoded visible text, i18n dictionary shape drift, default-locale i18n source drift, page route coverage gaps, unlocalized revision summaries, unlocalized authorization labels, unlocalized field/product terms, design token drift, page/control/text/surface/article/media overflow, oversized article media, duplicate admin controls, stray dialogs, tiny or oversized controls, control or form-label typography mismatches, segmented-control mismatches, activity row overlaps, iconless command buttons, unnamed icon-only controls, button icon size/spacing or button size drift, modal mismatches, mobile shell drift, active-state source transforms, or active-state transform drift."
   );
 }
 
@@ -1315,6 +1316,13 @@ async function auditRoute(page: Page, route: string, browserName: string, sizeNa
   recordElementFailures(
     "text_content_overflow",
     metrics.textContentOverflow,
+    browserName,
+    sizeName,
+    route
+  );
+  recordElementFailures(
+    "surface_rhythm_mismatch",
+    metrics.surfaceRhythmMismatches,
     browserName,
     sizeName,
     route
@@ -2137,6 +2145,56 @@ async function readRouteMetrics(page: Page): Promise<RouteMetrics> {
               return childRect.left < rect.left - 1 || childRect.right > rect.right + 1;
             });
           return scrollOverflow || childOverflow;
+        })
+        .map(summarize)
+        .slice(0, 12),
+      surfaceRhythmMismatches: visibleMatches(
+        [
+          ".home-hero",
+          ".panel",
+          ".card",
+          ".timeline-panel",
+          ".data-panel",
+          ".page-index-panel",
+          ".category-card",
+          ".feature-card",
+          ".media-card",
+          ".media-detail",
+          ".upload-panel",
+          ".article",
+          ".article-info-card",
+          ".auth-card",
+          ".auth-compact-card",
+          ".setup-hero",
+          ".setup-stepper",
+          ".setup-card",
+          ".group-card",
+          ".status-card-grid .status-card",
+          ".settings-card",
+          ".role-card",
+          ".media-picker-dialog",
+          ".confirm-dialog"
+        ].join(",")
+      )
+        .filter((element) => {
+          if (element.closest(".media-picker-grid")) {
+            return false;
+          }
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          const radius = Number.parseFloat(style.borderTopLeftRadius);
+          const borderWidth = Number.parseFloat(style.borderTopWidth);
+          const hasBorder =
+            Number.isFinite(borderWidth) && borderWidth >= 1 && style.borderTopStyle !== "none";
+          const hasBackground =
+            style.backgroundColor !== "rgba(0, 0, 0, 0)" &&
+            style.backgroundColor !== "transparent";
+          const hasReasonableRadius = Number.isFinite(radius) && radius >= 8 && radius <= 16;
+          const mobileViewport = document.documentElement.clientWidth <= 560;
+          const mobileViewportFit =
+            !mobileViewport ||
+            (rect.left >= -1 && rect.right <= document.documentElement.clientWidth + 1);
+          return !hasBorder || !hasBackground || !hasReasonableRadius || !mobileViewportFit;
         })
         .map(summarize)
         .slice(0, 12),
