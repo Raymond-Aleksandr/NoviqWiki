@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decorateWikiLinkHtml } from "@/components/article/wiki-link-html";
+import { decorateWikiLinkHtml } from "@/modules/rendering/wiki-link-html";
 import type { PageOutboundLink } from "@/modules/pages/service";
 
 describe("wiki link HTML decoration", () => {

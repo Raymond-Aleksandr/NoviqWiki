@@ -22,7 +22,7 @@ import { toggleWatchPageAction } from "@/app/actions";
 import type { Page, PageRevision } from "@/db/schema";
 import type { Messages } from "@/i18n";
 import type { PageOutboundLink } from "@/modules/pages/service";
-import { decorateWikiLinkHtml } from "./wiki-link-html";
+import { decorateWikiLinkHtml } from "@/modules/rendering/wiki-link-html";
 
 export function ArticleView({
   page,

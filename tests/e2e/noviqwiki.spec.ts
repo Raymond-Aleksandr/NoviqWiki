@@ -38,12 +38,49 @@ test("fresh setup and core wiki workflow", async ({ page }) => {
   await page.goto("/edit/e2e-article");
   await page.locator(".cm-content").click();
   await page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
-  await page.keyboard.type(
-    "# E2E Article\n\nUpdated searchable body for rollback.\n\n[[Category:Testing]]"
+  await page.keyboard.insertText(
+    [
+      "# E2E Article",
+      "",
+      "Updated searchable body for rollback.",
+      "",
+      "![Preview image](https://example.com/preview.png)",
+      "",
+      "[External reference](https://example.com)",
+      "",
+      "| Feature | State |",
+      "| --- | --- |",
+      "| Preview | Ready |",
+      "",
+      "[[E2E Article|Self link]]",
+      "",
+      "[[Category:Testing]]"
+    ].join("\n")
   );
+  const preview = page.locator(".editor-preview .article-body");
+  await expect(preview.getByRole("img", { name: "Preview image" })).toHaveAttribute(
+    "src",
+    "https://example.com/preview.png"
+  );
+  await expect(preview.getByRole("link", { name: "External reference" })).toHaveAttribute(
+    "href",
+    "https://example.com"
+  );
+  await expect(preview.locator("table")).toContainText("Preview");
+  await expect(preview.getByRole("link", { name: "Self link" })).toHaveAttribute(
+    "href",
+    "/page/e2e-article"
+  );
+  await page.getByRole("button", { name: "Expand preview" }).click();
+  await expect(page.locator(".editor-shell")).toHaveClass(/preview-expanded/);
+  await page.getByRole("button", { name: "Return to split view" }).click();
   await page.getByLabel("Edit summary").fill("Update body");
   await page.getByRole("button", { name: "Publish" }).click();
   await expect(page.getByText("Published revision 2.")).toBeVisible();
+  await expect(
+    page.locator(".article-body").getByRole("img", { name: "Preview image" })
+  ).toBeVisible();
+  await expect(page.locator(".article-body table")).toContainText("Preview");
 
   await page.goto("/history/e2e-article");
   await expect(page.getByRole("heading", { name: "History · E2E Article" })).toBeVisible();
@@ -51,7 +88,9 @@ test("fresh setup and core wiki workflow", async ({ page }) => {
   await page.getByLabel("To revision").selectOption({ index: 0 });
   await page.getByRole("button", { name: "Compare" }).click();
   await expect(page.getByRole("heading", { name: /Compare revision/ })).toBeVisible();
-  await expect(page.locator(".diff-add")).toContainText("Updated searchable body");
+  await expect(
+    page.locator(".diff-add").filter({ hasText: "Updated searchable body" })
+  ).toBeVisible();
 
   await page.goto("/history/e2e-article");
   await page.getByRole("button", { name: "Rollback" }).last().click();

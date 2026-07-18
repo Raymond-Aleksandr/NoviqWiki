@@ -4581,6 +4581,10 @@ pre.citation-block {
   background: var(--surface-muted);
 }
 
+.editor-toolbar-spacer {
+  flex: 1 1 auto;
+}
+
 .editor-tool-button {
   flex: 0 0 auto;
   width: 36px;
@@ -4613,13 +4617,19 @@ pre.citation-block {
 .editor-preview {
   min-width: 0;
   padding: 20px 22px;
-  font-family: var(--nw-font-serif);
-  font-size: 16px;
-  line-height: 1.7;
+  overflow: hidden;
+}
+
+.editor-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 20px;
+  margin-bottom: 14px;
 }
 
 .editor-preview-kicker {
-  margin-bottom: 14px;
   color: var(--text-faint);
   font-family: var(--nw-font-body);
   font-size: 11px;
@@ -4628,45 +4638,42 @@ pre.citation-block {
   text-transform: uppercase;
 }
 
-.editor-preview h2,
-.editor-preview h3 {
-  font-family: var(--nw-font-serif);
-}
-
-.editor-preview h2 {
-  margin: 0 0 10px;
-  font-size: 24px;
-}
-
-.editor-preview h3 {
-  margin: 16px 0 8px;
-  font-size: 19px;
-}
-
-.editor-preview p {
-  margin: 0 0 12px;
-}
-
-.editor-preview blockquote {
-  margin: 0 0 12px;
-  border-left: 3px solid var(--primary);
+.editor-preview-status {
+  min-height: 1.25em;
   color: var(--text-muted);
-  padding: 4px 0 4px 14px;
+  font-family: var(--nw-font-body);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
 }
 
-.editor-preview code {
-  border-radius: 5px;
-  background: var(--code-bg);
-  color: var(--code-text);
-  font-family: var(--nw-font-mono);
-  padding: 0.1em 0.25em;
+.editor-preview-status.error {
+  color: var(--danger);
 }
 
-.editor-preview ul,
-.editor-preview ol {
+.editor-preview-body {
+  transition: opacity 120ms ease;
+}
+
+.editor-preview[aria-busy="true"] .editor-preview-body {
+  opacity: 0.68;
+}
+
+.editor-preview > .muted {
   margin: 0;
-  padding-left: 22px;
-  line-height: 1.8;
+}
+
+.editor-shell.preview-expanded .editor-columns {
+  grid-template-columns: 1fr;
+}
+
+.editor-shell.preview-expanded .editor-code-pane {
+  display: none;
+}
+
+.editor-shell.preview-expanded .editor-preview-body {
+  max-inline-size: 818px;
+  margin-inline: auto;
 }
 
 .editor-footer {
