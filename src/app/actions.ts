@@ -15,6 +15,7 @@ import {
   passwordResetRequestSchema,
   passwordResetSchema,
   registerSchema,
+  ownerSetupSchema,
   setupSchema
 } from "@/modules/auth/schemas";
 import { login, registerUser } from "@/modules/auth/service";
@@ -43,7 +44,7 @@ import {
   setPageProtection,
   softDeletePage
 } from "@/modules/pages/service";
-import { completeSetup } from "@/modules/setup/service";
+import { bootstrapOwner, completeSetup, getSetupMode } from "@/modules/setup/service";
 import { normalizeAllowedMediaTypes, updateSiteSettings } from "@/modules/settings/service";
 import { unwatchPage, watchPage } from "@/modules/watchlist/service";
 import {
@@ -59,9 +60,17 @@ import { createUser, setUserStatus } from "@/modules/users/service";
 
 export async function setupAction(_state: ActionState, formData: FormData): Promise<ActionState> {
   try {
-    const parsed = setupSchema.parse(Object.fromEntries(formData.entries()));
-    const { owner } = await completeSetup(parsed);
-    const session = await login({ identifier: owner.username, password: parsed.ownerPassword });
+    const values = Object.fromEntries(formData.entries());
+    const mode = await getSetupMode();
+    if (mode === "complete") {
+      throw new Error("Setup has already been completed.");
+    }
+    const setup =
+      mode === "owner"
+        ? await bootstrapOwner(ownerSetupSchema.parse(values))
+        : await completeSetup(setupSchema.parse(values));
+    const ownerPassword = String(values.ownerPassword ?? "");
+    const session = await login({ identifier: setup.owner.username, password: ownerPassword });
     await setSessionCookies(session.token, session.csrfToken);
   } catch (error) {
     return actionError(error);

@@ -1,55 +1,71 @@
 import "dotenv/config";
 import { spawnSync } from "node:child_process";
-import { mkdir, readFile } from "node:fs/promises";
-import { getEnv } from "@/lib/env";
+import { closeSync, fstatSync, openSync, type Stats } from "node:fs";
+import {
+  assertSameFileIdentity,
+  composeDockerArguments,
+  composeTargetLabel,
+  createComposeToolEnvironment,
+  createDatabaseToolEnvironment,
+  expectedRestoreConfirmation,
+  parsePostgresTarget,
+  prepareSafeMediaDestination,
+  requireNoviqWikiSqlBackup,
+  requireReadableRegularFile,
+  requireSafeMediaArchive,
+  withDatabaseToolEnvironment,
+  type PostgresTarget
+} from "./ops-safety";
 
 async function main() {
-  const env = getEnv();
+  process.umask(0o077);
+  const databaseTarget = parsePostgresTarget(
+    process.env.DATABASE_URL ?? "postgres://nextwiki:nextwiki@localhost:5432/nextwiki"
+  );
+  const mediaDriver = process.env.NEXTWIKI_MEDIA_DRIVER ?? "local";
+  const mediaRoot = process.env.NEXTWIKI_MEDIA_ROOT ?? "./media";
   const backupSql = process.env.NEXTWIKI_RESTORE_SQL;
   const mediaArchive = process.env.NEXTWIKI_RESTORE_MEDIA;
 
   if (!backupSql) {
     throw new Error("Set NEXTWIKI_RESTORE_SQL to the SQL backup file path.");
   }
-  if (process.env.NEXTWIKI_RESTORE_CONFIRM !== "restore") {
-    throw new Error("Set NEXTWIKI_RESTORE_CONFIRM=restore to confirm destructive restore.");
+  if (mediaDriver !== "local" && mediaDriver !== "s3") {
+    throw new Error("NEXTWIKI_MEDIA_DRIVER must be local or s3.");
+  }
+  const sqlIdentity = await requireNoviqWikiSqlBackup(backupSql);
+  let mediaIdentity: Stats | null = null;
+  if (mediaArchive) {
+    if (mediaDriver !== "local") {
+      throw new Error("NEXTWIKI_RESTORE_MEDIA can be used only with local media storage.");
+    }
+    mediaIdentity = await requireReadableRegularFile(mediaArchive, "Media archive");
+    requireSafeMediaArchive(mediaArchive);
   }
 
-  const resetSql =
-    "drop schema if exists public cascade; drop schema if exists drizzle cascade; create schema public;";
-  const reset = spawnSync("psql", [env.DATABASE_URL, "-c", resetSql], { stdio: "inherit" });
-  const hasLocalPsql = reset.status === 0;
-  if (!hasLocalPsql) {
-    const composeReset = spawnSync(
-      "docker",
-      ["compose", "exec", "-T", "db", "psql", "-U", "nextwiki", "-d", "nextwiki", "-c", resetSql],
-      { stdio: "inherit" }
+  const mode = resolveDatabaseMode();
+  const targetLabel = mode === "local" ? databaseTarget.label : composeTargetLabel;
+  const expectedConfirmation = expectedRestoreConfirmation(targetLabel);
+  if (process.env.NEXTWIKI_RESTORE_CONFIRM !== expectedConfirmation) {
+    throw new Error(
+      `Set NEXTWIKI_RESTORE_CONFIRM=${expectedConfirmation} to confirm destructive restore of this exact target.`
     );
-    if (composeReset.status !== 0) {
-      throw new Error("Database reset failed before restore.");
-    }
+  }
+  const safeMediaRoot = mediaArchive ? await prepareSafeMediaDestination(mediaRoot) : null;
+
+  const input = openSync(backupSql, "r");
+  try {
+    assertSameFileIdentity(sqlIdentity, fstatSync(input), "SQL backup");
+    await restoreDatabase(mode, databaseTarget, input);
+  } finally {
+    closeSync(input);
   }
 
-  if (hasLocalPsql) {
-    const restore = spawnSync("psql", [env.DATABASE_URL, "-f", backupSql], { stdio: "inherit" });
-    if (restore.status !== 0) {
-      throw new Error("psql restore failed.");
-    }
-  } else {
-    const sql = await readFile(backupSql);
-    const composeRestore = spawnSync(
-      "docker",
-      ["compose", "exec", "-T", "db", "psql", "-U", "nextwiki", "-d", "nextwiki"],
-      { input: sql, stdio: ["pipe", "inherit", "inherit"] }
-    );
-    if (composeRestore.status !== 0) {
-      throw new Error("psql restore failed.");
-    }
-  }
-
-  if (mediaArchive && env.NEXTWIKI_MEDIA_DRIVER === "local") {
-    await mkdir(env.NEXTWIKI_MEDIA_ROOT, { recursive: true });
-    const tar = spawnSync("tar", ["-xzf", mediaArchive, "-C", env.NEXTWIKI_MEDIA_ROOT], {
+  if (mediaArchive && mediaIdentity && safeMediaRoot) {
+    const currentMediaIdentity = await requireReadableRegularFile(mediaArchive, "Media archive");
+    assertSameFileIdentity(mediaIdentity, currentMediaIdentity, "Media archive");
+    requireSafeMediaArchive(mediaArchive);
+    const tar = spawnSync("tar", ["-xzf", mediaArchive, "-C", safeMediaRoot], {
       stdio: "inherit"
     });
     if (tar.status !== 0) {
@@ -60,4 +76,83 @@ async function main() {
   console.log("Restore complete.");
 }
 
+type DatabaseMode = "local" | "compose";
+
+function resolveDatabaseMode(): DatabaseMode {
+  const probe = spawnSync("psql", ["--version"], {
+    env: createDatabaseToolEnvironment(),
+    stdio: "ignore"
+  });
+  if (probe.status === 0) {
+    return "local";
+  }
+  if ((probe.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") {
+    requireComposeFallbackConfirmation("psql");
+    return "compose";
+  }
+  throw new Error("Unable to verify the local psql executable; refusing to reset a database.");
+}
+
+async function restoreDatabase(mode: DatabaseMode, databaseTarget: PostgresTarget, input: number) {
+  const resetSql =
+    "drop schema if exists public cascade; drop schema if exists drizzle cascade; create schema public;";
+  const restore =
+    mode === "local"
+      ? await withDatabaseToolEnvironment(databaseTarget, (environment) =>
+          spawnSync(
+            "psql",
+            [
+              "-X",
+              databaseTarget.url,
+              "-v",
+              "ON_ERROR_STOP=1",
+              "--single-transaction",
+              "-c",
+              resetSql,
+              "-f",
+              "-"
+            ],
+            { env: environment, stdio: [input, "inherit", "inherit"] }
+          )
+        )
+      : spawnSync(
+          "docker",
+          composeDockerArguments([
+            "exec",
+            "-T",
+            "db",
+            "psql",
+            "-X",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-U",
+            "nextwiki",
+            "-d",
+            "nextwiki",
+            "--single-transaction",
+            "-c",
+            resetSql,
+            "-f",
+            "-"
+          ]),
+          {
+            env: createComposeToolEnvironment(),
+            stdio: [input, "inherit", "inherit"]
+          }
+        );
+  if (restore.status !== 0) {
+    throw new Error(
+      "psql restore failed; the schema reset and import transaction was rolled back."
+    );
+  }
+}
+
 void main();
+
+function requireComposeFallbackConfirmation(tool: string) {
+  if (process.env.NEXTWIKI_COMPOSE_FALLBACK !== "1") {
+    throw new Error(
+      `${tool} is unavailable. Install PostgreSQL client tools, or set NEXTWIKI_COMPOSE_FALLBACK=1 only after verifying the fixed ${composeTargetLabel} target.`
+    );
+  }
+}

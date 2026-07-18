@@ -22,8 +22,10 @@ type Props = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
   defaultBaseUrl: string;
   defaultMediaDriver: "local" | "s3";
+  defaultSiteName: string;
   initialLocale: "en" | "zh-CN";
   messages: Messages;
+  ownerOnly?: boolean;
 };
 
 const initialActionState: ActionState = { ok: true };
@@ -32,50 +34,53 @@ export function SetupWizard({
   action,
   defaultBaseUrl,
   defaultMediaDriver,
+  defaultSiteName,
   initialLocale,
-  messages
+  messages,
+  ownerOnly = false
 }: Props) {
   const [activeStep, setActiveStep] = useState(0);
   const [localError, setLocalError] = useState("");
   const [actionState, formAction, pending] = useActionState(action, initialActionState);
-  const steps = useMemo(
-    () =>
-      [
-        {
-          id: "site",
-          title: messages.setupSite,
-          eyebrow: messages.setupIdentity,
-          description: messages.setupSiteDescription
-        },
-        {
-          id: "access",
-          title: messages.setupAccess,
-          eyebrow: messages.setupPolicy,
-          description: messages.setupAccessDescription
-        },
-        {
-          id: "storage",
-          title: messages.setupStorage,
-          eyebrow: messages.setupMedia,
-          description: messages.setupStorageDescription
-        },
-        {
-          id: "owner",
-          title: messages.setupOwner,
-          eyebrow: messages.setupAccount,
-          description: messages.setupOwnerDescription
-        },
-        {
-          id: "review",
-          title: messages.setupReview,
-          eyebrow: messages.setupLaunch,
-          description: messages.setupReviewDescription
-        }
-      ] as const,
-    [messages]
-  );
+  const steps = useMemo(() => {
+    const allSteps = [
+      {
+        id: "site",
+        title: messages.setupSite,
+        eyebrow: messages.setupIdentity,
+        description: messages.setupSiteDescription
+      },
+      {
+        id: "access",
+        title: messages.setupAccess,
+        eyebrow: messages.setupPolicy,
+        description: messages.setupAccessDescription
+      },
+      {
+        id: "storage",
+        title: messages.setupStorage,
+        eyebrow: messages.setupMedia,
+        description: messages.setupStorageDescription
+      },
+      {
+        id: "owner",
+        title: messages.setupOwner,
+        eyebrow: messages.setupAccount,
+        description: messages.setupOwnerDescription
+      },
+      {
+        id: "review",
+        title: messages.setupReview,
+        eyebrow: messages.setupLaunch,
+        description: messages.setupReviewDescription
+      }
+    ] as const;
+    return ownerOnly
+      ? allSteps.filter((step) => step.id === "owner" || step.id === "review")
+      : allSteps;
+  }, [messages, ownerOnly]);
   const [values, setValues] = useState<SetupValues>({
-    siteName: "NoviqWiki",
+    siteName: defaultSiteName,
     tagline: messages.modernSelfHostedWiki,
     baseUrl: defaultBaseUrl,
     defaultLocale: initialLocale,
@@ -87,7 +92,11 @@ export function SetupWizard({
     ownerPassword: ""
   });
 
-  const progress = useMemo(() => Math.round(((activeStep + 1) / steps.length) * 100), [activeStep]);
+  const progress = useMemo(
+    () => Math.round(((activeStep + 1) / steps.length) * 100),
+    [activeStep, steps.length]
+  );
+  const current = steps[activeStep];
 
   function update<K extends keyof SetupValues>(key: K, value: SetupValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -95,7 +104,7 @@ export function SetupWizard({
   }
 
   function goNext() {
-    const error = validateStep(activeStep, values, messages);
+    const error = validateStep(current.id, values, messages);
     if (error) {
       setLocalError(error);
       return;
@@ -108,15 +117,15 @@ export function SetupWizard({
     setActiveStep((current) => Math.max(current - 1, 0));
   }
 
-  const current = steps[activeStep];
-
   return (
     <section className="setup-shell" aria-labelledby="setup-title">
       <div className="setup-hero">
         <div className="setup-hero-content">
-          <p className="setup-kicker">{messages.firstRunSetup}</p>
-          <h1 id="setup-title">{messages.setupTitle}</h1>
-          <p>{messages.setupIntro}</p>
+          <p className="setup-kicker">
+            {ownerOnly ? messages.ownerBootstrapKicker : messages.firstRunSetup}
+          </p>
+          <h1 id="setup-title">{ownerOnly ? messages.ownerBootstrapTitle : messages.setupTitle}</h1>
+          <p>{ownerOnly ? messages.ownerBootstrapIntro : messages.setupIntro}</p>
         </div>
       </div>
 
@@ -164,7 +173,7 @@ export function SetupWizard({
             <p className="muted">{current.description}</p>
           </div>
 
-          {activeStep === 0 ? (
+          {current.id === "site" ? (
             <div className="setup-fields">
               <label>
                 {messages.siteName}
@@ -207,7 +216,7 @@ export function SetupWizard({
             </div>
           ) : null}
 
-          {activeStep === 1 ? (
+          {current.id === "access" ? (
             <div className="setup-choice-grid">
               <label className="setup-choice radio-row">
                 <input
@@ -256,7 +265,7 @@ export function SetupWizard({
             </div>
           ) : null}
 
-          {activeStep === 2 ? (
+          {current.id === "storage" ? (
             <div className="setup-choice-grid">
               <label className="setup-choice radio-row">
                 <input
@@ -283,7 +292,7 @@ export function SetupWizard({
             </div>
           ) : null}
 
-          {activeStep === 3 ? (
+          {current.id === "owner" ? (
             <div className="setup-fields">
               <label>
                 {messages.username}
@@ -325,35 +334,41 @@ export function SetupWizard({
             </div>
           ) : null}
 
-          {activeStep === 4 ? (
+          {current.id === "review" ? (
             <div className="setup-review">
               <dl>
-                <div>
-                  <dt>{messages.setupSite}</dt>
-                  <dd>{values.siteName}</dd>
-                </div>
-                <div>
-                  <dt>{messages.baseUrl}</dt>
-                  <dd>{values.baseUrl}</dd>
-                </div>
-                <div>
-                  <dt>{messages.defaultLocale}</dt>
-                  <dd>
-                    {values.defaultLocale === "zh-CN"
-                      ? messages.simplifiedChinese
-                      : messages.english}
-                  </dd>
-                </div>
-                <div>
-                  <dt>{messages.registration}</dt>
-                  <dd>{registrationLabel(values.registrationMode, messages)}</dd>
-                </div>
-                <div>
-                  <dt>{messages.mediaStorage}</dt>
-                  <dd>
-                    {values.mediaDriver === "local" ? messages.localFilesystem : messages.s3Storage}
-                  </dd>
-                </div>
+                {!ownerOnly ? (
+                  <>
+                    <div>
+                      <dt>{messages.setupSite}</dt>
+                      <dd>{values.siteName}</dd>
+                    </div>
+                    <div>
+                      <dt>{messages.baseUrl}</dt>
+                      <dd>{values.baseUrl}</dd>
+                    </div>
+                    <div>
+                      <dt>{messages.defaultLocale}</dt>
+                      <dd>
+                        {values.defaultLocale === "zh-CN"
+                          ? messages.simplifiedChinese
+                          : messages.english}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>{messages.registration}</dt>
+                      <dd>{registrationLabel(values.registrationMode, messages)}</dd>
+                    </div>
+                    <div>
+                      <dt>{messages.mediaStorage}</dt>
+                      <dd>
+                        {values.mediaDriver === "local"
+                          ? messages.localFilesystem
+                          : messages.s3Storage}
+                      </dd>
+                    </div>
+                  </>
+                ) : null}
                 <div>
                   <dt>{messages.owner}</dt>
                   <dd>
@@ -361,7 +376,9 @@ export function SetupWizard({
                   </dd>
                 </div>
               </dl>
-              <p className="muted">{messages.setupOneTimeNote}</p>
+              <p className="muted">
+                {ownerOnly ? messages.ownerBootstrapNote : messages.setupOneTimeNote}
+              </p>
             </div>
           ) : null}
 
@@ -395,7 +412,13 @@ export function SetupWizard({
             ) : (
               <button key="submit" type="submit" className="primary" disabled={pending}>
                 <Rocket size={15} aria-hidden="true" />
-                {pending ? messages.creatingSite : messages.completeSetup}
+                {pending
+                  ? ownerOnly
+                    ? messages.creatingOwner
+                    : messages.creatingSite
+                  : ownerOnly
+                    ? messages.completeOwnerSetup
+                    : messages.completeSetup}
               </button>
             )}
           </div>
@@ -405,8 +428,8 @@ export function SetupWizard({
   );
 }
 
-function validateStep(step: number, values: SetupValues, messages: Messages) {
-  if (step === 0) {
+function validateStep(step: string, values: SetupValues, messages: Messages) {
+  if (step === "site") {
     if (!values.siteName.trim()) return messages.enterSiteName;
     try {
       new URL(values.baseUrl);
@@ -414,7 +437,7 @@ function validateStep(step: number, values: SetupValues, messages: Messages) {
       return messages.enterValidBaseUrl;
     }
   }
-  if (step === 3) {
+  if (step === "owner") {
     if (!values.ownerUsername.trim()) return messages.enterOwnerUsername;
     if (!/^[A-Za-z0-9_.-]+$/.test(values.ownerUsername)) {
       return messages.usernameCharacters;

@@ -9,6 +9,7 @@ import { TopbarSettingsLink } from "@/components/layout/topbar-settings-link";
 import { PreferenceControls } from "@/components/layout/theme-controls";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getCurrentSession } from "@/modules/auth/session";
+import { isSetupRequired } from "@/modules/setup/service";
 import { getMessages } from "@/i18n";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const site = await getPrimarySiteWithSettings().catch(() => null);
   const session = await getCurrentSession().catch(() => null);
+  const setupRequired = await isSetupRequired().catch(() => !site);
   const cookieStore = await cookies();
   const cookieLocale = cookieStore.get("noviqwiki-locale")?.value;
   const cookieAppearance = cookieStore.get("noviqwiki-appearance")?.value;
@@ -68,7 +70,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               initialLocale={locale === "zh-CN" ? "zh-CN" : "en"}
               messages={messages}
             />
-            {!session ? (
+            {setupRequired ? (
+              <Link className="utility-login" href="/setup">
+                <Rocket size={17} aria-hidden="true" />
+                {messages.firstRunSetup}
+              </Link>
+            ) : !session ? (
               <Link className="utility-login" href="/login">
                 <LogIn size={17} aria-hidden="true" />
                 {messages.login}
@@ -89,7 +96,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </Link>
               <SiteNav messages={messages} showAdmin={Boolean(session)} />
               <div className="sidebar-footer">
-                {!site ? (
+                {setupRequired ? (
                   <Link className="button sidebar-setup-link" href="/setup">
                     <Rocket size={16} aria-hidden="true" />
                     {messages.firstRunSetup}

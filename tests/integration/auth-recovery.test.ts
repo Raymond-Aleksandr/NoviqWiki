@@ -36,7 +36,7 @@ describe("auth recovery integration", () => {
         email: "reader@example.test",
         password: "ReaderPassword123"
       },
-      test.executor
+      test.db
     );
 
     expect(user.locale).toBe("zh-CN");

@@ -6,6 +6,7 @@ import { getCurrentSession } from "@/modules/auth/session";
 import { loginAction } from "@/app/actions";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
+import { isSetupRequired } from "@/modules/setup/service";
 
 type Props = {
   searchParams: Promise<{ registered?: string; reset?: string; verified?: string }>;
@@ -14,6 +15,9 @@ type Props = {
 export default async function LoginPage({ searchParams }: Props) {
   if (await getCurrentSession()) {
     redirect("/");
+  }
+  if (await isSetupRequired()) {
+    redirect("/setup");
   }
   const site = await getPrimarySiteWithSettings();
   if (!site) {

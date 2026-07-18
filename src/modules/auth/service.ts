@@ -1,5 +1,5 @@
-import { eq } from "drizzle-orm";
-import { db, type Database } from "@/db/client";
+import { eq, sql } from "drizzle-orm";
+import { db, type Database, type RootDatabase } from "@/db/client";
 import { siteSettings, users } from "@/db/schema";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -82,27 +82,27 @@ export async function registerUser(
     displayName?: string;
     password: string;
   },
-  database: Database = db
+  database: RootDatabase = db
 ) {
-  const site = await getPrimarySiteWithSettings(database);
-  if (!site?.settings) {
+  let context = await getRegistrationContext(database);
+  if (!context) {
+    context = await database.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('noviqwiki.initial_setup'))`);
+      return getRegistrationContext(tx);
+    });
+  }
+  if (!context) {
     throw new AppError("Site setup is required before registration.", "setup_required", 503);
   }
-  const mode = site.settings.registrationMode;
-  if (mode === "closed" || mode === "invite") {
+  const { site, registrationMode } = context;
+  if (registrationMode === "closed" || registrationMode === "invite") {
     throw new ForbiddenError("Public registration is closed.");
   }
-  const status = mode === "email_verification" ? "pending" : "active";
+  const status = registrationMode === "email_verification" ? "pending" : "active";
   const user = await createUser(
     { ...input, status, locale: site.settings.defaultLocale },
     database
   );
-  if (mode === "email_verification") {
-    await sendEmailVerification(
-      { userId: user.id, email: user.email, displayName: user.displayName },
-      database
-    );
-  }
   await writeAuditLog(
     {
       siteId: site.site.id,
@@ -111,11 +111,29 @@ export async function registerUser(
       action: "user.created",
       targetType: "user",
       targetId: user.id,
-      details: { registrationMode: mode }
+      details: { registrationMode }
     },
     database
   );
+  if (registrationMode === "email_verification") {
+    await sendEmailVerification(
+      { userId: user.id, email: user.email, displayName: user.displayName },
+      database
+    );
+  }
   return user;
+}
+
+async function getRegistrationContext(database: Database) {
+  const site = await getPrimarySiteWithSettings(database);
+  if (!site?.settings) {
+    return null;
+  }
+  const [existingUser] = await database.select({ id: users.id }).from(users).limit(1);
+  if (!existingUser) {
+    return null;
+  }
+  return { site, registrationMode: site.settings.registrationMode };
 }
 
 export async function updateRegistrationMode(
