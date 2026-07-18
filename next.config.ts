@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const allowedDevOrigins = [
   "localhost",
   "127.0.0.1",
-  ...(process.env.NEXTWIKI_ALLOWED_DEV_ORIGINS ?? "")
+  ...(process.env.NOVIQWIKI_ALLOWED_DEV_ORIGINS ?? "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean)

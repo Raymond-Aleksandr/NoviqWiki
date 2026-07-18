@@ -9,21 +9,21 @@ async function main() {
   const reset = await resetE2eDatabase();
   const playwrightPort = process.env.PLAYWRIGHT_PORT ?? "3101";
   const playwrightBaseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`;
-  const mediaRoot = path.resolve(process.env.NEXTWIKI_E2E_MEDIA_ROOT ?? "test-results/e2e-media");
+  const mediaRoot = path.resolve(process.env.NOVIQWIKI_E2E_MEDIA_ROOT ?? "test-results/e2e-media");
   const command = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
   const childEnv = {
     ...process.env,
     DATABASE_URL: reset.databaseUrl,
     NEXT_TELEMETRY_DISABLED: "1",
-    NEXTWIKI_BASE_URL: playwrightBaseUrl,
-    NEXTWIKI_MEDIA_ROOT: mediaRoot,
-    NEXTWIKI_SECRET:
-      process.env.NEXTWIKI_SECRET ?? "e2e-only-secret-change-before-production-000000",
+    NOVIQWIKI_BASE_URL: playwrightBaseUrl,
+    NOVIQWIKI_MEDIA_ROOT: mediaRoot,
+    NOVIQWIKI_SECRET:
+      process.env.NOVIQWIKI_SECRET ?? "e2e-only-secret-change-before-production-000000",
     HOSTNAME: process.env.HOSTNAME ?? "127.0.0.1",
     PORT: process.env.PORT ?? playwrightPort,
     PLAYWRIGHT_BASE_URL: playwrightBaseUrl,
     PLAYWRIGHT_PORT: playwrightPort,
-    NEXTWIKI_E2E_SERVER_MODE: process.env.NEXTWIKI_E2E_SERVER_MODE ?? "start"
+    NOVIQWIKI_E2E_SERVER_MODE: process.env.NOVIQWIKI_E2E_SERVER_MODE ?? "start"
   };
 
   await mkdir(mediaRoot, { recursive: true });
@@ -34,7 +34,7 @@ async function main() {
   );
   console.log(`Running Playwright against ${playwrightBaseUrl}.`);
 
-  if (process.env.NEXTWIKI_E2E_SKIP_BUILD !== "1") {
+  if (process.env.NOVIQWIKI_E2E_SKIP_BUILD !== "1") {
     await run(command, ["exec", "next", "build"], childEnv);
   }
   await prepareStandaloneAssets();

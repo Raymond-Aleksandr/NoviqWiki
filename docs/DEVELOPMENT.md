@@ -63,12 +63,12 @@ cp .env.example .env.local
 The template contains container paths. For `pnpm dev` on the host, make at least these changes in `.env.local`:
 
 ```bash
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki
-NEXTWIKI_BASE_URL=http://localhost:3000
-NEXTWIKI_SECRET=replace-with-a-long-random-development-secret
-NEXTWIKI_MEDIA_DRIVER=local
-NEXTWIKI_MEDIA_ROOT=./media
-NEXTWIKI_STORAGE_PUBLIC_PATH=/media
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki
+NOVIQWIKI_BASE_URL=http://localhost:3000
+NOVIQWIKI_SECRET=replace-with-a-long-random-development-secret
+NOVIQWIKI_MEDIA_DRIVER=local
+NOVIQWIKI_MEDIA_ROOT=./media
+NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 ```
 
 Use `localhost`, not the Compose hostname `db`, because the Next.js process is running on the host. Likewise, use a host-writable media directory such as `./media`, not the container path `/app/media`.
@@ -76,7 +76,7 @@ Use `localhost`, not the Compose hostname `db`, because the Next.js process is r
 Repository TypeScript scripts load `.env`, not `.env.local`, through `dotenv/config`. Apply migrations by exporting the host URL explicitly or selecting the file:
 
 ```bash
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki pnpm db:migrate
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki pnpm db:migrate
 ```
 
 Equivalent explicit file loading:
@@ -101,7 +101,7 @@ To run both the application and PostgreSQL inside Compose instead of running `pn
 docker compose up --build -d
 ```
 
-When `NEXTWIKI_SECRET` is unset or empty, the entrypoint reuses `/app/secrets/nextwiki-secret` from the persistent `nextwiki-secrets` volume or generates that fallback if it is missing. An explicitly supplied environment value is used directly, is never written to the fallback file or an environment file, and causes startup to proactively delete any old fallback file. If the explicit value is later removed, the next start generates a new fallback; the secret change invalidates existing HMAC-backed sessions, email-verification tokens, and password-reset tokens. This fallback is convenient for evaluation, but production should explicitly provide a stable managed secret. `docker compose down` preserves the volume; `docker compose down -v` deletes it together with the database, media, and backup volumes, and `pnpm backup` does not copy it.
+When `NOVIQWIKI_SECRET` is unset or empty, the entrypoint reuses `/app/secrets/noviqwiki-secret` from the persistent `noviqwiki-secrets` volume or generates that fallback if it is missing. An explicitly supplied environment value is used directly, is never written to the fallback file or an environment file, and causes startup to proactively delete any old fallback file. If the explicit value is later removed, the next start generates a new fallback; the secret change invalidates existing HMAC-backed sessions, email-verification tokens, and password-reset tokens. This fallback is convenient for evaluation, but production should explicitly provide a stable managed secret. `docker compose down` preserves the volume; `docker compose down -v` deletes it together with the database, media, and backup volumes, and `pnpm backup` does not copy it.
 
 The committed Compose service correctly uses `db` and `/app/media` inside the container. It is an evaluation configuration with example credentials and published ports, not a production security baseline. See [DEPLOYMENT.md](./DEPLOYMENT.md).
 
@@ -110,7 +110,7 @@ The committed Compose service correctly uses `db` and `/app/media` inside the co
 The setup wizard is the normal first-run path. For disposable development data only:
 
 ```bash
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki pnpm db:seed
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki pnpm db:seed
 ```
 
 On a fresh database, the seed script creates development credentials including `owner / OwnerPassword123`. It is disabled when `NODE_ENV=production`. Never expose or reuse seeded credentials in a shared or production environment.
@@ -120,12 +120,12 @@ On a fresh database, the seed script creates development credentials including `
 Bind the development server to all interfaces and allow the workstation IP:
 
 ```bash
-NEXTWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
+NOVIQWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
 ```
 
 Replace `192.168.1.20` with the host IP. Review devices must be on a permitted network, and the workstation firewall must allow the selected port. Do not expose a development server directly to the public internet.
 
-If links or recovery URLs need to use the LAN address, update both `NEXTWIKI_BASE_URL` before setup and the stored base URL in `/admin/settings` after setup. The `NEXTWIKI_BASE_URL` scheme, not `NODE_ENV`, controls the session and CSRF cookies' `Secure` attribute: `https:` enables it and `http:` disables it.
+If links or recovery URLs need to use the LAN address, update both `NOVIQWIKI_BASE_URL` before setup and the stored base URL in `/admin/settings` after setup. The `NOVIQWIKI_BASE_URL` scheme, not `NODE_ENV`, controls the session and CSRF cookies' `Secure` attribute: `https:` enables it and `http:` disables it.
 
 ## Feature Workflow
 
@@ -152,7 +152,7 @@ Typical local workflow:
 
 ```bash
 pnpm db:generate
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki pnpm db:migrate
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki pnpm db:migrate
 ```
 
 Review generated SQL before applying it. Confirm constraints, defaults, indexes, foreign-key behavior, data backfills, lock duration, and compatibility with the previous application version. Integration tests execute the migration SQL in PGlite, while e2e and deployment validation provide the real PostgreSQL layer; use a representative PostgreSQL staging copy for risky migrations.
@@ -231,7 +231,7 @@ UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui
 
 An authenticated release audit also needs the credentials and fixture guidance in [TESTING.md](./TESTING.md#ui-release-audit).
 
-`pnpm test:e2e` resets only a database whose name contains a separate `test`, `e2e`, or `ci` token. By default it uses `nextwiki_e2e`, builds the application, and serves the standalone production output on port `3101`. It does not replace the non-reset UI audit.
+`pnpm test:e2e` resets only a database whose name contains a separate `test`, `e2e`, or `ci` token. By default it uses `noviqwiki_e2e`, builds the application, and serves the standalone production output on port `3101`. It does not replace the non-reset UI audit.
 
 If a gate cannot run, record the exact command, reason, and unverified scope. Never report a command as passing based on an earlier checkout.
 
@@ -302,12 +302,12 @@ cp .env.example .env.local
 模板包含容器路径。要在主机上运行 `pnpm dev`，至少应在 `.env.local` 中改为：
 
 ```bash
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki
-NEXTWIKI_BASE_URL=http://localhost:3000
-NEXTWIKI_SECRET=replace-with-a-long-random-development-secret
-NEXTWIKI_MEDIA_DRIVER=local
-NEXTWIKI_MEDIA_ROOT=./media
-NEXTWIKI_STORAGE_PUBLIC_PATH=/media
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki
+NOVIQWIKI_BASE_URL=http://localhost:3000
+NOVIQWIKI_SECRET=replace-with-a-long-random-development-secret
+NOVIQWIKI_MEDIA_DRIVER=local
+NOVIQWIKI_MEDIA_ROOT=./media
+NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 ```
 
 Next.js 进程在主机上运行，因此应使用 `localhost`，而不是 Compose 主机名 `db`。同理，应使用 `./media` 等主机可写媒体目录，而不是容器路径 `/app/media`。
@@ -315,7 +315,7 @@ Next.js 进程在主机上运行，因此应使用 `localhost`，而不是 Compo
 仓库 TypeScript 脚本通过 `dotenv/config` 加载 `.env`，不会加载 `.env.local`。可显式导出主机 URL 后应用迁移：
 
 ```bash
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki pnpm db:migrate
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki pnpm db:migrate
 ```
 
 也可显式选择文件：
@@ -340,7 +340,7 @@ pnpm dev
 docker compose up --build -d
 ```
 
-未设置 `NEXTWIKI_SECRET` 或其值为空时，入口会从持久化 `nextwiki-secrets` 卷复用 `/app/secrets/nextwiki-secret`；若该回退文件不存在，则生成它。显式提供的环境值会直接使用，绝不会写入回退文件或环境文件，并且启动时会主动删除任何旧回退文件。如果后来移除显式值，下次启动会生成新回退；密钥变化会使现有依赖 HMAC 的会话、电子邮件验证令牌和密码重置令牌失效。此回退行为便于评估，但生产环境应显式提供稳定的受管密钥。`docker compose down` 会保留该卷；`docker compose down -v` 会将它与数据库、媒体和备份卷一并删除，而 `pnpm backup` 不会复制它。
+未设置 `NOVIQWIKI_SECRET` 或其值为空时，入口会从持久化 `noviqwiki-secrets` 卷复用 `/app/secrets/noviqwiki-secret`；若该回退文件不存在，则生成它。显式提供的环境值会直接使用，绝不会写入回退文件或环境文件，并且启动时会主动删除任何旧回退文件。如果后来移除显式值，下次启动会生成新回退；密钥变化会使现有依赖 HMAC 的会话、电子邮件验证令牌和密码重置令牌失效。此回退行为便于评估，但生产环境应显式提供稳定的受管密钥。`docker compose down` 会保留该卷；`docker compose down -v` 会将它与数据库、媒体和备份卷一并删除，而 `pnpm backup` 不会复制它。
 
 提交的 Compose 服务在容器内正确使用 `db` 和 `/app/media`。它使用示例凭据和公开端口，只适合评估，不是生产安全基线。参见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
@@ -349,7 +349,7 @@ docker compose up --build -d
 设置向导是正常的首次运行路径。仅对可丢弃开发数据使用：
 
 ```bash
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki pnpm db:seed
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki pnpm db:seed
 ```
 
 在全新数据库上，种子脚本会创建包括 `owner / OwnerPassword123` 在内的开发凭据。`NODE_ENV=production` 时该脚本会被禁用。绝不能在共享或生产环境暴露或复用种子凭据。
@@ -359,12 +359,12 @@ DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki pnpm db:seed
 将开发服务器绑定到所有接口，并允许工作站 IP：
 
 ```bash
-NEXTWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
+NOVIQWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
 ```
 
 将 `192.168.1.20` 替换为主机 IP。检查设备必须处于允许的网络中，工作站防火墙也必须允许所选端口。不要把开发服务器直接暴露到公共互联网。
 
-若链接或恢复 URL 需要使用局域网地址，请在设置前更新 `NEXTWIKI_BASE_URL`，并在设置后通过 `/admin/settings` 更新已存储的基础 URL。会话和 CSRF Cookie 的 `Secure` 属性由 `NEXTWIKI_BASE_URL` 的协议决定，而不是 `NODE_ENV`：`https:` 会启用它，`http:` 会禁用它。
+若链接或恢复 URL 需要使用局域网地址，请在设置前更新 `NOVIQWIKI_BASE_URL`，并在设置后通过 `/admin/settings` 更新已存储的基础 URL。会话和 CSRF Cookie 的 `Secure` 属性由 `NOVIQWIKI_BASE_URL` 的协议决定，而不是 `NODE_ENV`：`https:` 会启用它，`http:` 会禁用它。
 
 ### 功能开发流程
 
@@ -391,7 +391,7 @@ NEXTWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
 
 ```bash
 pnpm db:generate
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki pnpm db:migrate
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki pnpm db:migrate
 ```
 
 应用前检查生成的 SQL。确认约束、默认值、索引、外键行为、数据回填、锁定时间以及与旧应用版本的兼容性。集成测试在 PGlite 中执行迁移 SQL，而 e2e 和部署验证提供真实 PostgreSQL 层；高风险迁移应使用有代表性的 PostgreSQL 预发布副本。
@@ -470,6 +470,6 @@ UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui
 
 已登录发布审计还需要 [TESTING.md](./TESTING.md#ui-发布审计) 中说明的凭据和测试数据。
 
-`pnpm test:e2e` 只会重置数据库名中含独立 `test`、`e2e` 或 `ci` 标记的数据库。默认使用 `nextwiki_e2e`，构建应用，并在 `3101` 端口提供独立生产输出。它不能替代非重置 UI 审计。
+`pnpm test:e2e` 只会重置数据库名中含独立 `test`、`e2e` 或 `ci` 标记的数据库。默认使用 `noviqwiki_e2e`，构建应用，并在 `3101` 端口提供独立生产输出。它不能替代非重置 UI 审计。
 
 如果某项门禁无法运行，应记录准确命令、原因和未验证范围。绝不能根据旧检出结果宣称命令通过。

@@ -4,6 +4,7 @@ import { siteSettings, users } from "@/db/schema";
 import { AppError, ForbiddenError } from "@/lib/errors";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { writeAuditLog } from "@/modules/audit/service";
+import { hasActiveOwner } from "@/modules/authorization/permissions";
 import { createUser, findUserForLogin, verifyPassword } from "@/modules/users/service";
 import { createSession } from "./session";
 import { assertRateLimit } from "./rate-limit";
@@ -129,8 +130,7 @@ async function getRegistrationContext(database: Database) {
   if (!site?.settings) {
     return null;
   }
-  const [existingUser] = await database.select({ id: users.id }).from(users).limit(1);
-  if (!existingUser) {
+  if (!(await hasActiveOwner(site.site.id, database))) {
     return null;
   }
   return { site, registrationMode: site.settings.registrationMode };

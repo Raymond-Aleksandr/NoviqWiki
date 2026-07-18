@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 export const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 export const composeProjectName = "noviqwiki";
-export const composeTargetLabel = `compose:default/${composeProjectName}/db/nextwiki`;
+export const composeTargetLabel = `compose:default/${composeProjectName}/db/noviqwiki`;
 
 export type PostgresTarget = {
   url: string;
@@ -228,10 +228,10 @@ export async function requireSafeMediaSource(configuredPath: string) {
   assertSafeMediaRoot(resolved);
   const source = await stat(resolved).catch(() => null);
   if (!source?.isDirectory()) {
-    throw new Error(`NEXTWIKI_MEDIA_ROOT is not an existing directory: ${resolved}`);
+    throw new Error(`NOVIQWIKI_MEDIA_ROOT is not an existing directory: ${resolved}`);
   }
   await access(resolved, constants.R_OK | constants.X_OK).catch(() => {
-    throw new Error(`NEXTWIKI_MEDIA_ROOT is not readable: ${resolved}`);
+    throw new Error(`NOVIQWIKI_MEDIA_ROOT is not readable: ${resolved}`);
   });
   const canonical = await realpath(resolved);
   assertSafeMediaRoot(canonical);
@@ -245,7 +245,7 @@ export async function prepareSafeMediaDestination(configuredPath: string) {
   const canonical = await realpath(resolved);
   assertSafeMediaRoot(canonical);
   await access(canonical, constants.W_OK | constants.X_OK).catch(() => {
-    throw new Error(`NEXTWIKI_MEDIA_ROOT is not writable: ${canonical}`);
+    throw new Error(`NOVIQWIKI_MEDIA_ROOT is not writable: ${canonical}`);
   });
   return canonical;
 }
@@ -332,7 +332,7 @@ function assertSafeMediaRoot(resolvedPath: string) {
     depth < 2
   ) {
     throw new Error(
-      `Refusing unsafe NEXTWIKI_MEDIA_ROOT: ${resolvedPath}. Use a dedicated media subdirectory.`
+      `Refusing unsafe NOVIQWIKI_MEDIA_ROOT: ${resolvedPath}. Use a dedicated media subdirectory.`
     );
   }
 }

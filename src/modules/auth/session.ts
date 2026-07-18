@@ -39,7 +39,7 @@ export async function createSession(
 
 export async function setSessionCookies(token: string, csrfToken: string) {
   const cookieStore = await cookies();
-  const secure = shouldUseSecureCookies(getEnv().NEXTWIKI_BASE_URL);
+  const secure = shouldUseSecureCookies(getEnv().NOVIQWIKI_BASE_URL);
   cookieStore.set(sessionCookieName, token, {
     httpOnly: true,
     sameSite: "lax",

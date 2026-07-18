@@ -37,7 +37,7 @@ cp .env.example .env
 openssl rand -base64 32
 ```
 
-Paste the generated value after `NEXTWIKI_SECRET=` in `.env`, then start NoviqWiki:
+Paste the generated value after `NOVIQWIKI_SECRET=` in `.env`, then start NoviqWiki:
 
 ```bash
 docker compose up --build -d
@@ -45,7 +45,7 @@ docker compose up --build -d
 
 Open <http://localhost:3000/setup> and complete the setup wizard. Check container state with `docker compose ps` and logs with `docker compose logs --tail=200 app`.
 
-If `NEXTWIKI_SECRET` is empty, the container reuses or generates a fallback in `/app/secrets/nextwiki-secret`; the committed Compose file preserves it in the `nextwiki-secrets` named volume across container recreation. When an explicit environment value is supplied, startup uses it, never writes it to the fallback file, and proactively deletes any old fallback file. Removing that explicit value later therefore generates a new fallback and invalidates HMAC-derived sessions and outstanding recovery/verification tokens. While the fallback is in use, deleting or replacing its volume has the same rotation effect. `pnpm backup` does not include this volume. Long-lived and production deployments should inject a stable, explicitly managed secret and include its reference in the recovery plan. Review [Configuration](docs/CONFIGURATION.md) and [Deployment](docs/DEPLOYMENT.md) before exposing an instance to the internet.
+If `NOVIQWIKI_SECRET` is empty, the container reuses or generates a fallback in `/app/secrets/noviqwiki-secret`; the committed Compose file preserves it in the `noviqwiki-secrets` named volume across container recreation. When an explicit environment value is supplied, startup uses it, never writes it to the fallback file, and proactively deletes any old fallback file. Removing that explicit value later therefore generates a new fallback and invalidates HMAC-derived sessions and outstanding recovery/verification tokens. While the fallback is in use, deleting or replacing its volume has the same rotation effect. `pnpm backup` does not include this volume. Long-lived and production deployments should inject a stable, explicitly managed secret and include its reference in the recovery plan. Review [Configuration](docs/CONFIGURATION.md) and [Deployment](docs/DEPLOYMENT.md) before exposing an instance to the internet.
 
 When PostgreSQL already contains a site but the `users` table is empty, `/setup` switches to an Owner-only bootstrap and preserves the existing site settings, pages, and media metadata. Public registration remains blocked until that Owner exists. The first successful setup visitor can claim the Owner account, so complete this step on a trusted network before exposing such an instance.
 
@@ -68,12 +68,12 @@ cp .env.example .env
 When the app runs on the host and PostgreSQL runs in Compose, set at least these values in `.env`:
 
 ```dotenv
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki
-NEXTWIKI_BASE_URL=http://localhost:3000
-NEXTWIKI_SECRET=replace-with-a-long-random-secret
-NEXTWIKI_MEDIA_DRIVER=local
-NEXTWIKI_MEDIA_ROOT=media
-NEXTWIKI_STORAGE_PUBLIC_PATH=/media
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki
+NOVIQWIKI_BASE_URL=http://localhost:3000
+NOVIQWIKI_SECRET=replace-with-a-long-random-secret
+NOVIQWIKI_MEDIA_DRIVER=local
+NOVIQWIKI_MEDIA_ROOT=media
+NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 ```
 
 Generate the secret with `openssl rand -base64 32`, start PostgreSQL, apply migrations, and start the development server:
@@ -194,7 +194,7 @@ cp .env.example .env
 openssl rand -base64 32
 ```
 
-将生成的值粘贴到 `.env` 中的 `NEXTWIKI_SECRET=` 后，再启动 NoviqWiki：
+将生成的值粘贴到 `.env` 中的 `NOVIQWIKI_SECRET=` 后，再启动 NoviqWiki：
 
 ```bash
 docker compose up --build -d
@@ -202,7 +202,7 @@ docker compose up --build -d
 
 打开 <http://localhost:3000/setup> 并完成初始化向导。可使用 `docker compose ps` 检查容器状态，使用 `docker compose logs --tail=200 app` 查看日志。
 
-如果 `NEXTWIKI_SECRET` 为空，容器会复用或生成 `/app/secrets/nextwiki-secret` 回退密钥；提交的 Compose 文件通过 `nextwiki-secrets` 命名卷在重新创建容器后继续保留该密钥。提供显式环境变量值时，启动流程会使用该值、绝不会将其写入回退文件，并主动删除任何旧回退文件。因此，日后移除显式值会生成新的回退密钥，并使 HMAC 派生的会话及尚未使用的恢复/验证令牌失效；使用回退密钥期间，删除或替换该卷也会产生同样的轮换效果。`pnpm backup` 不包含此卷。长期和生产部署应注入稳定且由部署系统明确管理的密钥，并把其引用纳入恢复计划。将实例暴露到互联网前，请阅读[配置](docs/CONFIGURATION.md)和[部署](docs/DEPLOYMENT.md)文档。
+如果 `NOVIQWIKI_SECRET` 为空，容器会复用或生成 `/app/secrets/noviqwiki-secret` 回退密钥；提交的 Compose 文件通过 `noviqwiki-secrets` 命名卷在重新创建容器后继续保留该密钥。提供显式环境变量值时，启动流程会使用该值、绝不会将其写入回退文件，并主动删除任何旧回退文件。因此，日后移除显式值会生成新的回退密钥，并使 HMAC 派生的会话及尚未使用的恢复/验证令牌失效；使用回退密钥期间，删除或替换该卷也会产生同样的轮换效果。`pnpm backup` 不包含此卷。长期和生产部署应注入稳定且由部署系统明确管理的密钥，并把其引用纳入恢复计划。将实例暴露到互联网前，请阅读[配置](docs/CONFIGURATION.md)和[部署](docs/DEPLOYMENT.md)文档。
 
 当 PostgreSQL 已有站点但 `users` 表为空时，`/setup` 会切换为仅创建 Owner 的引导，并保留现有站点设置、页面和媒体元数据。首个 Owner 创建前，公开注册会保持阻断。第一个成功提交设置的人可以取得 Owner 账号，因此必须先在受信网络完成此步骤，再暴露该实例。
 
@@ -225,12 +225,12 @@ cp .env.example .env
 当应用在主机运行而 PostgreSQL 在 Compose 中运行时，请至少在 `.env` 中设置以下值：
 
 ```dotenv
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki
-NEXTWIKI_BASE_URL=http://localhost:3000
-NEXTWIKI_SECRET=replace-with-a-long-random-secret
-NEXTWIKI_MEDIA_DRIVER=local
-NEXTWIKI_MEDIA_ROOT=media
-NEXTWIKI_STORAGE_PUBLIC_PATH=/media
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki
+NOVIQWIKI_BASE_URL=http://localhost:3000
+NOVIQWIKI_SECRET=replace-with-a-long-random-secret
+NOVIQWIKI_MEDIA_DRIVER=local
+NOVIQWIKI_MEDIA_ROOT=media
+NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 ```
 
 使用 `openssl rand -base64 32` 生成密钥，然后启动 PostgreSQL、应用迁移并启动开发服务器：

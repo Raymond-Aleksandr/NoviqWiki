@@ -3,18 +3,18 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://nextwiki:nextwiki@db:5432/nextwiki
-      NEXTWIKI_BASE_URL: http://localhost:3000
-      NEXTWIKI_SECRET: ${NEXTWIKI_SECRET:-}
-      NEXTWIKI_MEDIA_DRIVER: local
-      NEXTWIKI_MEDIA_ROOT: /app/media
-      NEXTWIKI_STORAGE_PUBLIC_PATH: /media
+      DATABASE_URL: postgres://noviqwiki:noviqwiki@db:5432/noviqwiki
+      NOVIQWIKI_BASE_URL: http://localhost:3000
+      NOVIQWIKI_SECRET: ${NOVIQWIKI_SECRET:-}
+      NOVIQWIKI_MEDIA_DRIVER: local
+      NOVIQWIKI_MEDIA_ROOT: /app/media
+      NOVIQWIKI_STORAGE_PUBLIC_PATH: /media
     ports:
       - "3000:3000"
     volumes:
-      - nextwiki-media:/app/media
-      - nextwiki-backups:/app/backups
-      - nextwiki-secrets:/app/secrets
+      - noviqwiki-media:/app/media
+      - noviqwiki-backups:/app/backups
+      - noviqwiki-secrets:/app/secrets
     depends_on:
       db:
         condition: service_healthy
@@ -23,21 +23,21 @@ services:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: nextwiki
-      POSTGRES_PASSWORD: nextwiki
-      POSTGRES_DB: nextwiki
+      POSTGRES_USER: noviqwiki
+      POSTGRES_PASSWORD: noviqwiki
+      POSTGRES_DB: noviqwiki
     volumes:
-      - nextwiki-db:/var/lib/postgresql/data
+      - noviqwiki-db:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nextwiki -d nextwiki"]
+      test: ["CMD-SHELL", "pg_isready -U noviqwiki -d noviqwiki"]
       interval: 10s
       timeout: 5s
       retries: 10
 
 volumes:
-  nextwiki-db:
-  nextwiki-media:
-  nextwiki-backups:
-  nextwiki-secrets:
+  noviqwiki-db:
+  noviqwiki-media:
+  noviqwiki-backups:
+  noviqwiki-secrets:

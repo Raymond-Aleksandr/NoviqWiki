@@ -9,7 +9,7 @@ declare global {
 
 export function createSqlClient(connectionString = getDatabaseUrl()) {
   return postgres(connectionString, {
-    max: Number(process.env.NEXTWIKI_DB_POOL_SIZE ?? 10),
+    max: Number(process.env.NOVIQWIKI_DB_POOL_SIZE ?? 10),
     idle_timeout: 20,
     connect_timeout: 10,
     prepare: false

@@ -3,7 +3,7 @@ import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
 import * as schema from "@/db/schema";
 
-const defaultE2eDatabaseUrl = "postgres://nextwiki:nextwiki@localhost:5432/nextwiki_e2e";
+const defaultE2eDatabaseUrl = "postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki_e2e";
 const safeDatabaseNamePattern = /(^|[_-])(test|e2e|ci)([_-]|$)/i;
 
 type E2eEnvironment = Record<string, string | undefined>;
@@ -15,7 +15,7 @@ export type E2eDatabaseResetResult = {
 };
 
 export function resolveE2eDatabaseUrl(env: E2eEnvironment = process.env) {
-  const explicit = env.NEXTWIKI_E2E_DATABASE_URL?.trim();
+  const explicit = env.NOVIQWIKI_E2E_DATABASE_URL?.trim();
   if (explicit) return explicit;
 
   const ambient = env.DATABASE_URL?.trim();
@@ -74,7 +74,7 @@ function assertSafeResetTarget(databaseUrl: string) {
   if (!isResetSafeDatabaseUrl(databaseUrl)) {
     throw new Error(
       `Refusing to reset database "${databaseLabel(databaseUrl)}". ` +
-        "Use NEXTWIKI_E2E_DATABASE_URL with a database name containing test, e2e, or ci."
+        "Use NOVIQWIKI_E2E_DATABASE_URL with a database name containing test, e2e, or ci."
     );
   }
 }
@@ -108,7 +108,7 @@ async function ensureE2eDatabaseExists(databaseUrl: string) {
 
   throw new Error(
     `Could not create e2e database "${databaseLabel(databaseUrl)}". ` +
-      "Create it manually or set NEXTWIKI_E2E_DATABASE_URL to an existing disposable database.",
+      "Create it manually or set NOVIQWIKI_E2E_DATABASE_URL to an existing disposable database.",
     { cause: lastError }
   );
 }

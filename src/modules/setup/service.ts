@@ -1,9 +1,13 @@
 import { eq, sql } from "drizzle-orm";
 import { db, type Database, type RootDatabase } from "@/db/client";
-import { siteSettings, sites, users } from "@/db/schema";
+import { siteSettings, sites } from "@/db/schema";
 import { slugifyTitle } from "@/lib/normalize";
 import { writeAuditLog } from "@/modules/audit/service";
-import { assignUserToGroup, ensureDefaultAuthorization } from "@/modules/authorization/permissions";
+import {
+  assignUserToGroup,
+  ensureDefaultAuthorization,
+  hasActiveOwner
+} from "@/modules/authorization/permissions";
 import { createUser } from "@/modules/users/service";
 
 export type SetupMode = "initial" | "owner" | "complete";
@@ -18,8 +22,7 @@ export async function getSetupState(database: Database = db): Promise<SetupState
   if (!site) {
     return { mode: "initial", site: null };
   }
-  const [user] = await database.select({ id: users.id }).from(users).limit(1);
-  return { mode: user ? "complete" : "owner", site };
+  return { mode: (await hasActiveOwner(site.id, database)) ? "complete" : "owner", site };
 }
 
 export async function getSetupMode(database: Database = db): Promise<SetupMode> {
@@ -113,8 +116,7 @@ export async function bootstrapOwner(
     if (!site) {
       throw new Error("Site setup has not been completed.");
     }
-    const [existingUser] = await tx.select({ id: users.id }).from(users).limit(1);
-    if (existingUser) {
+    if (await hasActiveOwner(site.id, tx)) {
       throw new Error("Setup has already been completed.");
     }
     const [settings] = await tx

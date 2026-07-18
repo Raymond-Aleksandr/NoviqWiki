@@ -98,7 +98,7 @@ describe("operations safety", () => {
       "--quiet"
     ]);
     expect(expectedRestoreConfirmation(composeTargetLabel)).toBe(
-      "restore:compose:default/noviqwiki/db/nextwiki"
+      "restore:compose:default/noviqwiki/db/noviqwiki"
     );
   });
 

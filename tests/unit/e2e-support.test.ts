@@ -5,8 +5,8 @@ describe("e2e database safety", () => {
   it("uses an explicit e2e database URL first", () => {
     expect(
       resolveE2eDatabaseUrl({
-        NEXTWIKI_E2E_DATABASE_URL: "postgres://user:pass@localhost:5432/custom_e2e",
-        DATABASE_URL: "postgres://user:pass@localhost:5432/nextwiki"
+        NOVIQWIKI_E2E_DATABASE_URL: "postgres://user:pass@localhost:5432/custom_e2e",
+        DATABASE_URL: "postgres://user:pass@localhost:5432/noviqwiki"
       })
     ).toBe("postgres://user:pass@localhost:5432/custom_e2e");
   });
@@ -19,15 +19,15 @@ describe("e2e database safety", () => {
     ).toBe("postgres://user:pass@localhost:5432/noviqwiki_test");
     expect(
       resolveE2eDatabaseUrl({
-        DATABASE_URL: "postgres://user:pass@localhost:5432/nextwiki"
+        DATABASE_URL: "postgres://user:pass@localhost:5432/noviqwiki"
       })
-    ).toBe("postgres://nextwiki:nextwiki@localhost:5432/nextwiki_e2e");
+    ).toBe("postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki_e2e");
   });
 
   it("only treats test, e2e, and ci database names as reset-safe", () => {
-    expect(isResetSafeDatabaseUrl("postgres://user:pass@localhost:5432/nextwiki_e2e")).toBe(true);
+    expect(isResetSafeDatabaseUrl("postgres://user:pass@localhost:5432/noviqwiki_e2e")).toBe(true);
     expect(isResetSafeDatabaseUrl("postgres://user:pass@localhost:5432/noviqwiki_test")).toBe(true);
     expect(isResetSafeDatabaseUrl("postgres://user:pass@localhost:5432/ci")).toBe(true);
-    expect(isResetSafeDatabaseUrl("postgres://user:pass@localhost:5432/nextwiki")).toBe(false);
+    expect(isResetSafeDatabaseUrl("postgres://user:pass@localhost:5432/noviqwiki")).toBe(false);
   });
 });

@@ -22,7 +22,7 @@ Next.js application
 
 - Next.js serves public wiki pages, authenticated editing/workspace pages, administration pages, direct local-media reads, and JSON routes.
 - PostgreSQL stores the primary site and settings, identities and sessions, RBAC, content state, immutable revisions, per-user drafts, current link/category/search projections, watchlists, media metadata, audit events, and rate-limit events.
-- Local media bytes live in `NEXTWIKI_MEDIA_ROOT`; S3-compatible media bytes live in the configured bucket.
+- Local media bytes live in `NOVIQWIKI_MEDIA_ROOT`; S3-compatible media bytes live in the configured bucket.
 - `compose.yaml` runs the application and PostgreSQL, with named volumes for the database, local media, backups, and the container-generated fallback secret.
 - The runtime currently loads one primary site through `getPrimarySiteWithSettings`. Many tables carry `siteId` for isolation and future multi-site work, but v0.1.0 is operated as a single-site application.
 
@@ -119,7 +119,7 @@ Published pages update a dedicated `search_index` table. PostgreSQL uses a gener
 
 - Local username/email credentials are hashed with Argon2id.
 - Setup has three database-derived modes: no site runs full initial setup; an existing site with zero users runs an Owner-only bootstrap that preserves site/content records; any user row closes setup. Public registration uses a no-lock fast path after setup, but an incomplete-state preflight is rechecked under the same advisory lock as Owner creation; it therefore cannot create the first account. Because the zero-user mode is unauthenticated first-Owner provisioning, isolate the instance until a trusted administrator completes it.
-- Successful login creates a 14-day database session and sets `noviqwiki_session` (`HttpOnly`) plus `noviqwiki_csrf` (readable by the browser), both `SameSite=Lax`. They are `Secure` when the environment `NEXTWIKI_BASE_URL` uses `https:`, independent of `NODE_ENV` and the base URL stored in PostgreSQL.
+- Successful login creates a 14-day database session and sets `noviqwiki_session` (`HttpOnly`) plus `noviqwiki_csrf` (readable by the browser), both `SameSite=Lax`. They are `Secure` when the environment `NOVIQWIKI_BASE_URL` uses `https:`, independent of `NODE_ENV` and the base URL stored in PostgreSQL.
 - Permission evaluation unions the permissions of every role assigned to every group containing the user.
 - Anonymous users receive only `site.view`, `page.read`, `revision.read`, and `media.read`, and only while `publicMode` is enabled. If the primary site has no `site_settings` row, the current permission helper defaults `publicMode` to enabled.
 - Built-in Administrator and Owner roles currently receive every permission key. Owner is additionally protected by the final-active-Owner invariant.
@@ -131,9 +131,9 @@ See [Authorization](./AUTHORIZATION.md) for the exact role grants, protected-pag
 
 `StorageAdapter` defines `put`, `delete`, `getPublicUrl`, and `isReady`.
 
-- `LocalStorageAdapter` uses randomized storage keys below `NEXTWIKI_MEDIA_ROOT`, rejects traversal outside that root, and serves bytes through `/media/[...key]` after `media.read` authorization. The current local response is marked `public, max-age=31536000, immutable`. Private deployments must disable shared proxy/CDN caching. Deployments that require immediate revocation after logout, permission removal, a private-mode change, or deletion must change the route to `Cache-Control: private, no-store` and purge already cached objects or rotate previously distributed URLs.
+- `LocalStorageAdapter` uses randomized storage keys below `NOVIQWIKI_MEDIA_ROOT`, rejects traversal outside that root, and serves bytes through `/media/[...key]` after `media.read` authorization. The current local response is marked `public, max-age=31536000, immutable`. Private deployments must disable shared proxy/CDN caching. Deployments that require immediate revocation after logout, permission removal, a private-mode change, or deletion must change the route to `Cache-Control: private, no-store` and purge already cached objects or rotate previously distributed URLs.
 - `S3StorageAdapter` uses an S3-compatible endpoint. Its signed GET URLs last one hour and do not re-check application authorization after issuance. Upload currently persists that temporary URL in `media_assets.publicUrl`, and the media picker/editor can copy or insert it. The same-origin `/media/[...key]` route performs `media.read` authorization but then redirects to the external signed URL; the default `img-src 'self' data: blob:` policy blocks that external image unless deployment CSP is extended. Reference discovery scans only the current published Markdown for `publicUrl` or `safeFilename` substrings, not `storageKey`, so stable same-origin S3 references can be missed and delete-conflict detection is not a reliable integrity guarantee.
-- Runtime adapter selection uses `NEXTWIKI_MEDIA_DRIVER`. The `site_settings.media_driver` value collected during setup is persisted but is not consulted by `getStorageAdapter`; deployments must configure the environment variable consistently.
+- Runtime adapter selection uses `NOVIQWIKI_MEDIA_DRIVER`. The `site_settings.media_driver` value collected during setup is persisted but is not consulted by `getStorageAdapter`; deployments must configure the environment variable consistently.
 - Local readiness only creates the media directory and does not perform a read/write probe. S3 readiness currently checks only that a bucket name exists and does not contact S3.
 - Upload validation enforces size and an allowlist. When byte detection fails, it currently falls back to the client-declared MIME type; this is a known hardening gap, not full content verification.
 
@@ -160,10 +160,10 @@ The root layout currently uses cookie, active user, then site default and does n
 
 ## Deployment and Operations
 
-- The production image builds a Next.js standalone bundle, runs as the non-root `nextwiki` user, applies migrations at startup, and then starts the server.
-- Production requires a stable `NEXTWIKI_SECRET` of at least 32 characters. When Compose leaves it empty, the container entrypoint generates `/app/secrets/nextwiki-secret`; the committed `nextwiki-secrets` volume preserves it across container recreation. An explicit value is not written there and removes any old fallback, so later removing the explicit value creates a new fallback and rotates HMAC-derived sessions/tokens. Removing the volume has the same rotation effect while fallback mode is active, and `pnpm backup` does not include it. Production should inject one stable managed secret instead.
+- The production image builds a Next.js standalone bundle, runs as the non-root `noviqwiki` user, applies migrations at startup, and then starts the server.
+- Production requires a stable `NOVIQWIKI_SECRET` of at least 32 characters. When Compose leaves it empty, the container entrypoint generates `/app/secrets/noviqwiki-secret`; the committed `noviqwiki-secrets` volume preserves it across container recreation. An explicit value is not written there and removes any old fallback, so later removing the explicit value creates a new fallback and rotates HMAC-derived sessions/tokens. Removing the volume has the same rotation effect while fallback mode is active, and `pnpm backup` does not include it. Production should inject one stable managed secret instead.
 - `/api/health` checks process liveness. `/api/ready` queries PostgreSQL and checks the storage adapter as described above.
-- Backup and restore are CLI operations in `scripts/backup.ts` and `scripts/restore.ts`; the `backup.create` permission is not consulted by those operating-system commands. They read only their database/media/restore variables rather than validating unrelated web-runtime secrets. Local database tools receive a normalized URL target without ambient libpq routing overrides or a password in argv. A missing local PostgreSQL client can use the repository-anchored Docker `default` context, `noviqwiki` project, and `db/nextwiki` service/database only with explicit `NEXTWIKI_COMPOSE_FALLBACK=1`; connection or SQL failures never switch targets. Restore preflights recognized complete plain SQL and safe media inputs, binds confirmation to the selected target, and sends the schema reset plus import through one `ON_ERROR_STOP=1` transaction. A following local-media extraction is necessarily outside that database transaction.
+- Backup and restore are CLI operations in `scripts/backup.ts` and `scripts/restore.ts`; the `backup.create` permission is not consulted by those operating-system commands. They read only their database/media/restore variables rather than validating unrelated web-runtime secrets. Local database tools receive a normalized URL target without ambient libpq routing overrides or a password in argv. A missing local PostgreSQL client can use the repository-anchored Docker `default` context, `noviqwiki` project, and `db/noviqwiki` service/database only with explicit `NOVIQWIKI_COMPOSE_FALLBACK=1`; connection or SQL failures never switch targets. Restore preflights recognized complete plain SQL and safe media inputs, binds confirmation to the selected target, and sends the schema reset plus import through one `ON_ERROR_STOP=1` transaction. A following local-media extraction is necessarily outside that database transaction.
 - There is no background worker or queue. Email delivery and media work happen in the request/command process.
 
 ## Current Security and Integration Boundaries
@@ -205,7 +205,7 @@ Next.js 应用
 
 - Next.js 提供公开 Wiki 页面、已登录编辑/工作区页面、管理页面、本地媒体直接读取和 JSON 路由。
 - PostgreSQL 存储主站点及设置、身份与会话、RBAC、内容状态、不可变修订、每用户草稿、当前链接/分类/搜索投影、监视列表、媒体元数据、审计事件和限流事件。
-- 本地媒体字节位于 `NEXTWIKI_MEDIA_ROOT`；S3 兼容媒体字节位于配置的存储桶。
+- 本地媒体字节位于 `NOVIQWIKI_MEDIA_ROOT`；S3 兼容媒体字节位于配置的存储桶。
 - `compose.yaml` 运行应用和 PostgreSQL，并为数据库、本地媒体、备份及容器生成的回退密钥使用命名卷。
 - 运行时目前通过 `getPrimarySiteWithSettings` 加载一个主站点。许多表带有 `siteId`，用于隔离和未来多站点工作，但 v0.1.0 按单站点应用运行。
 
@@ -302,7 +302,7 @@ Markdown
 
 - 本地用户名/邮箱凭据使用 Argon2id 哈希。
 - 设置有三种由数据库状态决定的模式：没有站点时运行完整初始设置；已有站点但用户数为零时运行仅 Owner 引导并保留站点/内容记录；存在任意用户记录后关闭设置。设置完成后的公开注册走无锁快速路径；若预检发现状态不完整，则会在与 Owner 创建相同的 advisory lock 内重新检查，因此不能创建首个账户。零用户模式本质上是未经身份验证的首个 Owner 配置，因此受信管理员完成前必须隔离实例。
-- 登录成功会创建 14 天数据库会话，并设置 `noviqwiki_session`（`HttpOnly`）及 `noviqwiki_csrf`（浏览器可读）；两者均为 `SameSite=Lax`。只有环境变量 `NEXTWIKI_BASE_URL` 使用 `https:` 时才启用 `Secure`，与 `NODE_ENV` 及 PostgreSQL 中保存的基础 URL 无关。
+- 登录成功会创建 14 天数据库会话，并设置 `noviqwiki_session`（`HttpOnly`）及 `noviqwiki_csrf`（浏览器可读）；两者均为 `SameSite=Lax`。只有环境变量 `NOVIQWIKI_BASE_URL` 使用 `https:` 时才启用 `Secure`，与 `NODE_ENV` 及 PostgreSQL 中保存的基础 URL 无关。
 - 权限计算会合并用户所在所有用户组所分配全部角色的权限。
 - 匿名用户只能获得 `site.view`、`page.read`、`revision.read` 和 `media.read`，且仅在启用 `publicMode` 时有效。若主站点缺少 `site_settings` 记录，当前权限辅助函数会默认把 `publicMode` 视为启用。
 - 内置 Administrator 和 Owner 角色目前都拥有全部权限键。Owner 还受“至少保留一个活跃 Owner”不变量保护。
@@ -314,9 +314,9 @@ Markdown
 
 `StorageAdapter` 定义 `put`、`delete`、`getPublicUrl` 和 `isReady`。
 
-- `LocalStorageAdapter` 在 `NEXTWIKI_MEDIA_ROOT` 下使用随机存储键，拒绝根目录外的路径穿越，并在校验 `media.read` 后通过 `/media/[...key]` 提供字节。当前本地响应带有 `public, max-age=31536000, immutable`。私有部署必须禁用代理/CDN 共享缓存。若部署要求在退出登录、移除权限、切换私有模式或删除后立即撤销访问，则必须把该路由改为 `Cache-Control: private, no-store`，并清除已缓存对象或轮换此前分发的 URL。
+- `LocalStorageAdapter` 在 `NOVIQWIKI_MEDIA_ROOT` 下使用随机存储键，拒绝根目录外的路径穿越，并在校验 `media.read` 后通过 `/media/[...key]` 提供字节。当前本地响应带有 `public, max-age=31536000, immutable`。私有部署必须禁用代理/CDN 共享缓存。若部署要求在退出登录、移除权限、切换私有模式或删除后立即撤销访问，则必须把该路由改为 `Cache-Control: private, no-store`，并清除已缓存对象或轮换此前分发的 URL。
 - `S3StorageAdapter` 使用 S3 兼容端点。签名 GET URL 的有效期为一小时，签发后不会再次检查应用权限。上传当前会把该临时 URL 持久化到 `media_assets.publicUrl`，媒体选择器/编辑器也可以复制或插入它。同源 `/media/[...key]` 路由会检查 `media.read`，但随后重定向到外部签名 URL；除非部署扩展 CSP，否则默认 `img-src 'self' data: blob:` 会阻止该外部图片。引用发现只扫描当前已发布 Markdown 中 `publicUrl` 或 `safeFilename` 的子字符串，不扫描 `storageKey`，因此稳定的同源 S3 引用可能漏检，删除冲突检测也不是可靠的完整性保证。
-- 运行时适配器由 `NEXTWIKI_MEDIA_DRIVER` 选择。设置时采集的 `site_settings.media_driver` 会持久化，但 `getStorageAdapter` 不会读取它；部署必须保持环境变量配置一致。
+- 运行时适配器由 `NOVIQWIKI_MEDIA_DRIVER` 选择。设置时采集的 `site_settings.media_driver` 会持久化，但 `getStorageAdapter` 不会读取它；部署必须保持环境变量配置一致。
 - 本地就绪检查只会创建媒体目录，不执行读写探测。S3 就绪检查目前只确认存在存储桶名称，不会联系 S3。
 - 上传校验执行大小和允许列表检查。当字节检测失败时，目前会回退到客户端声明的 MIME 类型；这是已知加固缺口，不是完整内容验证。
 
@@ -343,10 +343,10 @@ Markdown
 
 ### 部署与运维
 
-- 生产镜像构建 Next.js standalone 包，以非 root 用户 `nextwiki` 运行，在启动服务器前应用迁移。
-- 生产环境要求至少 32 个字符的稳定 `NEXTWIKI_SECRET`。当 Compose 留空时，容器入口会生成 `/app/secrets/nextwiki-secret`；提交的 `nextwiki-secrets` 卷会在容器重建后保留它。显式值不会写入该文件，并会删除任何旧回退；因此日后移除显式值会创建新回退并轮换 HMAC 派生的会话/Token。使用回退模式时删除该卷也会产生相同轮换效果，且 `pnpm backup` 不包含此卷。生产环境应改为注入单一稳定的受管密钥。
+- 生产镜像构建 Next.js standalone 包，以非 root 用户 `noviqwiki` 运行，在启动服务器前应用迁移。
+- 生产环境要求至少 32 个字符的稳定 `NOVIQWIKI_SECRET`。当 Compose 留空时，容器入口会生成 `/app/secrets/noviqwiki-secret`；提交的 `noviqwiki-secrets` 卷会在容器重建后保留它。显式值不会写入该文件，并会删除任何旧回退；因此日后移除显式值会创建新回退并轮换 HMAC 派生的会话/Token。使用回退模式时删除该卷也会产生相同轮换效果，且 `pnpm backup` 不包含此卷。生产环境应改为注入单一稳定的受管密钥。
 - `/api/health` 检查进程存活。`/api/ready` 查询 PostgreSQL，并按上述方式检查存储适配器。
-- 备份和恢复是 `scripts/backup.ts` 与 `scripts/restore.ts` 中的 CLI 操作；这些操作系统命令不会检查 `backup.create` 权限。它们只读取数据库、媒体与恢复相关变量，不会校验无关的 Web 运行时密钥。本地数据库工具会收到规范化 URL 目标，不继承环境中的 libpq 路由覆盖，密码也不会出现在 argv 中。只有本机缺少 PostgreSQL 客户端且显式设置 `NEXTWIKI_COMPOSE_FALLBACK=1` 时，才可使用锚定到本仓库的 Docker `default` context、`noviqwiki` 项目与 `db/nextwiki` 服务/数据库；连接或 SQL 失败绝不会切换目标。恢复会预检可识别的完整纯 SQL 与安全媒体输入，把确认值绑定到所选目标，并在同一个 `ON_ERROR_STOP=1` 事务中执行 Schema 重置与导入；后续本地媒体解压必然位于该数据库事务之外。
+- 备份和恢复是 `scripts/backup.ts` 与 `scripts/restore.ts` 中的 CLI 操作；这些操作系统命令不会检查 `backup.create` 权限。它们只读取数据库、媒体与恢复相关变量，不会校验无关的 Web 运行时密钥。本地数据库工具会收到规范化 URL 目标，不继承环境中的 libpq 路由覆盖，密码也不会出现在 argv 中。只有本机缺少 PostgreSQL 客户端且显式设置 `NOVIQWIKI_COMPOSE_FALLBACK=1` 时，才可使用锚定到本仓库的 Docker `default` context、`noviqwiki` 项目与 `db/noviqwiki` 服务/数据库；连接或 SQL 失败绝不会切换目标。恢复会预检可识别的完整纯 SQL 与安全媒体输入，把确认值绑定到所选目标，并在同一个 `ON_ERROR_STOP=1` 事务中执行 Schema 重置与导入；后续本地媒体解压必然位于该数据库事务之外。
 - 没有后台 Worker 或队列。邮件投递和媒体工作都在请求/命令进程中完成。
 
 ### 当前安全与集成边界

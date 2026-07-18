@@ -9,12 +9,12 @@ type MailInput = {
 
 export async function sendSystemEmail(input: MailInput) {
   const env = getEnv();
-  if (!env.NEXTWIKI_SMTP_URL || !env.NEXTWIKI_EMAIL_FROM) {
+  if (!env.NOVIQWIKI_SMTP_URL || !env.NOVIQWIKI_EMAIL_FROM) {
     return false;
   }
-  const transport = nodemailer.createTransport(env.NEXTWIKI_SMTP_URL);
+  const transport = nodemailer.createTransport(env.NOVIQWIKI_SMTP_URL);
   await transport.sendMail({
-    from: env.NEXTWIKI_EMAIL_FROM,
+    from: env.NOVIQWIKI_EMAIL_FROM,
     to: input.to,
     subject: input.subject,
     text: input.text

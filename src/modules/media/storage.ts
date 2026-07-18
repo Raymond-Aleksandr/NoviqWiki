@@ -19,8 +19,8 @@ export interface StorageAdapter {
 
 export class LocalStorageAdapter implements StorageAdapter {
   constructor(
-    private readonly root = getEnv().NEXTWIKI_MEDIA_ROOT,
-    private readonly publicPath = getEnv().NEXTWIKI_STORAGE_PUBLIC_PATH
+    private readonly root = getEnv().NOVIQWIKI_MEDIA_ROOT,
+    private readonly publicPath = getEnv().NOVIQWIKI_STORAGE_PUBLIC_PATH
   ) {}
 
   async put(key: string, bytes: Buffer) {
@@ -63,14 +63,14 @@ export class S3StorageAdapter implements StorageAdapter {
 
   constructor() {
     const env = getEnv();
-    this.bucket = env.NEXTWIKI_S3_BUCKET ?? "";
+    this.bucket = env.NOVIQWIKI_S3_BUCKET ?? "";
     this.client = new S3Client({
-      endpoint: env.NEXTWIKI_S3_ENDPOINT,
-      region: env.NEXTWIKI_S3_REGION,
+      endpoint: env.NOVIQWIKI_S3_ENDPOINT,
+      region: env.NOVIQWIKI_S3_REGION,
       forcePathStyle: true,
       credentials: {
-        accessKeyId: env.NEXTWIKI_S3_ACCESS_KEY_ID ?? "",
-        secretAccessKey: env.NEXTWIKI_S3_SECRET_ACCESS_KEY ?? ""
+        accessKeyId: env.NOVIQWIKI_S3_ACCESS_KEY_ID ?? "",
+        secretAccessKey: env.NOVIQWIKI_S3_SECRET_ACCESS_KEY ?? ""
       }
     });
   }
@@ -103,7 +103,7 @@ export class S3StorageAdapter implements StorageAdapter {
 }
 
 export function getStorageAdapter(): StorageAdapter {
-  return getEnv().NEXTWIKI_MEDIA_DRIVER === "s3"
+  return getEnv().NOVIQWIKI_MEDIA_DRIVER === "s3"
     ? new S3StorageAdapter()
     : new LocalStorageAdapter();
 }

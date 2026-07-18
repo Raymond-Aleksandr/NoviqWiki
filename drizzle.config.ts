@@ -5,7 +5,7 @@ export default defineConfig({
   out: "./drizzle",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.DATABASE_URL ?? "postgres://nextwiki:nextwiki@localhost:5432/nextwiki"
+    url: process.env.DATABASE_URL ?? "postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki"
   },
   verbose: true,
   strict: true

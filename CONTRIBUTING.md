@@ -34,12 +34,12 @@ cp .env.example .env
 When the app runs on the host and PostgreSQL runs in Compose, set a host-reachable database URL and a local secret in `.env`:
 
 ```dotenv
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki
-NEXTWIKI_BASE_URL=http://localhost:3000
-NEXTWIKI_SECRET=replace-with-a-long-random-secret
-NEXTWIKI_MEDIA_DRIVER=local
-NEXTWIKI_MEDIA_ROOT=media
-NEXTWIKI_STORAGE_PUBLIC_PATH=/media
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki
+NOVIQWIKI_BASE_URL=http://localhost:3000
+NOVIQWIKI_SECRET=replace-with-a-long-random-secret
+NOVIQWIKI_MEDIA_DRIVER=local
+NOVIQWIKI_MEDIA_ROOT=media
+NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 ```
 
 Generate a secret with `openssl rand -base64 32`, then prepare and start the app:
@@ -187,12 +187,12 @@ cp .env.example .env
 当应用在主机运行而 PostgreSQL 在 Compose 中运行时，请在 `.env` 中设置主机可访问的数据库地址和本地密钥：
 
 ```dotenv
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki
-NEXTWIKI_BASE_URL=http://localhost:3000
-NEXTWIKI_SECRET=replace-with-a-long-random-secret
-NEXTWIKI_MEDIA_DRIVER=local
-NEXTWIKI_MEDIA_ROOT=media
-NEXTWIKI_STORAGE_PUBLIC_PATH=/media
+DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki
+NOVIQWIKI_BASE_URL=http://localhost:3000
+NOVIQWIKI_SECRET=replace-with-a-long-random-secret
+NOVIQWIKI_MEDIA_DRIVER=local
+NOVIQWIKI_MEDIA_ROOT=media
+NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 ```
 
 使用 `openssl rand -base64 32` 生成密钥，然后准备并启动应用：

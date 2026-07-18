@@ -54,7 +54,7 @@ Do not place a bare `pnpm test:ui` into an unattended full-suite batch unless a 
 - The UI audit does not reset its target database. It navigates a live site and opens supported dialogs without submitting destructive confirmations.
 - Never point e2e, seed, restore, or manual cleanup commands at production or shared staging data.
 - Operational scripts load `.env` by default through `dotenv/config`, not `.env.local`. Export test variables explicitly when the distinction matters.
-- A smoke test that intentionally leaves an existing site with zero users exposes the unauthenticated Owner-only bootstrap. Keep that target isolated from untrusted networks until the bootstrap is complete.
+- A smoke test that intentionally leaves an existing site without an active Owner exposes the unauthenticated Owner-only bootstrap, even when non-Owner accounts remain. Keep that target isolated from untrusted networks until the bootstrap is complete.
 
 ## Unit Tests
 
@@ -74,8 +74,10 @@ The script executes `vitest run tests/unit`. Current unit coverage includes smal
 - English and Simplified Chinese error, authorization-label, and revision-summary behavior.
 - E2E disposable database-target safety helpers.
 - Backup/restore target parsing, default-port normalization, ambient libpq/Compose override removal, password passfile handling, exact host/Compose confirmations, complete plain-SQL dumps, file-identity checks, dedicated canonical media paths, and unsafe tar member rejection.
-- Session/CSRF cookie `Secure` selection from the `NEXTWIKI_BASE_URL` `http:` or `https:` scheme, independently of `NODE_ENV`.
+- Session/CSRF cookie `Secure` selection from the `NOVIQWIKI_BASE_URL` `http:` or `https:` scheme, independently of `NODE_ENV`.
 - Optional registration and Owner-setup display-name normalization, including blank values becoming absent.
+- Repository branding enforcement that rejects the provisional identifier in any Git-tracked content.
+- Container fallback-secret publication across concurrent contenders that share both a secret directory and the same shell PID identity.
 
 Unit tests should remain deterministic and avoid a real network or production service. When a change introduces pure domain behavior, test edge cases and failure paths here before relying on a browser test.
 
@@ -92,7 +94,7 @@ The script executes `vitest run tests/integration`. Each current integration tes
 Current integration coverage includes:
 
 - Site setup, registration locale, email verification, password reset, and login after recovery.
-- Setup-mode detection for no site, an existing site with zero users, and completed setup; the zero-user Owner bootstrap preserves the existing site identity/default locale, blocks public registration until the Owner exists, and rejects a second bootstrap.
+- Setup-mode detection for no site, an existing site without an active Owner, and completed setup; Owner recovery preserves the existing site identity/default locale and non-Owner accounts, blocks public registration until an active Owner exists, and rejects a second bootstrap.
 - Site visibility, groups, roles, permission assignment, built-in-role protection, and the final Owner invariant.
 - Page creation, drafts, publishing, revisions, search indexing, categories, aliases, redirects, rename, archive, delete, restore, rollback, and page protection.
 - Public page index, random page, wanted, orphaned, dead-end, short, protected, uncategorized, and redirect-maintenance queries.
@@ -127,16 +129,16 @@ The wrapper performs these steps:
 The default database URL is:
 
 ```text
-postgres://nextwiki:nextwiki@localhost:5432/nextwiki_e2e
+postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki_e2e
 ```
 
 Override it when needed:
 
 ```bash
-NEXTWIKI_E2E_DATABASE_URL=postgres://user:pass@localhost:5432/noviqwiki_test pnpm test:e2e
+NOVIQWIKI_E2E_DATABASE_URL=postgres://user:pass@localhost:5432/noviqwiki_test pnpm test:e2e
 ```
 
-The database name must contain a separate `test`, `e2e`, or `ci` token. If `NEXTWIKI_E2E_DATABASE_URL` is unset and ambient `DATABASE_URL` already passes that rule, the wrapper uses it; otherwise it uses `nextwiki_e2e`. It refuses ordinary names such as `nextwiki` and refuses all resets when `NODE_ENV=production`.
+The database name must contain a separate `test`, `e2e`, or `ci` token. If `NOVIQWIKI_E2E_DATABASE_URL` is unset and ambient `DATABASE_URL` already passes that rule, the wrapper uses it; otherwise it uses `noviqwiki_e2e`. It refuses ordinary names such as `noviqwiki` and refuses all resets when `NODE_ENV=production`.
 
 Current Playwright coverage consists of two serial Chromium tests:
 
@@ -147,14 +149,14 @@ Do not claim that the current e2e suite covers logout, login rate limiting, API 
 
 Useful overrides:
 
-| Variable                    | Default                   | Purpose                                                      |
-| --------------------------- | ------------------------- | ------------------------------------------------------------ |
-| `PLAYWRIGHT_PORT`           | `3101`                    | Standalone e2e server port.                                  |
-| `PLAYWRIGHT_BASE_URL`       | `http://127.0.0.1:<port>` | Browser target URL.                                          |
-| `NEXTWIKI_E2E_MEDIA_ROOT`   | `test-results/e2e-media`  | E2E local media directory.                                   |
-| `NEXTWIKI_E2E_SKIP_BUILD`   | Unset                     | Set to `1` only with a compatible existing build.            |
-| `NEXTWIKI_E2E_REUSE_SERVER` | Unset                     | Set to `1` to reuse an existing server.                      |
-| `NEXTWIKI_E2E_SERVER_MODE`  | `start`                   | Set to `dev` only for an intentional development-server run. |
+| Variable                     | Default                   | Purpose                                                      |
+| ---------------------------- | ------------------------- | ------------------------------------------------------------ |
+| `PLAYWRIGHT_PORT`            | `3101`                    | Standalone e2e server port.                                  |
+| `PLAYWRIGHT_BASE_URL`        | `http://127.0.0.1:<port>` | Browser target URL.                                          |
+| `NOVIQWIKI_E2E_MEDIA_ROOT`   | `test-results/e2e-media`  | E2E local media directory.                                   |
+| `NOVIQWIKI_E2E_SKIP_BUILD`   | Unset                     | Set to `1` only with a compatible existing build.            |
+| `NOVIQWIKI_E2E_REUSE_SERVER` | Unset                     | Set to `1` to reuse an existing server.                      |
+| `NOVIQWIKI_E2E_SERVER_MODE`  | `start`                   | Set to `dev` only for an intentional development-server run. |
 
 Create the disposable database manually if the configured PostgreSQL user cannot create databases. The wrapper resets the database schema but does not promise to delete arbitrary files from a custom e2e media path.
 
@@ -222,7 +224,7 @@ docker compose config --quiet
 docker compose build
 ```
 
-Use `--quiet` for this human gate. Plain `docker compose config` can print the resolved `NEXTWIKI_SECRET`; `docker compose config --services` below is limited to service names.
+Use `--quiet` for this human gate. Plain `docker compose config` can print the resolved `NOVIQWIKI_SECRET`; `docker compose config --services` below is limited to service names.
 
 Inspect the committed service names when needed:
 
@@ -239,7 +241,7 @@ docker compose logs --tail=200 app
 
 `docker compose config --quiet` and `docker compose build` do not prove that the stack starts, migrations succeed, setup loads, persistent volumes work, or backup/restore succeeds. Record a separate clean-deployment smoke test when those properties are release requirements.
 
-The committed stack mounts `nextwiki-secrets` at `/app/secrets`. A relevant smoke test should verify that an automatically generated secret survives container recreation and `docker compose down`, that activating an explicit `NEXTWIKI_SECRET` removes the old fallback file without writing the explicit value there, that later removing the explicit value generates a new fallback, and that `docker compose down -v` deletes the secrets volume along with the database, media, and backup volumes. `pnpm backup` does not include the secrets volume.
+The committed stack mounts `noviqwiki-secrets` at `/app/secrets`. A relevant smoke test should verify that an automatically generated secret survives container recreation and `docker compose down`, that activating an explicit `NOVIQWIKI_SECRET` removes the old fallback file without writing the explicit value there, that later removing the explicit value generates a new fallback, and that `docker compose down -v` deletes the secrets volume along with the database, media, and backup volumes. `pnpm backup` does not include the secrets volume.
 
 ## Current CI Scope
 
@@ -351,7 +353,7 @@ UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui
 - UI 审计不会重置目标数据库。它浏览在线站点并打开支持的对话框，但不会提交破坏性确认。
 - 绝不能把 e2e、种子、恢复或手动清理命令指向生产或共享预发布数据。
 - 运维脚本通过 `dotenv/config` 默认加载 `.env`，不是 `.env.local`。有区别时应显式导出测试变量。
-- 若冒烟测试故意让现有站点处于零用户状态，就会暴露未经身份验证的仅限 Owner 引导流程。在引导完成前，必须让该目标与不受信任网络隔离。
+- 若冒烟测试故意让现有站点处于没有 active Owner 的状态，即使仍有非 Owner 账号，也会暴露未经身份验证的仅限 Owner 引导流程。在引导完成前，必须让该目标与不受信任网络隔离。
 
 ### 单元测试
 
@@ -371,8 +373,10 @@ pnpm test
 - 英文和简体中文错误、授权标签及修订摘要行为。
 - E2E 一次性数据库目标安全辅助函数。
 - 备份/恢复目标解析、默认端口规范化、环境中 libpq/Compose 覆盖的移除、密码 passfile 处理、准确的主机/Compose 确认、完整纯 SQL 转储、文件身份检查、专用规范媒体路径以及不安全 tar 成员拒绝逻辑。
-- 根据 `NEXTWIKI_BASE_URL` 的 `http:` 或 `https:` 协议选择会话/CSRF Cookie 的 `Secure` 属性，且不依赖 `NODE_ENV`。
+- 根据 `NOVIQWIKI_BASE_URL` 的 `http:` 或 `https:` 协议选择会话/CSRF Cookie 的 `Secure` 属性，且不依赖 `NODE_ENV`。
 - 可选注册与 Owner 设置显示名称的规范化，包括把空白值视为未提供。
+- 仓库品牌标识约束：任何 Git 跟踪内容重新引入临时标识都会失败。
+- 共享密钥目录及相同 Shell PID 标识的并发发布者只能获得同一个容器回退密钥。
 
 单元测试应保持确定性，不依赖真实网络或生产服务。变更新增纯领域行为时，应先在此覆盖边界情况和失败路径，而不是只依赖浏览器测试。
 
@@ -389,7 +393,7 @@ pnpm test:integration
 当前集成覆盖包括：
 
 - 站点设置、注册语言、邮箱验证、密码重置以及恢复后的登录。
-- 无站点、现有站点零用户和已完成设置三种模式的检测；零用户 Owner 引导会保留现有站点标识/默认语言，在 Owner 创建前阻断公开注册，并拒绝第二次引导。
+- 无站点、现有站点没有 active Owner 和已完成设置三种模式的检测；Owner 恢复会保留现有站点标识、默认语言和非 Owner 账号，在 active Owner 创建前阻断公开注册，并拒绝第二次引导。
 - 站点可见性、组、角色、权限分配、内置角色保护和最后一个所有者不变量。
 - 页面创建、草稿、发布、修订、搜索索引、分类、别名、重定向、重命名、归档、删除、恢复、回滚和页面保护。
 - 公共页面索引、随机页面、需要页面、孤立页面、无出链页面、短页面、受保护页面、未分类页面和重定向维护查询。
@@ -424,16 +428,16 @@ pnpm test:e2e
 默认数据库 URL：
 
 ```text
-postgres://nextwiki:nextwiki@localhost:5432/nextwiki_e2e
+postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki_e2e
 ```
 
 需要时覆盖：
 
 ```bash
-NEXTWIKI_E2E_DATABASE_URL=postgres://user:pass@localhost:5432/noviqwiki_test pnpm test:e2e
+NOVIQWIKI_E2E_DATABASE_URL=postgres://user:pass@localhost:5432/noviqwiki_test pnpm test:e2e
 ```
 
-数据库名必须包含独立的 `test`、`e2e` 或 `ci` 标记。如果未设置 `NEXTWIKI_E2E_DATABASE_URL`，但现有 `DATABASE_URL` 已满足该规则，包装脚本会使用它；否则使用 `nextwiki_e2e`。它拒绝 `nextwiki` 等普通名称，并在 `NODE_ENV=production` 时拒绝所有重置。
+数据库名必须包含独立的 `test`、`e2e` 或 `ci` 标记。如果未设置 `NOVIQWIKI_E2E_DATABASE_URL`，但现有 `DATABASE_URL` 已满足该规则，包装脚本会使用它；否则使用 `noviqwiki_e2e`。它拒绝 `noviqwiki` 等普通名称，并在 `NODE_ENV=production` 时拒绝所有重置。
 
 当前 Playwright 覆盖由两个串行 Chromium 测试组成：
 
@@ -444,14 +448,14 @@ NEXTWIKI_E2E_DATABASE_URL=postgres://user:pass@localhost:5432/noviqwiki_test pnp
 
 常用覆盖变量：
 
-| 变量                        | 默认值                    | 用途                                       |
-| --------------------------- | ------------------------- | ------------------------------------------ |
-| `PLAYWRIGHT_PORT`           | `3101`                    | 独立 e2e 服务器端口。                      |
-| `PLAYWRIGHT_BASE_URL`       | `http://127.0.0.1:<port>` | 浏览器目标 URL。                           |
-| `NEXTWIKI_E2E_MEDIA_ROOT`   | `test-results/e2e-media`  | E2E 本地媒体目录。                         |
-| `NEXTWIKI_E2E_SKIP_BUILD`   | 未设置                    | 仅在已有兼容构建时设置为 `1`。             |
-| `NEXTWIKI_E2E_REUSE_SERVER` | 未设置                    | 设置为 `1` 复用现有服务器。                |
-| `NEXTWIKI_E2E_SERVER_MODE`  | `start`                   | 仅在明确进行开发服务器运行时设置为 `dev`。 |
+| 变量                         | 默认值                    | 用途                                       |
+| ---------------------------- | ------------------------- | ------------------------------------------ |
+| `PLAYWRIGHT_PORT`            | `3101`                    | 独立 e2e 服务器端口。                      |
+| `PLAYWRIGHT_BASE_URL`        | `http://127.0.0.1:<port>` | 浏览器目标 URL。                           |
+| `NOVIQWIKI_E2E_MEDIA_ROOT`   | `test-results/e2e-media`  | E2E 本地媒体目录。                         |
+| `NOVIQWIKI_E2E_SKIP_BUILD`   | 未设置                    | 仅在已有兼容构建时设置为 `1`。             |
+| `NOVIQWIKI_E2E_REUSE_SERVER` | 未设置                    | 设置为 `1` 复用现有服务器。                |
+| `NOVIQWIKI_E2E_SERVER_MODE`  | `start`                   | 仅在明确进行开发服务器运行时设置为 `dev`。 |
 
 若配置的 PostgreSQL 用户无法创建数据库，请手动创建可丢弃数据库。包装脚本会重置数据库架构，但不保证删除自定义 e2e 媒体路径中的任意文件。
 
@@ -519,7 +523,7 @@ docker compose config --quiet
 docker compose build
 ```
 
-此人类门禁应使用 `--quiet`。普通 `docker compose config` 可能输出解析后的 `NEXTWIKI_SECRET`；下方的 `docker compose config --services` 只输出服务名。
+此人类门禁应使用 `--quiet`。普通 `docker compose config` 可能输出解析后的 `NOVIQWIKI_SECRET`；下方的 `docker compose config --services` 只输出服务名。
 
 需要时检查提交的服务名：
 
@@ -536,7 +540,7 @@ docker compose logs --tail=200 app
 
 `docker compose config --quiet` 和 `docker compose build` 不能证明栈能够启动、迁移成功、设置页加载、持久卷工作或备份恢复成功。如果这些属性属于发布要求，应单独记录干净部署冒烟测试。
 
-提交的栈把 `nextwiki-secrets` 挂载到 `/app/secrets`。相关冒烟测试应验证自动生成的密钥在容器重建和 `docker compose down` 后仍然存在；启用显式 `NEXTWIKI_SECRET` 会删除旧回退文件，且不会把显式值写入该文件；日后移除显式值会生成新的回退密钥；并验证 `docker compose down -v` 会将密钥卷与数据库、媒体和备份卷一并删除。`pnpm backup` 不包含密钥卷。
+提交的栈把 `noviqwiki-secrets` 挂载到 `/app/secrets`。相关冒烟测试应验证自动生成的密钥在容器重建和 `docker compose down` 后仍然存在；启用显式 `NOVIQWIKI_SECRET` 会删除旧回退文件，且不会把显式值写入该文件；日后移除显式值会生成新的回退密钥；并验证 `docker compose down -v` 会将密钥卷与数据库、媒体和备份卷一并删除。`pnpm backup` 不包含密钥卷。
 
 ### 当前 CI 范围
 

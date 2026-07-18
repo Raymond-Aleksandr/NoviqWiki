@@ -20,24 +20,24 @@ import {
 async function main() {
   process.umask(0o077);
   const databaseTarget = parsePostgresTarget(
-    process.env.DATABASE_URL ?? "postgres://nextwiki:nextwiki@localhost:5432/nextwiki"
+    process.env.DATABASE_URL ?? "postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki"
   );
-  const mediaDriver = process.env.NEXTWIKI_MEDIA_DRIVER ?? "local";
-  const mediaRoot = process.env.NEXTWIKI_MEDIA_ROOT ?? "./media";
-  const backupSql = process.env.NEXTWIKI_RESTORE_SQL;
-  const mediaArchive = process.env.NEXTWIKI_RESTORE_MEDIA;
+  const mediaDriver = process.env.NOVIQWIKI_MEDIA_DRIVER ?? "local";
+  const mediaRoot = process.env.NOVIQWIKI_MEDIA_ROOT ?? "./media";
+  const backupSql = process.env.NOVIQWIKI_RESTORE_SQL;
+  const mediaArchive = process.env.NOVIQWIKI_RESTORE_MEDIA;
 
   if (!backupSql) {
-    throw new Error("Set NEXTWIKI_RESTORE_SQL to the SQL backup file path.");
+    throw new Error("Set NOVIQWIKI_RESTORE_SQL to the SQL backup file path.");
   }
   if (mediaDriver !== "local" && mediaDriver !== "s3") {
-    throw new Error("NEXTWIKI_MEDIA_DRIVER must be local or s3.");
+    throw new Error("NOVIQWIKI_MEDIA_DRIVER must be local or s3.");
   }
   const sqlIdentity = await requireNoviqWikiSqlBackup(backupSql);
   let mediaIdentity: Stats | null = null;
   if (mediaArchive) {
     if (mediaDriver !== "local") {
-      throw new Error("NEXTWIKI_RESTORE_MEDIA can be used only with local media storage.");
+      throw new Error("NOVIQWIKI_RESTORE_MEDIA can be used only with local media storage.");
     }
     mediaIdentity = await requireReadableRegularFile(mediaArchive, "Media archive");
     requireSafeMediaArchive(mediaArchive);
@@ -46,9 +46,9 @@ async function main() {
   const mode = resolveDatabaseMode();
   const targetLabel = mode === "local" ? databaseTarget.label : composeTargetLabel;
   const expectedConfirmation = expectedRestoreConfirmation(targetLabel);
-  if (process.env.NEXTWIKI_RESTORE_CONFIRM !== expectedConfirmation) {
+  if (process.env.NOVIQWIKI_RESTORE_CONFIRM !== expectedConfirmation) {
     throw new Error(
-      `Set NEXTWIKI_RESTORE_CONFIRM=${expectedConfirmation} to confirm destructive restore of this exact target.`
+      `Set NOVIQWIKI_RESTORE_CONFIRM=${expectedConfirmation} to confirm destructive restore of this exact target.`
     );
   }
   const safeMediaRoot = mediaArchive ? await prepareSafeMediaDestination(mediaRoot) : null;
@@ -126,9 +126,9 @@ async function restoreDatabase(mode: DatabaseMode, databaseTarget: PostgresTarge
             "-v",
             "ON_ERROR_STOP=1",
             "-U",
-            "nextwiki",
+            "noviqwiki",
             "-d",
-            "nextwiki",
+            "noviqwiki",
             "--single-transaction",
             "-c",
             resetSql,
@@ -150,9 +150,9 @@ async function restoreDatabase(mode: DatabaseMode, databaseTarget: PostgresTarge
 void main();
 
 function requireComposeFallbackConfirmation(tool: string) {
-  if (process.env.NEXTWIKI_COMPOSE_FALLBACK !== "1") {
+  if (process.env.NOVIQWIKI_COMPOSE_FALLBACK !== "1") {
     throw new Error(
-      `${tool} is unavailable. Install PostgreSQL client tools, or set NEXTWIKI_COMPOSE_FALLBACK=1 only after verifying the fixed ${composeTargetLabel} target.`
+      `${tool} is unavailable. Install PostgreSQL client tools, or set NOVIQWIKI_COMPOSE_FALLBACK=1 only after verifying the fixed ${composeTargetLabel} target.`
     );
   }
 }
