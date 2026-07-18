@@ -668,6 +668,10 @@ async function isPublicReadEnabled(siteId: string, database: Database) {
   return settings?.publicMode ?? true;
 }
 
+export async function hasActiveOwner(siteId: string, database: Database = db) {
+  return (await countActiveOwners(siteId, database)) > 0;
+}
+
 export async function getRoleSummaries(siteId: string, database: Database = db) {
   const rows = await database
     .select({

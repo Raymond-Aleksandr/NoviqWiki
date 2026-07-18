@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { eq } from "drizzle-orm";
 import { users } from "@/db/schema";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { login, registerUser } from "@/modules/auth/service";
@@ -12,7 +13,7 @@ import {
 import { createTestDatabase } from "../helpers/test-db";
 
 describe("setup owner bootstrap", () => {
-  it("creates the first Owner for a populated site that has no accounts", async () => {
+  it("creates an Owner for a populated site that has only non-Owner accounts", async () => {
     const test = await createTestDatabase();
     expect(await getSetupMode(test.executor)).toBe("initial");
     expect(await getSetupState(test.executor)).toEqual({ mode: "initial", site: null });
@@ -31,7 +32,15 @@ describe("setup owner bootstrap", () => {
       },
       test.db
     );
-    await test.db.delete(users);
+    const existingReader = await registerUser(
+      {
+        username: "existing-reader",
+        email: "existing-reader@example.test",
+        password: "ExistingReaderPassword123"
+      },
+      test.db
+    );
+    await test.db.delete(users).where(eq(users.id, initial.owner.id));
 
     expect(await getSetupMode(test.executor)).toBe("owner");
     expect(await getSetupState(test.executor)).toMatchObject({
@@ -39,6 +48,12 @@ describe("setup owner bootstrap", () => {
       site: { id: initial.site.id, name: "Portable Wiki" }
     });
     expect(await isSetupRequired(test.executor)).toBe(true);
+    await expect(
+      login(
+        { identifier: existingReader.username, password: "ExistingReaderPassword123" },
+        test.executor
+      )
+    ).resolves.toMatchObject({ user: { id: existingReader.id } });
     await expect(
       registerUser(
         {
