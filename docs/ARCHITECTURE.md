@@ -23,7 +23,7 @@ Next.js application
 - Next.js serves public wiki pages, authenticated editing/workspace pages, administration pages, direct local-media reads, and JSON routes.
 - PostgreSQL stores the primary site and settings, identities and sessions, RBAC, content state, immutable revisions, per-user drafts, current link/category/search projections, watchlists, media metadata, audit events, and rate-limit events.
 - Local media bytes live in `NEXTWIKI_MEDIA_ROOT`; S3-compatible media bytes live in the configured bucket.
-- `compose.yaml` runs the application and PostgreSQL, with named volumes for the database, local media, and backups.
+- `compose.yaml` runs the application and PostgreSQL, with named volumes for the database, local media, backups, and the container-generated fallback secret.
 - The runtime currently loads one primary site through `getPrimarySiteWithSettings`. Many tables carry `siteId` for isolation and future multi-site work, but v0.1.0 is operated as a single-site application.
 
 ## Request and Mutation Flow
@@ -34,13 +34,13 @@ The intended boundary is:
 route/page/server action -> parse input and establish actor -> domain service -> Drizzle/PostgreSQL or storage
 ```
 
-- JSON mutation handlers in `src/app/api/v1/**/route.ts` parse their request bodies with Zod and call services in `src/modules/**`.
+- Mutation handlers in `src/app/api/v1/**/route.ts` that accept JSON bodies parse those bodies with Zod and call services in `src/modules/**`. The multipart media-upload handler uses `request.formData()` plus service-level file checks instead of a Zod body schema.
 - Server actions in `src/app/actions.ts` establish the current session where required, extract form values, and delegate to domain services. Most privileged branches check permissions before delegation; every new branch must do so explicitly.
 - Read-only React Server Components call services to obtain domain data.
 - Global permission checks are currently concentrated at route/server-action boundaries. Page services independently enforce the extra `page.protect` requirement for protected-page mutations, but most services do not repeat every global permission check. Internal callers must not bypass an authorized boundary.
 - Input validation is not yet uniform: many form actions use typed extraction helpers, and most query strings/route parameters are not Zod-parsed. New boundaries should validate all untrusted input before calling a service.
 
-Known boundary exceptions: `src/app/admin/status/page.tsx` runs a database readiness query directly from a Server Component, and `src/app/admin/page.tsx` directly queries database tables for dashboard counts. These reads should move behind operational/admin services if the “components do not query the database” rule is to remain absolute.
+Known boundary exceptions include direct database reads in `src/app/admin/status/page.tsx` and `src/app/admin/page.tsx`, primary-site helper calls from Server Components, route handlers, and server actions, the media-byte handler in `src/app/media/[...key]/route.ts`, and the readiness handler in `src/app/api/ready/route.ts`. These reads should move behind domain or operational services if request-boundary code is not meant to query the database directly.
 
 ## Source Layout and Responsibilities
 
@@ -53,7 +53,7 @@ Known boundary exceptions: `src/app/admin/status/page.tsx` runs a database readi
 - `src/modules/search/**`, `src/modules/categories/**`, `src/modules/activity/**`, and `src/modules/watchlist/**`: read models for discovery and user activity.
 - `src/modules/media/**`: upload checks, metadata, reference discovery, and local/S3 storage adapters.
 - `src/modules/settings/**`, `src/modules/setup/**`, and `src/modules/audit/**`: installation, site settings, homepage configuration, and audit events.
-- `src/modules/plugins/**`: a small in-process registry; see “Extension boundary” below.
+- `src/modules/plugins/**`: a small in-process registry; see [Extension Boundary](#extension-boundary) below.
 - `src/db/**`: Drizzle client, schema, and primary-site query helpers.
 - `drizzle/**`: committed SQL migrations and Drizzle migration metadata.
 - `scripts/**`: migration, seed, search reindex, backup, restore, disposable E2E setup, UI audit, and OpenAPI generation commands.
@@ -65,7 +65,7 @@ Known boundary exceptions: `src/app/admin/status/page.tsx` runs a database readi
 
 - `sites` and `site_settings` hold the primary site and configurable behavior.
 - `users` stores normalized identity fields and Argon2id password hashes.
-- `sessions` stores HMAC-derived session and CSRF hashes, expiry, revocation, user agent, and hashed client IP metadata.
+- `sessions` stores HMAC-derived session and CSRF hashes, expiry, revocation, and nullable user-agent and hashed-client-IP metadata. Current setup/login server actions do not pass a `Request` into session creation, so those metadata fields are normally empty for those flows.
 - `groups`, `roles`, `permissions`, `user_groups`, `group_roles`, and `role_permissions` implement group-mediated RBAC. Users do not have a direct user-to-role relation.
 - Verification and password-reset token tables store HMAC-derived token values with expiry and consumption timestamps.
 
@@ -118,22 +118,23 @@ Published pages update a dedicated `search_index` table. PostgreSQL uses a gener
 ## Authentication and Authorization
 
 - Local username/email credentials are hashed with Argon2id.
-- Successful login creates a 14-day database session and sets `noviqwiki_session` (`HttpOnly`) plus `noviqwiki_csrf` (readable by the browser), both `SameSite=Lax` and `Secure` in production.
+- Setup has three database-derived modes: no site runs full initial setup; an existing site with zero users runs an Owner-only bootstrap that preserves site/content records; any user row closes setup. Public registration uses a no-lock fast path after setup, but an incomplete-state preflight is rechecked under the same advisory lock as Owner creation; it therefore cannot create the first account. Because the zero-user mode is unauthenticated first-Owner provisioning, isolate the instance until a trusted administrator completes it.
+- Successful login creates a 14-day database session and sets `noviqwiki_session` (`HttpOnly`) plus `noviqwiki_csrf` (readable by the browser), both `SameSite=Lax`. They are `Secure` when the environment `NEXTWIKI_BASE_URL` uses `https:`, independent of `NODE_ENV` and the base URL stored in PostgreSQL.
 - Permission evaluation unions the permissions of every role assigned to every group containing the user.
-- Anonymous users receive only `site.view`, `page.read`, `revision.read`, and `media.read`, and only while `publicMode` is enabled.
+- Anonymous users receive only `site.view`, `page.read`, `revision.read`, and `media.read`, and only while `publicMode` is enabled. If the primary site has no `site_settings` row, the current permission helper defaults `publicMode` to enabled.
 - Built-in Administrator and Owner roles currently receive every permission key. Owner is additionally protected by the final-active-Owner invariant.
-- `/admin/**` has an outer `site.configure` layout gate. Narrow permissions such as `audit.read` may authorize JSON routes but do not independently grant access to the corresponding admin page.
+- `/admin/**` has an outer `site.configure` layout gate. That permission is sufficient to render every admin read page; those page components do not additionally require narrower read permissions such as `user.read`, `audit.read`, or `media.read`. Conversely, narrow permissions may authorize JSON routes but do not grant access to the corresponding admin page. Mutating actions still perform their own management-permission checks.
 
-See `docs/AUTHORIZATION.md` for the exact role grants, protected-page rules, and current enforcement gaps.
+See [Authorization](./AUTHORIZATION.md) for the exact role grants, protected-page rules, and current enforcement gaps.
 
 ## Media Architecture
 
 `StorageAdapter` defines `put`, `delete`, `getPublicUrl`, and `isReady`.
 
 - `LocalStorageAdapter` uses randomized storage keys below `NEXTWIKI_MEDIA_ROOT`, rejects traversal outside that root, and serves bytes through `/media/[...key]` after `media.read` authorization. The current local response is marked `public, max-age=31536000, immutable`. Private deployments must disable shared proxy/CDN caching. Deployments that require immediate revocation after logout, permission removal, a private-mode change, or deletion must change the route to `Cache-Control: private, no-store` and purge already cached objects or rotate previously distributed URLs.
-- `S3StorageAdapter` uses an S3-compatible endpoint and redirects authorized `/media/[...key]` reads to a short-lived signed URL. A signed URL returned during upload is not a durable content identifier; page content should use the same-origin media route and storage key.
+- `S3StorageAdapter` uses an S3-compatible endpoint. Its signed GET URLs last one hour and do not re-check application authorization after issuance. Upload currently persists that temporary URL in `media_assets.publicUrl`, and the media picker/editor can copy or insert it. The same-origin `/media/[...key]` route performs `media.read` authorization but then redirects to the external signed URL; the default `img-src 'self' data: blob:` policy blocks that external image unless deployment CSP is extended. Reference discovery scans only the current published Markdown for `publicUrl` or `safeFilename` substrings, not `storageKey`, so stable same-origin S3 references can be missed and delete-conflict detection is not a reliable integrity guarantee.
 - Runtime adapter selection uses `NEXTWIKI_MEDIA_DRIVER`. The `site_settings.media_driver` value collected during setup is persisted but is not consulted by `getStorageAdapter`; deployments must configure the environment variable consistently.
-- Local readiness creates/checks the media directory. S3 readiness currently checks only that a bucket name exists and does not contact S3.
+- Local readiness only creates the media directory and does not perform a read/write probe. S3 readiness currently checks only that a bucket name exists and does not contact S3.
 - Upload validation enforces size and an allowlist. When byte detection fails, it currently falls back to the client-declared MIME type; this is a known hardening gap, not full content verification.
 
 ## Internationalization
@@ -160,9 +161,9 @@ The root layout currently uses cookie, active user, then site default and does n
 ## Deployment and Operations
 
 - The production image builds a Next.js standalone bundle, runs as the non-root `nextwiki` user, applies migrations at startup, and then starts the server.
-- Production requires a stable `NEXTWIKI_SECRET` of at least 32 characters. The container entrypoint can generate an ephemeral secret when Compose leaves it empty, but that invalidates HMAC-derived sessions/tokens after a restart and is not suitable for production.
+- Production requires a stable `NEXTWIKI_SECRET` of at least 32 characters. When Compose leaves it empty, the container entrypoint generates `/app/secrets/nextwiki-secret`; the committed `nextwiki-secrets` volume preserves it across container recreation. An explicit value is not written there and removes any old fallback, so later removing the explicit value creates a new fallback and rotates HMAC-derived sessions/tokens. Removing the volume has the same rotation effect while fallback mode is active, and `pnpm backup` does not include it. Production should inject one stable managed secret instead.
 - `/api/health` checks process liveness. `/api/ready` queries PostgreSQL and checks the storage adapter as described above.
-- Backup and restore are CLI operations in `scripts/backup.ts` and `scripts/restore.ts`; the `backup.create` permission is not consulted by those operating-system commands.
+- Backup and restore are CLI operations in `scripts/backup.ts` and `scripts/restore.ts`; the `backup.create` permission is not consulted by those operating-system commands. They read only their database/media/restore variables rather than validating unrelated web-runtime secrets. Local database tools receive a normalized URL target without ambient libpq routing overrides or a password in argv. A missing local PostgreSQL client can use the repository-anchored Docker `default` context, `noviqwiki` project, and `db/nextwiki` service/database only with explicit `NEXTWIKI_COMPOSE_FALLBACK=1`; connection or SQL failures never switch targets. Restore preflights recognized complete plain SQL and safe media inputs, binds confirmation to the selected target, and sends the schema reset plus import through one `ON_ERROR_STOP=1` transaction. A following local-media extraction is necessarily outside that database transaction.
 - There is no background worker or queue. Email delivery and media work happen in the request/command process.
 
 ## Current Security and Integration Boundaries
@@ -170,7 +171,8 @@ The root layout currently uses cookie, active user, then site default and does n
 The architecture describes the implemented system, including these v0.1.0 boundaries:
 
 - The JSON resource API has no stable cross-origin, API-key, or API-token contract. Keep it same-origin and limited to trusted application integrations; deployments with untrusted accounts must not treat it as a general-purpose or multi-tenant API boundary.
-- Current-user and admin-user response shapes reflect internal application records rather than a stable, minimized public DTO contract. Consumers and logs must allowlist only required fields.
+- `GET /api/v1/me` currently returns the full internal user row, including `passwordHash` and normalized identifiers, plus the CSRF token; `GET /api/v1/admin/users` returns full user rows including `passwordHash`. These are not stable or minimized public DTOs, so consumers and logs must allowlist only required fields.
+- `assertCsrf` has no callers. Cookie-authenticated `/api/v1` mutations and `POST /logout` do not currently validate `Origin` or `x-csrf-token`; their primary browser-side CSRF mitigation is `SameSite=Lax`.
 - Page resource reads can expose draft/archived records to any actor with `page.read`. Search, category, and maintenance discovery paths are published-only, but a known archived slug can still resolve through direct article/history UI; archival status is not a confidentiality boundary.
 - Upload detection can trust the declared MIME type when byte detection returns no result.
 - Request IDs are added to response headers, but audit write sites generally do not attach them to `audit_logs`.
@@ -204,7 +206,7 @@ Next.js 应用
 - Next.js 提供公开 Wiki 页面、已登录编辑/工作区页面、管理页面、本地媒体直接读取和 JSON 路由。
 - PostgreSQL 存储主站点及设置、身份与会话、RBAC、内容状态、不可变修订、每用户草稿、当前链接/分类/搜索投影、监视列表、媒体元数据、审计事件和限流事件。
 - 本地媒体字节位于 `NEXTWIKI_MEDIA_ROOT`；S3 兼容媒体字节位于配置的存储桶。
-- `compose.yaml` 运行应用和 PostgreSQL，并为数据库、本地媒体及备份使用命名卷。
+- `compose.yaml` 运行应用和 PostgreSQL，并为数据库、本地媒体、备份及容器生成的回退密钥使用命名卷。
 - 运行时目前通过 `getPrimarySiteWithSettings` 加载一个主站点。许多表带有 `siteId`，用于隔离和未来多站点工作，但 v0.1.0 按单站点应用运行。
 
 ### 请求与写操作流程
@@ -215,13 +217,13 @@ Next.js 应用
 路由/页面/服务器操作 -> 解析输入并确定操作者 -> 领域服务 -> Drizzle/PostgreSQL 或存储
 ```
 
-- `src/app/api/v1/**/route.ts` 中的 JSON 写操作处理器使用 Zod 解析请求体，并调用 `src/modules/**` 中的服务。
+- `src/app/api/v1/**/route.ts` 中接受 JSON 请求体的写操作处理器会使用 Zod 解析请求体，并调用 `src/modules/**` 中的服务。multipart 媒体上传处理器改用 `request.formData()` 与服务层文件检查，而不是 Zod 请求体 Schema。
 - `src/app/actions.ts` 中的服务器操作会在需要时建立当前会话、提取表单值并委托给领域服务。大多数特权分支会在委托前检查权限；每个新分支都必须显式执行该检查。
 - 只读 React Server Components 通过服务取得领域数据。
 - 全局权限检查目前主要集中在路由/服务器操作边界。页面服务会额外独立执行受保护页面写操作所需的 `page.protect`，但大多数服务不会重复所有全局权限检查。内部调用方不得绕过已授权边界。
 - 输入校验尚未统一：许多表单操作使用带类型的提取辅助函数，大多数查询字符串/路由参数没有通过 Zod 解析。新边界应在调用服务前校验所有不可信输入。
 
-已知边界例外：`src/app/admin/status/page.tsx` 会直接从 Server Component 执行数据库就绪查询，`src/app/admin/page.tsx` 也会直接查询数据库表以生成仪表盘计数。如果“组件不查询数据库”要成为绝对规则，应把这些读取移到运维/管理服务之后。
+已知边界例外包括：`src/app/admin/status/page.tsx` 与 `src/app/admin/page.tsx` 直接读取数据库，Server Component、路由处理器和服务器操作直接调用主站点辅助函数，`src/app/media/[...key]/route.ts` 中的媒体字节处理器，以及 `src/app/api/ready/route.ts` 中的就绪处理器。若请求边界代码不应直接查询数据库，则应把这些读取移到领域或运维服务之后。
 
 ### 源码布局与职责
 
@@ -234,7 +236,7 @@ Next.js 应用
 - `src/modules/search/**`、`src/modules/categories/**`、`src/modules/activity/**` 和 `src/modules/watchlist/**`：发现与用户活动的读取模型。
 - `src/modules/media/**`：上传检查、元数据、引用发现和本地/S3 存储适配器。
 - `src/modules/settings/**`、`src/modules/setup/**` 和 `src/modules/audit/**`：安装、站点设置、首页配置和审计事件。
-- `src/modules/plugins/**`：小型进程内注册表；见下文“扩展边界”。
+- `src/modules/plugins/**`：小型进程内注册表；见下文[扩展边界](#扩展边界)。
 - `src/db/**`：Drizzle 客户端、Schema 和主站点查询辅助函数。
 - `drizzle/**`：已提交的 SQL 迁移和 Drizzle 迁移元数据。
 - `scripts/**`：迁移、种子、搜索重建索引、备份、恢复、一次性 E2E 设置、UI 审计和 OpenAPI 生成命令。
@@ -246,7 +248,7 @@ Next.js 应用
 
 - `sites` 和 `site_settings` 保存主站点及可配置行为。
 - `users` 保存规范化身份字段和 Argon2id 密码哈希。
-- `sessions` 保存 HMAC 派生的会话/CSRF 哈希、过期时间、吊销状态、User-Agent 和哈希后的客户端 IP 元数据。
+- `sessions` 保存 HMAC 派生的会话/CSRF 哈希、过期时间、吊销状态，以及可空的 User-Agent 和客户端 IP 哈希元数据。当前 setup/login 服务器操作不会把 `Request` 传给会话创建，因此这些流程通常不会填充上述元数据。
 - `groups`、`roles`、`permissions`、`user_groups`、`group_roles` 和 `role_permissions` 实现由用户组中介的 RBAC。用户与角色之间没有直接关系。
 - 验证和密码重置 Token 表保存 HMAC 派生的 Token 值、过期时间和使用时间。
 
@@ -299,22 +301,23 @@ Markdown
 ### 身份验证与授权
 
 - 本地用户名/邮箱凭据使用 Argon2id 哈希。
-- 登录成功会创建 14 天数据库会话，并设置 `noviqwiki_session`（`HttpOnly`）及 `noviqwiki_csrf`（浏览器可读）；两者均为 `SameSite=Lax`，生产环境启用 `Secure`。
+- 设置有三种由数据库状态决定的模式：没有站点时运行完整初始设置；已有站点但用户数为零时运行仅 Owner 引导并保留站点/内容记录；存在任意用户记录后关闭设置。设置完成后的公开注册走无锁快速路径；若预检发现状态不完整，则会在与 Owner 创建相同的 advisory lock 内重新检查，因此不能创建首个账户。零用户模式本质上是未经身份验证的首个 Owner 配置，因此受信管理员完成前必须隔离实例。
+- 登录成功会创建 14 天数据库会话，并设置 `noviqwiki_session`（`HttpOnly`）及 `noviqwiki_csrf`（浏览器可读）；两者均为 `SameSite=Lax`。只有环境变量 `NEXTWIKI_BASE_URL` 使用 `https:` 时才启用 `Secure`，与 `NODE_ENV` 及 PostgreSQL 中保存的基础 URL 无关。
 - 权限计算会合并用户所在所有用户组所分配全部角色的权限。
-- 匿名用户只能获得 `site.view`、`page.read`、`revision.read` 和 `media.read`，且仅在启用 `publicMode` 时有效。
+- 匿名用户只能获得 `site.view`、`page.read`、`revision.read` 和 `media.read`，且仅在启用 `publicMode` 时有效。若主站点缺少 `site_settings` 记录，当前权限辅助函数会默认把 `publicMode` 视为启用。
 - 内置 Administrator 和 Owner 角色目前都拥有全部权限键。Owner 还受“至少保留一个活跃 Owner”不变量保护。
-- `/admin/**` 外层布局要求 `site.configure`。`audit.read` 等较窄权限可能允许 JSON 路由，但不会单独授予相应管理页面访问权。
+- `/admin/**` 外层布局要求 `site.configure`。仅此权限就足以渲染所有管理读取页面；页面组件不会再要求 `user.read`、`audit.read` 或 `media.read` 等较窄读取权限。反过来，较窄权限可能允许 JSON 路由，但不会授予相应管理页面访问权。写操作仍会执行各自的管理权限检查。
 
-准确角色授权、受保护页面规则和当前执行缺口见 `docs/AUTHORIZATION.md`。
+准确角色授权、受保护页面规则和当前执行缺口见[授权](./AUTHORIZATION.md)。
 
 ### 媒体架构
 
 `StorageAdapter` 定义 `put`、`delete`、`getPublicUrl` 和 `isReady`。
 
 - `LocalStorageAdapter` 在 `NEXTWIKI_MEDIA_ROOT` 下使用随机存储键，拒绝根目录外的路径穿越，并在校验 `media.read` 后通过 `/media/[...key]` 提供字节。当前本地响应带有 `public, max-age=31536000, immutable`。私有部署必须禁用代理/CDN 共享缓存。若部署要求在退出登录、移除权限、切换私有模式或删除后立即撤销访问，则必须把该路由改为 `Cache-Control: private, no-store`，并清除已缓存对象或轮换此前分发的 URL。
-- `S3StorageAdapter` 使用 S3 兼容端点，并把通过授权的 `/media/[...key]` 读取重定向到短期签名地址。上传时返回的签名地址不是持久内容标识；页面内容应使用同源媒体路由和存储键。
+- `S3StorageAdapter` 使用 S3 兼容端点。签名 GET URL 的有效期为一小时，签发后不会再次检查应用权限。上传当前会把该临时 URL 持久化到 `media_assets.publicUrl`，媒体选择器/编辑器也可以复制或插入它。同源 `/media/[...key]` 路由会检查 `media.read`，但随后重定向到外部签名 URL；除非部署扩展 CSP，否则默认 `img-src 'self' data: blob:` 会阻止该外部图片。引用发现只扫描当前已发布 Markdown 中 `publicUrl` 或 `safeFilename` 的子字符串，不扫描 `storageKey`，因此稳定的同源 S3 引用可能漏检，删除冲突检测也不是可靠的完整性保证。
 - 运行时适配器由 `NEXTWIKI_MEDIA_DRIVER` 选择。设置时采集的 `site_settings.media_driver` 会持久化，但 `getStorageAdapter` 不会读取它；部署必须保持环境变量配置一致。
-- 本地就绪检查会创建/检查媒体目录。S3 就绪检查目前只确认存在存储桶名称，不会联系 S3。
+- 本地就绪检查只会创建媒体目录，不执行读写探测。S3 就绪检查目前只确认存在存储桶名称，不会联系 S3。
 - 上传校验执行大小和允许列表检查。当字节检测失败时，目前会回退到客户端声明的 MIME 类型；这是已知加固缺口，不是完整内容验证。
 
 ### 国际化
@@ -341,9 +344,9 @@ Markdown
 ### 部署与运维
 
 - 生产镜像构建 Next.js standalone 包，以非 root 用户 `nextwiki` 运行，在启动服务器前应用迁移。
-- 生产环境要求至少 32 个字符的稳定 `NEXTWIKI_SECRET`。当 Compose 留空时，容器入口可以生成临时密钥，但重启后会使 HMAC 派生的会话/Token 失效，不适合生产环境。
+- 生产环境要求至少 32 个字符的稳定 `NEXTWIKI_SECRET`。当 Compose 留空时，容器入口会生成 `/app/secrets/nextwiki-secret`；提交的 `nextwiki-secrets` 卷会在容器重建后保留它。显式值不会写入该文件，并会删除任何旧回退；因此日后移除显式值会创建新回退并轮换 HMAC 派生的会话/Token。使用回退模式时删除该卷也会产生相同轮换效果，且 `pnpm backup` 不包含此卷。生产环境应改为注入单一稳定的受管密钥。
 - `/api/health` 检查进程存活。`/api/ready` 查询 PostgreSQL，并按上述方式检查存储适配器。
-- 备份和恢复是 `scripts/backup.ts` 与 `scripts/restore.ts` 中的 CLI 操作；这些操作系统命令不会检查 `backup.create` 权限。
+- 备份和恢复是 `scripts/backup.ts` 与 `scripts/restore.ts` 中的 CLI 操作；这些操作系统命令不会检查 `backup.create` 权限。它们只读取数据库、媒体与恢复相关变量，不会校验无关的 Web 运行时密钥。本地数据库工具会收到规范化 URL 目标，不继承环境中的 libpq 路由覆盖，密码也不会出现在 argv 中。只有本机缺少 PostgreSQL 客户端且显式设置 `NEXTWIKI_COMPOSE_FALLBACK=1` 时，才可使用锚定到本仓库的 Docker `default` context、`noviqwiki` 项目与 `db/nextwiki` 服务/数据库；连接或 SQL 失败绝不会切换目标。恢复会预检可识别的完整纯 SQL 与安全媒体输入，把确认值绑定到所选目标，并在同一个 `ON_ERROR_STOP=1` 事务中执行 Schema 重置与导入；后续本地媒体解压必然位于该数据库事务之外。
 - 没有后台 Worker 或队列。邮件投递和媒体工作都在请求/命令进程中完成。
 
 ### 当前安全与集成边界
@@ -351,7 +354,8 @@ Markdown
 本架构描述已实现系统，也包括以下 v0.1.0 边界：
 
 - JSON 资源 API 没有稳定的跨域、API 密钥或 API Token 契约。应保持同源并限于受信任的应用集成；包含不受信任账户的部署不得把它当作通用或多租户 API 边界。
-- 当前用户和管理用户响应结构反映内部应用记录，而不是稳定、最小化的公开 DTO 契约。消费者和日志必须通过允许列表只使用所需字段。
+- `GET /api/v1/me` 当前返回完整内部用户记录（包括 `passwordHash` 和规范化标识）及 CSRF Token；`GET /api/v1/admin/users` 返回包括 `passwordHash` 在内的完整用户记录。这些不是稳定、最小化的公开 DTO，因此消费者和日志必须通过允许列表只使用所需字段。
+- `assertCsrf` 当前没有调用方。使用 Cookie 鉴权的 `/api/v1` 写操作和 `POST /logout` 不校验 `Origin` 或 `x-csrf-token`；它们目前主要依赖浏览器侧的 `SameSite=Lax` 缓解 CSRF。
 - 页面资源读取可能向任何具有 `page.read` 的操作者暴露草稿/已归档记录。搜索、分类和维护发现路径仅包含已发布内容，但已知的归档 slug 仍可通过直接条目/历史界面解析；归档状态不是保密边界。
 - 当字节检测没有结果时，上传检测可能信任声明的 MIME 类型。
 - 请求 ID 会添加到响应头，但审计写入点通常不会把它附加到 `audit_logs`。

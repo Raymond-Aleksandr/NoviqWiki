@@ -27,9 +27,11 @@ pnpm test
 pnpm test:integration
 pnpm build
 pnpm test:e2e
-docker compose config
+docker compose config --quiet
 docker compose build
 ```
+
+Use `docker compose config --quiet` for human verification. Plain `docker compose config` renders resolved environment values, including secrets, and must not be captured in logs or test evidence.
 
 `pnpm format` writes changes. For a read-only release or CI check, use:
 
@@ -52,6 +54,7 @@ Do not place a bare `pnpm test:ui` into an unattended full-suite batch unless a 
 - The UI audit does not reset its target database. It navigates a live site and opens supported dialogs without submitting destructive confirmations.
 - Never point e2e, seed, restore, or manual cleanup commands at production or shared staging data.
 - Operational scripts load `.env` by default through `dotenv/config`, not `.env.local`. Export test variables explicitly when the distinction matters.
+- A smoke test that intentionally leaves an existing site with zero users exposes the unauthenticated Owner-only bootstrap. Keep that target isolated from untrusted networks until the bootstrap is complete.
 
 ## Unit Tests
 
@@ -69,7 +72,10 @@ The script executes `vitest run tests/unit`. Current unit coverage includes smal
 - Homepage and site-setting normalization.
 - Plugin registry behavior.
 - English and Simplified Chinese error, authorization-label, and revision-summary behavior.
-- E2E database-target safety helpers.
+- E2E disposable database-target safety helpers.
+- Backup/restore target parsing, default-port normalization, ambient libpq/Compose override removal, password passfile handling, exact host/Compose confirmations, complete plain-SQL dumps, file-identity checks, dedicated canonical media paths, and unsafe tar member rejection.
+- Session/CSRF cookie `Secure` selection from the `NEXTWIKI_BASE_URL` `http:` or `https:` scheme, independently of `NODE_ENV`.
+- Optional registration and Owner-setup display-name normalization, including blank values becoming absent.
 
 Unit tests should remain deterministic and avoid a real network or production service. When a change introduces pure domain behavior, test edge cases and failure paths here before relying on a browser test.
 
@@ -86,6 +92,7 @@ The script executes `vitest run tests/integration`. Each current integration tes
 Current integration coverage includes:
 
 - Site setup, registration locale, email verification, password reset, and login after recovery.
+- Setup-mode detection for no site, an existing site with zero users, and completed setup; the zero-user Owner bootstrap preserves the existing site identity/default locale, blocks public registration until the Owner exists, and rejects a second bootstrap.
 - Site visibility, groups, roles, permission assignment, built-in-role protection, and the final Owner invariant.
 - Page creation, drafts, publishing, revisions, search indexing, categories, aliases, redirects, rename, archive, delete, restore, rollback, and page protection.
 - Public page index, random page, wanted, orphaned, dead-end, short, protected, uncategorized, and redirect-maintenance queries.
@@ -211,9 +218,11 @@ This verifies the current Next.js production build, TypeScript/server-client bou
 Validate the resolved Compose definition and build the image:
 
 ```bash
-docker compose config
+docker compose config --quiet
 docker compose build
 ```
+
+Use `--quiet` for this human gate. Plain `docker compose config` can print the resolved `NEXTWIKI_SECRET`; `docker compose config --services` below is limited to service names.
 
 Inspect the committed service names when needed:
 
@@ -228,7 +237,9 @@ docker compose ps
 docker compose logs --tail=200 app
 ```
 
-`docker compose config` and `docker compose build` do not prove that the stack starts, migrations succeed, setup loads, persistent volumes work, or backup/restore succeeds. Record a separate clean-deployment smoke test when those properties are release requirements.
+`docker compose config --quiet` and `docker compose build` do not prove that the stack starts, migrations succeed, setup loads, persistent volumes work, or backup/restore succeeds. Record a separate clean-deployment smoke test when those properties are release requirements.
+
+The committed stack mounts `nextwiki-secrets` at `/app/secrets`. A relevant smoke test should verify that an automatically generated secret survives container recreation and `docker compose down`, that activating an explicit `NEXTWIKI_SECRET` removes the old fallback file without writing the explicit value there, that later removing the explicit value generates a new fallback, and that `docker compose down -v` deletes the secrets volume along with the database, media, and backup volumes. `pnpm backup` does not include the secrets volume.
 
 ## Current CI Scope
 
@@ -313,9 +324,11 @@ pnpm test
 pnpm test:integration
 pnpm build
 pnpm test:e2e
-docker compose config
+docker compose config --quiet
 docker compose build
 ```
+
+人类验证应使用 `docker compose config --quiet`。普通 `docker compose config` 会渲染解析后的环境变量值，包括密钥，不得把其输出保存到日志或测试证据中。
 
 `pnpm format` 会写入变更。只读发布或 CI 检查使用：
 
@@ -338,6 +351,7 @@ UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui
 - UI 审计不会重置目标数据库。它浏览在线站点并打开支持的对话框，但不会提交破坏性确认。
 - 绝不能把 e2e、种子、恢复或手动清理命令指向生产或共享预发布数据。
 - 运维脚本通过 `dotenv/config` 默认加载 `.env`，不是 `.env.local`。有区别时应显式导出测试变量。
+- 若冒烟测试故意让现有站点处于零用户状态，就会暴露未经身份验证的仅限 Owner 引导流程。在引导完成前，必须让该目标与不受信任网络隔离。
 
 ### 单元测试
 
@@ -355,7 +369,10 @@ pnpm test
 - 首页和站点设置规范化。
 - 插件注册表行为。
 - 英文和简体中文错误、授权标签及修订摘要行为。
-- E2E 数据库目标安全辅助函数。
+- E2E 一次性数据库目标安全辅助函数。
+- 备份/恢复目标解析、默认端口规范化、环境中 libpq/Compose 覆盖的移除、密码 passfile 处理、准确的主机/Compose 确认、完整纯 SQL 转储、文件身份检查、专用规范媒体路径以及不安全 tar 成员拒绝逻辑。
+- 根据 `NEXTWIKI_BASE_URL` 的 `http:` 或 `https:` 协议选择会话/CSRF Cookie 的 `Secure` 属性，且不依赖 `NODE_ENV`。
+- 可选注册与 Owner 设置显示名称的规范化，包括把空白值视为未提供。
 
 单元测试应保持确定性，不依赖真实网络或生产服务。变更新增纯领域行为时，应先在此覆盖边界情况和失败路径，而不是只依赖浏览器测试。
 
@@ -372,6 +389,7 @@ pnpm test:integration
 当前集成覆盖包括：
 
 - 站点设置、注册语言、邮箱验证、密码重置以及恢复后的登录。
+- 无站点、现有站点零用户和已完成设置三种模式的检测；零用户 Owner 引导会保留现有站点标识/默认语言，在 Owner 创建前阻断公开注册，并拒绝第二次引导。
 - 站点可见性、组、角色、权限分配、内置角色保护和最后一个所有者不变量。
 - 页面创建、草稿、发布、修订、搜索索引、分类、别名、重定向、重命名、归档、删除、恢复、回滚和页面保护。
 - 公共页面索引、随机页面、需要页面、孤立页面、无出链页面、短页面、受保护页面、未分类页面和重定向维护查询。
@@ -497,9 +515,11 @@ pnpm build
 验证解析后的 Compose 定义并构建镜像：
 
 ```bash
-docker compose config
+docker compose config --quiet
 docker compose build
 ```
+
+此人类门禁应使用 `--quiet`。普通 `docker compose config` 可能输出解析后的 `NEXTWIKI_SECRET`；下方的 `docker compose config --services` 只输出服务名。
 
 需要时检查提交的服务名：
 
@@ -514,7 +534,9 @@ docker compose ps
 docker compose logs --tail=200 app
 ```
 
-`docker compose config` 和 `docker compose build` 不能证明栈能够启动、迁移成功、设置页加载、持久卷工作或备份恢复成功。如果这些属性属于发布要求，应单独记录干净部署冒烟测试。
+`docker compose config --quiet` 和 `docker compose build` 不能证明栈能够启动、迁移成功、设置页加载、持久卷工作或备份恢复成功。如果这些属性属于发布要求，应单独记录干净部署冒烟测试。
+
+提交的栈把 `nextwiki-secrets` 挂载到 `/app/secrets`。相关冒烟测试应验证自动生成的密钥在容器重建和 `docker compose down` 后仍然存在；启用显式 `NEXTWIKI_SECRET` 会删除旧回退文件，且不会把显式值写入该文件；日后移除显式值会生成新的回退密钥；并验证 `docker compose down -v` 会将密钥卷与数据库、媒体和备份卷一并删除。`pnpm backup` 不包含密钥卷。
 
 ### 当前 CI 范围
 

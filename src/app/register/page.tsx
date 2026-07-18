@@ -5,8 +5,12 @@ import { ActionForm } from "@/components/ui/action-form";
 import { registerAction } from "@/app/actions";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
+import { isSetupRequired } from "@/modules/setup/service";
 
 export default async function RegisterPage() {
+  if (await isSetupRequired()) {
+    redirect("/setup");
+  }
   const site = await getPrimarySiteWithSettings();
   if (!site) {
     redirect("/setup");

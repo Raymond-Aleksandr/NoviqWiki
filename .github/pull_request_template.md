@@ -39,12 +39,12 @@ Complete either the English or Simplified Chinese section and remove the unused 
 - [ ] `pnpm test`
 - [ ] `pnpm test:integration`
 - [ ] `pnpm build`
-- [ ] `pnpm test:ui`
+- [ ] `UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui`
 - [ ] `pnpm test:e2e`
-- [ ] `docker compose config`
+- [ ] `docker compose config --quiet`
 - [ ] `docker compose build`
 
-`pnpm test:ui` audits an already-running local review app and does not reset it. Without `UI_AUDIT_USERNAME` and `UI_AUDIT_PASSWORD`, authenticated editor and admin routes are skipped. `pnpm test:e2e` uses a disposable database; read `docs/TESTING.md` before running it.
+`pnpm test:ui` audits an already-running local review app and does not reset it. Without `UI_AUDIT_USERNAME` and `UI_AUDIT_PASSWORD`, authenticated editor and admin routes are skipped. `pnpm test:e2e` uses a disposable database; read `docs/TESTING.md` before running it. Use `docker compose config --quiet` when real environment values are present; never paste expanded Compose output into a pull request.
 
 ### Not run
 
@@ -115,12 +115,12 @@ Complete either the English or Simplified Chinese section and remove the unused 
 - [ ] `pnpm test`
 - [ ] `pnpm test:integration`
 - [ ] `pnpm build`
-- [ ] `pnpm test:ui`
+- [ ] `UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui`
 - [ ] `pnpm test:e2e`
-- [ ] `docker compose config`
+- [ ] `docker compose config --quiet`
 - [ ] `docker compose build`
 
-`pnpm test:ui` 审核一个已经运行的本地预览应用，不会重置该应用。如果未提供 `UI_AUDIT_USERNAME` 和 `UI_AUDIT_PASSWORD`，会跳过需要身份验证的编辑和管理路由。`pnpm test:e2e` 使用一次性数据库；运行前请阅读 `docs/TESTING.md`。
+`pnpm test:ui` 审核一个已经运行的本地预览应用，不会重置该应用。如果未提供 `UI_AUDIT_USERNAME` 和 `UI_AUDIT_PASSWORD`，会跳过需要身份验证的编辑和管理路由。`pnpm test:e2e` 使用一次性数据库；运行前请阅读 `docs/TESTING.md`。存在真实环境值时使用 `docker compose config --quiet`；绝不要把展开后的 Compose 输出粘贴到 pull request。
 
 #### 未运行项目
 

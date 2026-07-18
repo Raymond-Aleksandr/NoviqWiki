@@ -27,7 +27,7 @@ Do not run these commands over an uncommitted production working tree. Build rel
 2. Confirm the target Node.js, pnpm, PostgreSQL, Docker, and browser-test requirements.
 3. Compare `package.json`, `.env.example`, `compose.yaml`, `Dockerfile`, and deployment overrides with the installed version.
 4. Review every new SQL file in `drizzle/`, including locks, backfills, defaults, indexes, and backward compatibility.
-5. Back up PostgreSQL and the active local or S3 media store as one recovery point.
+5. Back up PostgreSQL and the active local or S3 media store as one recovery point, and separately preserve the managed `NEXTWIKI_SECRET` or the `nextwiki-secrets` volume when it is the only copy.
 6. Record the running image digest or source commit and preserve the previous artifact.
 7. Restore the backup into a separate environment and verify it.
 8. Run the full target-version verification suite in staging with representative data.
@@ -38,6 +38,10 @@ See [BACKUP_RESTORE.md](./BACKUP_RESTORE.md). A backup that has never been resto
 ## Configuration Review
 
 Check for added, removed, renamed, defaulted, or newly required environment variables. In particular, preserve the stable `NEXTWIKI_SECRET`, verify `DATABASE_URL`, and confirm all media and SMTP settings.
+
+The `NEXTWIKI_BASE_URL` scheme, not `NODE_ENV`, controls whether session and CSRF cookies use the `Secure` attribute. Verify that the upgraded production origin remains `https:` before testing authentication.
+
+When `NEXTWIKI_SECRET` is unset or empty, the committed Compose stack reuses the fallback in the `nextwiki-secrets` volume or generates it if missing. `pnpm backup` does not include that volume. Prefer a stable, explicitly managed production secret: an explicit environment value is never written to the fallback file or an environment file, and startup proactively deletes any old fallback. If that explicit value is later removed, the next start generates a new fallback and invalidates existing HMAC-backed sessions, email-verification tokens, and password-reset tokens.
 
 Operational scripts load `.env` by default through `dotenv/config`, not `.env.local`. Export the production values through the deployment system; do not assume a Next.js local file will be used by migrations or search reindexing.
 
@@ -90,6 +94,8 @@ docker compose up -d
 
 Use `--quiet` because plain `docker compose config` renders resolved environment values, including the exported secret. Never capture that expanded output in an upgrade record.
 
+The command above is the recommended managed-secret path; keep supplying the same value on every subsequent start because its first use deletes any old fallback file. If an evaluation deployment instead relies only on the automatically generated secret, preserve the existing `nextwiki-secrets` volume throughout the upgrade and do not start the container with an explicit value. In either mode, verify session and verification/reset-token continuity deliberately.
+
 The stock Docker image runs `scripts/migrate.ts` automatically before starting the standalone server. Its advisory lock serializes concurrent migration attempts. If the production deployment uses a dedicated migration job, customize the startup contract so the image does not create ambiguous duplicate migration ownership.
 
 Inspect the rollout:
@@ -101,7 +107,7 @@ docker compose logs --tail=200 app
 
 For a production override that uses a published image, update the pinned tag or digest in that deployment definition, pull it, and verify the resolved configuration before rollout. Do not infer those steps from the committed build-only Compose file.
 
-Never use `docker compose down -v` during an upgrade of retained data; it deletes named volumes.
+Never use `docker compose down -v` during an upgrade of retained data; it deletes the database, media, backup, and `nextwiki-secrets` named volumes.
 
 ## Post-Upgrade Checks
 
@@ -109,6 +115,7 @@ Verify all of the following before reopening normal writes or declaring success:
 
 - `GET /api/health` and `GET /api/ready` return success.
 - Existing setup remains complete and the expected site loads.
+- Confirm that the upgraded database has at least one user. A site with zero users intentionally opens an Owner-only bootstrap that preserves existing content and settings; keep the deployment isolated from untrusted networks until an Owner completes it and setup returns to the completed mode.
 - Login and logout work through the production HTTPS origin.
 - Public and restricted pages enforce the expected access policy.
 - Existing Markdown renders from stored sanitized HTML.
@@ -135,13 +142,13 @@ The repository has forward Drizzle migrations and no general automatic down-migr
 The project restore command is destructive and requires explicit variables:
 
 ```bash
-NEXTWIKI_RESTORE_SQL=backups/noviqwiki-2026-07-17T12-00-00-000Z.sql \
-NEXTWIKI_RESTORE_MEDIA=backups/noviqwiki-2026-07-17T12-00-00-000Z-media.tar.gz \
-NEXTWIKI_RESTORE_CONFIRM=restore \
+NEXTWIKI_RESTORE_SQL=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038.sql \
+NEXTWIKI_RESTORE_MEDIA=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038-media.tar.gz \
+NEXTWIKI_RESTORE_CONFIRM=restore:localhost:5432/nextwiki \
 pnpm restore
 ```
 
-It accepts the plain `.sql` output from `pnpm backup`, not a custom-format `.dump`. Read [BACKUP_RESTORE.md](./BACKUP_RESTORE.md) and verify the target before using it.
+The confirmation above matches the repository's default host database URL; use the exact `restore:<host>:<port>/<database>` label required for the actual target. An omitted URL port is normalized to `5432`. The command accepts the plain `.sql` output from `pnpm backup`, not a custom-format `.dump`. Read [BACKUP_RESTORE.md](./BACKUP_RESTORE.md) and verify the target before using it.
 
 After rollback, rerun health, login, authorization, page read/edit/history/search, and media checks before restoring traffic.
 
@@ -225,7 +232,7 @@ pnpm install --frozen-lockfile
 2. 确认目标 Node.js、pnpm、PostgreSQL、Docker 和浏览器测试要求。
 3. 将 `package.json`、`.env.example`、`compose.yaml`、`Dockerfile` 和部署覆盖与已安装版本比较。
 4. 检查 `drizzle/` 中每个新 SQL 文件，包括锁、回填、默认值、索引和向后兼容性。
-5. 将 PostgreSQL 与当前本地或 S3 媒体存储作为同一个恢复点备份。
+5. 将 PostgreSQL 与当前本地或 S3 媒体存储作为同一个恢复点备份；若受管 `NEXTWIKI_SECRET` 或 `nextwiki-secrets` 卷是唯一副本，还要单独保留它。
 6. 记录运行中的镜像摘要或源提交并保留旧制品。
 7. 将备份恢复到独立环境并验证。
 8. 使用代表性数据在预发布环境运行目标版本的完整验证套件。
@@ -236,6 +243,10 @@ pnpm install --frozen-lockfile
 ### 配置审查
 
 检查新增、删除、重命名、默认化或新近变为必填的环境变量。尤其要保留稳定的 `NEXTWIKI_SECRET`，核对 `DATABASE_URL`，并确认所有媒体和 SMTP 设置。
+
+会话和 CSRF Cookie 是否使用 `Secure` 属性由 `NEXTWIKI_BASE_URL` 的协议决定，而不是 `NODE_ENV`。测试身份验证前，应确认升级后的生产来源仍为 `https:`。
+
+未设置 `NEXTWIKI_SECRET` 或其值为空时，提交的 Compose 栈会复用 `nextwiki-secrets` 卷中的回退密钥；若其不存在，则生成它。`pnpm backup` 不包含该卷。生产环境应优先使用稳定的显式受管密钥：显式环境值绝不会写入回退文件或环境文件，并且启动时会主动删除任何旧回退。如果后来移除该显式值，下次启动会生成新回退，并使现有依赖 HMAC 的会话、电子邮件验证令牌和密码重置令牌失效。
 
 运维脚本通过 `dotenv/config` 默认加载 `.env`，不是 `.env.local`。应通过部署系统导出生产值；不要假设迁移或搜索重建会使用 Next.js 本地文件。
 
@@ -288,6 +299,8 @@ docker compose up -d
 
 应使用 `--quiet`，因为普通的 `docker compose config` 会渲染解析后的环境变量值，包括已导出的密钥。不得把这类展开后的输出保存到升级记录中。
 
+以上命令是推荐的受管密钥路径；首次使用显式值时会删除任何旧回退文件，因此后续每次启动都必须继续提供同一值。如果评估部署仅依赖自动生成的密钥，则升级全过程必须保留现有 `nextwiki-secrets` 卷，而且不得使用显式值启动容器。无论采用哪种模式，都应明确验证会话以及验证/重置令牌的连续性。
+
 原始 Docker 镜像会在启动独立服务器前自动运行 `scripts/migrate.ts`，其 advisory lock 会串行处理并发迁移尝试。如果生产部署使用专用迁移任务，应自定义启动契约，避免镜像产生含糊的重复迁移责任。
 
 检查发布：
@@ -299,7 +312,7 @@ docker compose logs --tail=200 app
 
 若生产覆盖使用已发布镜像，应在部署定义中更新固定标签或摘要，拉取镜像，并在发布前验证解析后的配置。不要从提交的仅构建 Compose 文件推断这些步骤。
 
-升级保留数据时绝不能使用 `docker compose down -v`；它会删除命名卷。
+升级保留数据时绝不能使用 `docker compose down -v`；它会删除数据库、媒体、备份和 `nextwiki-secrets` 命名卷。
 
 ### 升级后检查
 
@@ -307,6 +320,7 @@ docker compose logs --tail=200 app
 
 - `GET /api/health` 和 `GET /api/ready` 成功。
 - 现有设置保持完成，预期站点可以加载。
+- 确认升级后的数据库至少有一个用户。零用户站点会有意打开仅限 Owner 的引导流程，并保留现有内容和设置；在 Owner 完成引导、设置回到已完成模式前，必须让部署与不受信任网络隔离。
 - 通过生产 HTTPS 源登录和退出正常。
 - 公共和受限页面执行预期访问策略。
 - 现有 Markdown 从已存储的清理 HTML 正常渲染。
@@ -333,13 +347,13 @@ docker compose logs --tail=200 app
 项目恢复命令具有破坏性，并要求显式变量：
 
 ```bash
-NEXTWIKI_RESTORE_SQL=backups/noviqwiki-2026-07-17T12-00-00-000Z.sql \
-NEXTWIKI_RESTORE_MEDIA=backups/noviqwiki-2026-07-17T12-00-00-000Z-media.tar.gz \
-NEXTWIKI_RESTORE_CONFIRM=restore \
+NEXTWIKI_RESTORE_SQL=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038.sql \
+NEXTWIKI_RESTORE_MEDIA=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038-media.tar.gz \
+NEXTWIKI_RESTORE_CONFIRM=restore:localhost:5432/nextwiki \
 pnpm restore
 ```
 
-它接受 `pnpm backup` 生成的纯文本 `.sql`，不接受自定义格式 `.dump`。使用前阅读 [BACKUP_RESTORE.md](./BACKUP_RESTORE.md) 并确认目标。
+以上确认值对应仓库默认的主机数据库 URL；实际操作必须使用目标所要求的准确 `restore:<host>:<port>/<database>` 标签，URL 省略端口时会规范为 `5432`。该命令接受 `pnpm backup` 生成的纯文本 `.sql`，不接受自定义格式 `.dump`。使用前阅读 [BACKUP_RESTORE.md](./BACKUP_RESTORE.md) 并确认目标。
 
 回滚后，在恢复流量前重新执行健康、登录、授权、页面读取与编辑、历史、搜索和媒体检查。
 

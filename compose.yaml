@@ -14,6 +14,7 @@ services:
     volumes:
       - nextwiki-media:/app/media
       - nextwiki-backups:/app/backups
+      - nextwiki-secrets:/app/secrets
     depends_on:
       db:
         condition: service_healthy
@@ -39,3 +40,4 @@ volumes:
   nextwiki-db:
   nextwiki-media:
   nextwiki-backups:
+  nextwiki-secrets:

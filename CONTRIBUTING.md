@@ -50,7 +50,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-Open <http://localhost:3000> and complete the setup wizard on a fresh database. See [Quickstart](docs/QUICKSTART.md) and [Development](docs/DEVELOPMENT.md) for detailed setup and troubleshooting.
+Open <http://localhost:3000> and complete the full setup wizard on a fresh database. If the database already contains a site but has no users, complete the Owner-only bootstrap on a trusted network. See [Quickstart](docs/QUICKSTART.md) and [Development](docs/DEVELOPMENT.md) for detailed setup and troubleshooting.
 
 ## Architecture Rules
 
@@ -95,9 +95,9 @@ pnpm typecheck
 pnpm test
 pnpm test:integration
 pnpm build
-pnpm test:ui
+UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui
 pnpm test:e2e
-docker compose config
+docker compose config --quiet
 docker compose build
 ```
 
@@ -107,6 +107,7 @@ Important test conditions:
 - Integration tests use isolated in-memory PGlite databases created by the test helpers. Do not change test configuration to point at production or shared staging data.
 - `pnpm test:ui` audits an already-running local review app and does not reset it. Without `UI_AUDIT_USERNAME` and `UI_AUDIT_PASSWORD`, authenticated editor and admin routes are skipped.
 - `pnpm test:e2e` resets only a database whose name is recognized as disposable and starts its own production-mode test server. Review [Testing](docs/TESTING.md) before running it.
+- Use `docker compose config --quiet` when `.env` or the shell contains a real secret. Plain `docker compose config` expands environment values and its output must not be copied into logs or pull requests.
 - Documentation-only changes may make runtime or Docker checks not applicable. In that case, record each skipped command and the reason in the pull request instead of marking it as passed.
 
 Do not claim a command passed unless it ran successfully in the current checkout. Include relevant failure output and environment limitations for commands that fail or cannot run.
@@ -202,7 +203,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-打开 <http://localhost:3000>，并在全新数据库上完成初始化向导。详细设置和故障排查请参阅[快速开始](docs/QUICKSTART.md)和[开发指南](docs/DEVELOPMENT.md)。
+打开 <http://localhost:3000>，并在全新数据库上完成完整初始化向导。如果数据库已有站点但没有用户，请先在受信网络完成仅 Owner 引导。详细设置和故障排查请参阅[快速开始](docs/QUICKSTART.md)和[开发指南](docs/DEVELOPMENT.md)。
 
 ### 架构规则
 
@@ -247,9 +248,9 @@ pnpm typecheck
 pnpm test
 pnpm test:integration
 pnpm build
-pnpm test:ui
+UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui
 pnpm test:e2e
-docker compose config
+docker compose config --quiet
 docker compose build
 ```
 
@@ -259,6 +260,7 @@ docker compose build
 - 集成测试使用测试辅助工具创建的隔离内存 PGlite 数据库。不要更改测试配置，使其指向生产或共享预发布数据。
 - `pnpm test:ui` 审核一个已经运行的本地预览应用，不会重置该应用。如果未提供 `UI_AUDIT_USERNAME` 和 `UI_AUDIT_PASSWORD`，会跳过需要身份验证的编辑和管理路由。
 - `pnpm test:e2e` 只会重置名称被识别为一次性用途的数据库，并启动自己的生产模式测试服务器。运行前请阅读[测试指南](docs/TESTING.md)。
+- 当 `.env` 或 shell 含真实密钥时使用 `docker compose config --quiet`。普通 `docker compose config` 会展开环境变量值，其输出不得复制到日志或 pull request。
 - 对于仅修改文档的更改，运行时或 Docker 检查可能不适用。此时请在 pull request 中逐项记录跳过的命令及原因，不要将其标记为已通过。
 
 只有命令在当前检出版本中成功运行后，才能声称其通过。对于失败或无法运行的命令，请提供相关失败输出和环境限制。

@@ -91,15 +91,17 @@ Start the application:
 pnpm dev
 ```
 
-Open `http://localhost:3000/setup` on a fresh database and complete the setup wizard.
+Open `http://localhost:3000/setup` on a fresh database and complete the setup wizard. A database with no site uses the full flow. If an existing site has zero users, the same route enters an Owner-only bootstrap that preserves existing content, media, and settings while creating the first Owner. Keep that application isolated from untrusted networks until bootstrap completes.
 
 ## Full Compose Evaluation
 
 To run both the application and PostgreSQL inside Compose instead of running `pnpm dev` on the host:
 
 ```bash
-NEXTWIKI_SECRET="$(openssl rand -base64 32)" docker compose up --build -d
+docker compose up --build -d
 ```
+
+When `NEXTWIKI_SECRET` is unset or empty, the entrypoint reuses `/app/secrets/nextwiki-secret` from the persistent `nextwiki-secrets` volume or generates that fallback if it is missing. An explicitly supplied environment value is used directly, is never written to the fallback file or an environment file, and causes startup to proactively delete any old fallback file. If the explicit value is later removed, the next start generates a new fallback; the secret change invalidates existing HMAC-backed sessions, email-verification tokens, and password-reset tokens. This fallback is convenient for evaluation, but production should explicitly provide a stable managed secret. `docker compose down` preserves the volume; `docker compose down -v` deletes it together with the database, media, and backup volumes, and `pnpm backup` does not copy it.
 
 The committed Compose service correctly uses `db` and `/app/media` inside the container. It is an evaluation configuration with example credentials and published ports, not a production security baseline. See [DEPLOYMENT.md](./DEPLOYMENT.md).
 
@@ -123,7 +125,7 @@ NEXTWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
 
 Replace `192.168.1.20` with the host IP. Review devices must be on a permitted network, and the workstation firewall must allow the selected port. Do not expose a development server directly to the public internet.
 
-If links or recovery URLs need to use the LAN address, update both `NEXTWIKI_BASE_URL` before setup and the stored base URL in `/admin/settings` after setup.
+If links or recovery URLs need to use the LAN address, update both `NEXTWIKI_BASE_URL` before setup and the stored base URL in `/admin/settings` after setup. The `NEXTWIKI_BASE_URL` scheme, not `NODE_ENV`, controls the session and CSRF cookies' `Secure` attribute: `https:` enables it and `http:` disables it.
 
 ## Feature Workflow
 
@@ -213,11 +215,13 @@ pnpm test
 pnpm test:integration
 pnpm build
 pnpm test:e2e
-docker compose config
+docker compose config --quiet
 docker compose build
 ```
 
 Use `pnpm format:check` when a read-only formatting check is required. `pnpm format` writes formatting changes.
+
+Use `docker compose config --quiet` for a human gate. Plain `docker compose config` renders resolved environment values, including secrets, and must not be saved in logs or review artifacts.
 
 The live UI audit is additional and requires a running server:
 
@@ -326,15 +330,17 @@ DOTENV_CONFIG_PATH=.env.local pnpm db:migrate
 pnpm dev
 ```
 
-在全新数据库上打开 `http://localhost:3000/setup` 并完成设置向导。
+在全新数据库上打开 `http://localhost:3000/setup` 并完成设置向导。没有站点的数据库使用完整流程。如果现有站点的用户数为零，同一路由会进入仅限 Owner 的引导流程；它会保留现有内容、媒体和设置，只创建首个 Owner。在引导完成前，应让该应用与不受信任网络隔离。
 
 ### 完整 Compose 评估
 
 如果希望应用和 PostgreSQL 都在 Compose 内运行，而不是在主机运行 `pnpm dev`：
 
 ```bash
-NEXTWIKI_SECRET="$(openssl rand -base64 32)" docker compose up --build -d
+docker compose up --build -d
 ```
+
+未设置 `NEXTWIKI_SECRET` 或其值为空时，入口会从持久化 `nextwiki-secrets` 卷复用 `/app/secrets/nextwiki-secret`；若该回退文件不存在，则生成它。显式提供的环境值会直接使用，绝不会写入回退文件或环境文件，并且启动时会主动删除任何旧回退文件。如果后来移除显式值，下次启动会生成新回退；密钥变化会使现有依赖 HMAC 的会话、电子邮件验证令牌和密码重置令牌失效。此回退行为便于评估，但生产环境应显式提供稳定的受管密钥。`docker compose down` 会保留该卷；`docker compose down -v` 会将它与数据库、媒体和备份卷一并删除，而 `pnpm backup` 不会复制它。
 
 提交的 Compose 服务在容器内正确使用 `db` 和 `/app/media`。它使用示例凭据和公开端口，只适合评估，不是生产安全基线。参见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
@@ -358,7 +364,7 @@ NEXTWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
 
 将 `192.168.1.20` 替换为主机 IP。检查设备必须处于允许的网络中，工作站防火墙也必须允许所选端口。不要把开发服务器直接暴露到公共互联网。
 
-若链接或恢复 URL 需要使用局域网地址，请在设置前更新 `NEXTWIKI_BASE_URL`，并在设置后通过 `/admin/settings` 更新已存储的基础 URL。
+若链接或恢复 URL 需要使用局域网地址，请在设置前更新 `NEXTWIKI_BASE_URL`，并在设置后通过 `/admin/settings` 更新已存储的基础 URL。会话和 CSRF Cookie 的 `Secure` 属性由 `NEXTWIKI_BASE_URL` 的协议决定，而不是 `NODE_ENV`：`https:` 会启用它，`http:` 会禁用它。
 
 ### 功能开发流程
 
@@ -448,11 +454,13 @@ pnpm test
 pnpm test:integration
 pnpm build
 pnpm test:e2e
-docker compose config
+docker compose config --quiet
 docker compose build
 ```
 
 需要只读格式检查时使用 `pnpm format:check`。`pnpm format` 会写入格式化变更。
+
+人类门禁应使用 `docker compose config --quiet`。普通 `docker compose config` 会渲染解析后的环境变量值，包括密钥，不得把其输出保存到日志或审查制品中。
 
 在线 UI 审计是额外步骤，要求服务器已经运行：
 

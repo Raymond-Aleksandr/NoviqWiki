@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
-import { isSetupRequired } from "@/modules/setup/service";
+import { getSetupState } from "@/modules/setup/service";
 import { setupAction } from "@/app/actions";
 import { getEnv } from "@/lib/env";
 import { SetupWizard } from "@/components/setup/setup-wizard";
 import { getRequestI18n } from "@/i18n/server";
 
 export default async function SetupPage() {
-  if (!(await isSetupRequired().catch(() => true))) {
+  const setup = await getSetupState().catch(() => ({ mode: "initial" as const, site: null }));
+  if (setup.mode === "complete") {
     redirect("/");
   }
   const env = getEnv();
@@ -16,8 +17,10 @@ export default async function SetupPage() {
       action={setupAction}
       defaultBaseUrl={env.NEXTWIKI_BASE_URL}
       defaultMediaDriver={env.NEXTWIKI_MEDIA_DRIVER}
+      defaultSiteName={setup.site?.name ?? "NoviqWiki"}
       initialLocale={locale}
       messages={messages}
+      ownerOnly={setup.mode === "owner"}
     />
   );
 }

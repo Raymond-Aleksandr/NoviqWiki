@@ -39,7 +39,7 @@ export async function createSession(
 
 export async function setSessionCookies(token: string, csrfToken: string) {
   const cookieStore = await cookies();
-  const secure = getEnv().NODE_ENV === "production";
+  const secure = shouldUseSecureCookies(getEnv().NEXTWIKI_BASE_URL);
   cookieStore.set(sessionCookieName, token, {
     httpOnly: true,
     sameSite: "lax",
@@ -54,6 +54,10 @@ export async function setSessionCookies(token: string, csrfToken: string) {
     path: "/",
     maxAge: sessionMaxAgeSeconds
   });
+}
+
+export function shouldUseSecureCookies(baseUrl: string) {
+  return new URL(baseUrl).protocol === "https:";
 }
 
 export async function clearSessionCookies() {

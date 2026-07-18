@@ -172,6 +172,10 @@ export const en = {
   setupTitle: "Set up NoviqWiki",
   setupIntro:
     "Create the first site, choose the access policy, configure media storage, and create the Owner account. This route closes permanently after setup succeeds.",
+  ownerBootstrapKicker: "Owner setup",
+  ownerBootstrapTitle: "Create the Owner account",
+  ownerBootstrapIntro:
+    "This wiki already contains its site data and media. Create the first Owner account to administer it without changing the imported content.",
   setupStepsLabel: "Setup steps",
   setupSite: "Site",
   setupIdentity: "Identity",
@@ -213,10 +217,14 @@ export const en = {
   s3StorageDescription: "Use when production media should live outside the app container.",
   setupOneTimeNote:
     "Setup is a one-time operation. After creation, future changes happen in the admin settings area.",
+  ownerBootstrapNote:
+    "This one-time step only creates the first Owner account. Existing pages, media, and site settings stay unchanged.",
   back: "Back",
   continue: "Continue",
   creatingSite: "Creating site...",
+  creatingOwner: "Creating Owner...",
   completeSetup: "Complete setup",
+  completeOwnerSetup: "Create Owner",
   enterSiteName: "Enter a site name.",
   enterValidBaseUrl: "Enter a valid base URL.",
   enterOwnerUsername: "Enter an Owner username.",

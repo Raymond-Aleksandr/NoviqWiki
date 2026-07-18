@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const optionalDisplayNameSchema = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().trim().min(1).max(160).optional()
+);
+
 export const passwordSchema = z
   .string()
   .min(12, "Password must be at least 12 characters.")
@@ -34,7 +39,7 @@ export const registerSchema = z.object({
     .max(80)
     .regex(/^[A-Za-z0-9_.-]+$/),
   email: z.string().trim().email().max(320),
-  displayName: z.string().trim().min(1).max(160).optional(),
+  displayName: optionalDisplayNameSchema,
   password: passwordSchema
 });
 
@@ -52,6 +57,13 @@ export const setupSchema = z.object({
     .max(80)
     .regex(/^[A-Za-z0-9_.-]+$/),
   ownerEmail: z.string().trim().email().max(320),
-  ownerDisplayName: z.string().trim().min(1).max(160).optional(),
+  ownerDisplayName: optionalDisplayNameSchema,
   ownerPassword: passwordSchema
+});
+
+export const ownerSetupSchema = setupSchema.pick({
+  ownerUsername: true,
+  ownerEmail: true,
+  ownerDisplayName: true,
+  ownerPassword: true
 });

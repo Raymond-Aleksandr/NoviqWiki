@@ -2,7 +2,7 @@
 
 > [English](API.md) | [简体中文](API.md#简体中文)
 
-NoviqWiki v0.1.0 exposes JSON resource routes under `/api/v1` and operational probes under `/api`. First-run setup, login, logout, registration, password reset, and email verification are browser page/server-action flows; there is no JSON login endpoint, API key, or bearer-token flow in this release.
+NoviqWiki v0.1.0 exposes JSON resource routes under `/api/v1` and operational probes under `/api`. Initial setup, zero-user Owner bootstrap, login, logout, registration, password reset, and email verification are browser page/server-action flows; there is no JSON login endpoint, API key, or bearer-token flow in this release.
 
 ## Generate the OpenAPI Route Index
 
@@ -52,7 +52,7 @@ Errors use this shape. Validation errors and some application errors also includ
 }
 ```
 
-Error messages are localized from the locale cookie, active user locale, `Accept-Language`, or site default, depending on request context. Integrations should branch on the stable `code`, not the translated `message`.
+API error messages use this exact locale order: a valid `noviqwiki-locale` cookie; the locale of the active session user; Simplified Chinese when the raw `Accept-Language` value contains `zh` case-insensitively; otherwise English. The current check does not interpret language weights, and API errors do not consult the site's default locale. Integrations should branch on the stable `code`, not the translated `message`.
 
 Current status behavior:
 
@@ -73,7 +73,7 @@ JSON bodies use Zod in the implemented mutation routes. Query strings and route 
 
 | Endpoint                          | Required permission                                | Notes                                                      |
 | --------------------------------- | -------------------------------------------------- | ---------------------------------------------------------- |
-| `GET /me`                         | None                                               | Returns internal current-session context.                  |
+| `GET /me`                         | None                                               | Returns a full user row and CSRF token; see the warning.   |
 | `GET /pages`                      | `page.read`                                        | Lists non-deleted pages; see the visibility warning below. |
 | `POST /pages`                     | `page.create`; also `page.publish` when publishing | Creates a draft or a published page.                       |
 | `GET /pages/{id}`                 | `page.read`                                        | Returns a page and its current revision.                   |
@@ -91,7 +91,7 @@ JSON bodies use Zod in the implemented mutation routes. Query strings and route 
 | `POST /media`                     | `media.upload`                                     | Uploads one file.                                          |
 | `GET /media/{id}`                 | `media.read`                                       | Returns published-page references to an asset.             |
 | `DELETE /media/{id}`              | `media.delete`                                     | Deletes an unreferenced asset, or uses `force=true`.       |
-| `GET /admin/users`                | `user.read`                                        | Searches users by username/email.                          |
+| `GET /admin/users`                | `user.read`                                        | Searches and returns full internal user rows.              |
 | `PATCH /admin/users/{id}`         | `user.manage`                                      | Replaces group memberships.                                |
 | `GET /admin/groups`               | `group.read`                                       | Lists groups and assigned roles.                           |
 | `POST /admin/groups`              | `group.manage`                                     | Creates a group and optionally assigns roles.              |
@@ -109,7 +109,11 @@ Permissions are evaluated server-side. A protected page additionally requires `p
 GET /api/v1/me
 ```
 
-This endpoint and `GET /api/v1/admin/users` currently expose internal application response shapes rather than stable, minimized public DTOs and may include sensitive internal account fields. Restrict them to same-origin trusted use. Logs and downstream systems must record only an explicit allowlist of required fields and must not store or forward the raw responses.
+`GET /api/v1/me` requires no permission. Without an active session it returns `user: null` and `csrfToken: null`. With an active session, `user` is the complete persisted `users` row, including `passwordHash`, `normalizedUsername`, `normalizedEmail`, the original username and email, status, locale, appearance, verification/login timestamps, and creation/update timestamps. The response also contains the session's raw `csrfToken`.
+
+`GET /api/v1/admin/users` requires `user.read` and returns up to 100 complete `users` rows with the same internal fields, including `passwordHash` and both normalized identifiers; it does not add a CSRF token. These are current implementation facts, not merely fields that might appear.
+
+Neither response is a stable, minimized public DTO. Restrict both endpoints to same-origin trusted use. Treat password hashes and CSRF tokens as secrets: logs and downstream systems must record only an explicit allowlist of required fields and must not store or forward raw responses.
 
 ## Pages
 
@@ -152,7 +156,19 @@ DELETE /api/v1/pages/{id}
 
 Use one logical PATCH operation per request. The handler evaluates fields in this order: `action`, `protectionLevel`, `title`, then `markdown`.
 
-Empty PATCH bodies and bodies that combine more than one logical operation are unsupported. Send exactly one documented operation shape per request. This client contract is not a substitute for server-side operation validation; keep the resource API trusted-only until unsupported shapes are rejected before any data is returned.
+The current permission checks are:
+
+| Selected PATCH operation | Route permissions              | Additional check for an already protected page |
+| ------------------------ | ------------------------------ | ---------------------------------------------- |
+| `action: "archive"`      | `page.delete`                  | `page.protect`                                 |
+| `action: "restore"`      | `page.restore`                 | `page.protect`                                 |
+| `protectionLevel`        | `page.protect`                 | None beyond `page.protect`                     |
+| `title` rename           | `page.edit` and `page.rename`  | `page.protect`                                 |
+| `markdown` publication   | `page.edit` and `page.publish` | `page.protect`                                 |
+
+The PATCH schema does not enforce exactly one logical operation. A body containing several documented operations is accepted, and only the first matching branch in the order above runs; lower-priority operation fields are ignored.
+
+An empty `{}` body is also accepted. After requiring only an active session, the handler falls through to `getPageWithCurrentRevision` without checking `page.read` or applying the normal page-visibility assertion. Any active user who knows a page UUID can therefore retrieve the complete page row and current revision through empty PATCH, including a deleted page. This is a known authorization and data-exposure vulnerability. Do not send empty or combined PATCH bodies, and keep `/api/v1` trusted-only until the server rejects them before reading a page.
 
 Archive or restore:
 
@@ -231,7 +247,7 @@ Revision reads return stored immutable revision data. Diff returns both stored r
 GET /api/v1/search?q=term&category=docs&page=1&pageSize=20
 ```
 
-The supported pagination parameters are `page` and `pageSize`; `limit` and `offset` are not API query parameters. Search uses PostgreSQL full-text search plus prefix and case-insensitive substring fallbacks over titles, aliases, rendered plain text, and category names. An empty `q` returns no rows. The result is `{ "rows": [...], "count": number }`.
+The supported pagination parameters are `page` and `pageSize`; `limit` and `offset` are not API query parameters. Search uses PostgreSQL full-text search plus prefix and case-insensitive substring fallbacks over titles, aliases, rendered plain text, and category names. An empty `q` returns no rows. When supplied, `category` must exactly equal the stored, case-sensitive category `slug`; it is not a display name or fuzzy category query. Obtain the value from `GET /categories`. The result is `{ "rows": [...], "count": number }`.
 
 ## Categories
 
@@ -240,7 +256,7 @@ GET /api/v1/categories
 GET /api/v1/categories/{slug}
 ```
 
-Category lists and detail pages include published, non-deleted page associations.
+Category lists and detail pages include published, non-deleted page associations. The `{slug}` route parameter is an exact, case-sensitive stored slug; use the `slug` returned by `GET /categories`, not the category display name.
 
 ## Media
 
@@ -268,7 +284,13 @@ curl --cookie cookies.txt \
 
 Uploads are checked against the site size and MIME allowlists and stored through the runtime adapter selected by `NEXTWIKI_MEDIA_DRIVER`. The detector currently falls back to the client-declared MIME type when `file-type` cannot identify the bytes; deployers should keep a narrow allowlist and should not treat v0.1.0 upload inspection as complete content validation.
 
-`GET /media/{id}` returns `{ "references": [...] }`, not the binary file. Local storage returns a durable application URL. With S3, the current adapter can return a time-limited signed `publicUrl`; durable page content should use the same-origin `/media/{storageKey}` application route so authorization and URL renewal happen at read time. Deletion returns `409` while published pages reference the asset unless `force=true` is supplied.
+`GET /media/{id}` returns `{ "references": [...] }`, not the binary file. Local storage persists a durable application URL.
+
+With S3, an upload creates a signed GET URL valid for one hour and persists that exact URL in `media_assets.publicUrl`. Upload/list responses and the current editor and media-library flows reuse the stored value; they do not renew it on read. Database rows and Markdown can therefore retain an expired URL. A signed URL is a bearer capability: direct S3 requests do not recheck the NoviqWiki session or `media.read` permission before the signature expires.
+
+The same-origin `/media/{storageKey}` application route does check `media.read` and creates a fresh signed URL, but then redirects the browser to the S3 endpoint. The current CSP allows images only from `'self'`, `data:`, and `blob:`. Direct or redirected images on an external S3 origin are therefore blocked unless the deployment changes the CSP to allow that origin. Under the current defaults, the route is not by itself a fully working durable S3 embedding path.
+
+Reference reporting and the non-force deletion guard use a heuristic scan. They inspect only the current revisions of published, non-deleted pages and perform case-insensitive substring matches for the persisted `publicUrl` or `safeFilename`. They do not inspect drafts, archived or deleted pages, historical revisions, or `storageKey`/same-origin references that omit both stored strings; a filename appearing as unrelated text can also be a false positive. Deletion returns `409` only when this scan finds a match, and `force=true` bypasses it. Treat the reference list as incomplete rather than an authoritative dependency graph.
 
 ## Administration
 
@@ -309,7 +331,7 @@ GET /api/ready
 
 > [English](API.md) | [简体中文](API.md#简体中文)
 
-NoviqWiki v0.1.0 在 `/api/v1` 下提供 JSON 资源路由，并在 `/api` 下提供运行探针。首次设置、登录、退出、注册、密码重置和邮箱验证通过浏览器页面及服务器操作完成；此版本没有 JSON 登录端点、API 密钥或 Bearer Token 流程。
+NoviqWiki v0.1.0 在 `/api/v1` 下提供 JSON 资源路由，并在 `/api` 下提供运行探针。初始设置、零用户 Owner 引导、登录、退出、注册、密码重置和邮箱验证通过浏览器页面及服务器操作完成；此版本没有 JSON 登录端点、API 密钥或 Bearer Token 流程。
 
 ### 生成 OpenAPI 路由索引
 
@@ -359,7 +381,7 @@ API 使用与网页界面相同的数据库会话。`/api/v1` 不接受 `Authori
 }
 ```
 
-错误消息会根据请求上下文，从语言 Cookie、当前用户语言、`Accept-Language` 或站点默认语言中选择本地化文本。集成程序应依据稳定的 `code` 分支处理，不应依据已翻译的 `message`。
+API 错误消息严格按以下顺序选择语言：有效的 `noviqwiki-locale` Cookie；活跃会话用户的语言；原始 `Accept-Language` 值不区分大小写包含 `zh` 时使用简体中文；否则使用英文。当前检查不会解释语言权重，API 错误也不会查询站点默认语言。集成程序应依据稳定的 `code` 分支处理，不应依据已翻译的 `message`。
 
 当前状态码行为：
 
@@ -380,7 +402,7 @@ API 使用与网页界面相同的数据库会话。`/api/v1` 不接受 `Authori
 
 | 端点                              | 所需权限                                 | 说明                                      |
 | --------------------------------- | ---------------------------------------- | ----------------------------------------- |
-| `GET /me`                         | 无                                       | 返回内部当前会话上下文。                  |
+| `GET /me`                         | 无                                       | 返回完整用户行和 CSRF Token；见下方警告。 |
 | `GET /pages`                      | `page.read`                              | 列出未删除页面；请阅读下方可见性警告。    |
 | `POST /pages`                     | `page.create`；发布时还需 `page.publish` | 创建草稿或已发布页面。                    |
 | `GET /pages/{id}`                 | `page.read`                              | 返回页面及当前修订。                      |
@@ -398,7 +420,7 @@ API 使用与网页界面相同的数据库会话。`/api/v1` 不接受 `Authori
 | `POST /media`                     | `media.upload`                           | 上传一个文件。                            |
 | `GET /media/{id}`                 | `media.read`                             | 返回引用该资源的已发布页面。              |
 | `DELETE /media/{id}`              | `media.delete`                           | 删除未被引用的资源，或使用 `force=true`。 |
-| `GET /admin/users`                | `user.read`                              | 按用户名/邮箱搜索用户。                   |
+| `GET /admin/users`                | `user.read`                              | 搜索并返回完整内部用户行。                |
 | `PATCH /admin/users/{id}`         | `user.manage`                            | 替换用户的用户组成员关系。                |
 | `GET /admin/groups`               | `group.read`                             | 列出用户组及分配的角色。                  |
 | `POST /admin/groups`              | `group.manage`                           | 创建用户组并可选分配角色。                |
@@ -416,7 +438,11 @@ API 使用与网页界面相同的数据库会话。`/api/v1` 不接受 `Authori
 GET /api/v1/me
 ```
 
-此端点和 `GET /api/v1/admin/users` 当前暴露的是应用内部响应结构，而不是稳定、最小化的公开 DTO，并可能包含敏感的内部账户字段。只能在同源受信任场景使用。日志和下游系统必须通过明确允许列表只记录所需字段，不得存储或转发原始响应。
+`GET /api/v1/me` 不要求权限。没有活跃会话时，它返回 `user: null` 和 `csrfToken: null`。存在活跃会话时，`user` 是完整持久化 `users` 行，包括 `passwordHash`、`normalizedUsername`、`normalizedEmail`、原始用户名和邮箱、状态、语言、外观、验证/登录时间戳以及创建/更新时间戳。响应还包含当前会话的原始 `csrfToken`。
+
+`GET /api/v1/admin/users` 要求 `user.read`，最多返回 100 个完整 `users` 行，包含相同的内部字段，包括 `passwordHash` 和两个规范化标识符；它不会额外返回 CSRF Token。这些是当前实现确定会返回的内容，不是“可能出现”的字段。
+
+两种响应都不是稳定、最小化的公开 DTO。只能在同源受信任场景使用。密码哈希和 CSRF Token 必须作为密钥处理：日志和下游系统只能通过明确允许列表记录所需字段，不得存储或转发原始响应。
 
 ### 页面
 
@@ -459,7 +485,19 @@ DELETE /api/v1/pages/{id}
 
 每次请求只应执行一个逻辑 PATCH 操作。处理器按以下顺序判断字段：`action`、`protectionLevel`、`title`、`markdown`。
 
-不支持空 PATCH 请求体，也不支持在一个请求体中组合多个逻辑操作。每次请求必须只发送一种已记录的操作结构。客户端契约不能替代服务器端操作校验；在服务器能于返回任何数据前拒绝不受支持的结构之前，资源 API 只能限于受信任场景。
+当前权限检查如下：
+
+| 选中的 PATCH 操作   | 路由权限                      | 页面已经受保护时的额外检查 |
+| ------------------- | ----------------------------- | -------------------------- |
+| `action: "archive"` | `page.delete`                 | `page.protect`             |
+| `action: "restore"` | `page.restore`                | `page.protect`             |
+| `protectionLevel`   | `page.protect`                | 除 `page.protect` 外无其他 |
+| `title` 重命名      | `page.edit` 和 `page.rename`  | `page.protect`             |
+| `markdown` 发布     | `page.edit` 和 `page.publish` | `page.protect`             |
+
+PATCH Schema 不会强制只能有一个逻辑操作。包含多个已记录操作的请求体会通过校验，并且只执行上述顺序中的第一个匹配分支；优先级较低的操作字段会被忽略。
+
+空的 `{}` 请求体同样会通过校验。处理器只要求存在活跃会话，随后就会回退调用 `getPageWithCurrentRevision`，既不检查 `page.read`，也不执行正常的页面可见性断言。因此，任何知道页面 UUID 的活跃用户都能通过空 PATCH 读取完整页面行和当前修订，包括已删除页面。这是已知的授权和数据暴露漏洞。在服务器能于读取页面前拒绝这些请求体之前，不要发送空或组合 PATCH 请求，并将 `/api/v1` 限于受信任场景。
 
 归档或恢复：
 
@@ -538,7 +576,7 @@ GET /api/v1/revisions/{from}/diff/{to}
 GET /api/v1/search?q=term&category=docs&page=1&pageSize=20
 ```
 
-支持的分页参数是 `page` 和 `pageSize`；`limit` 和 `offset` 不是 API 查询参数。搜索使用 PostgreSQL 全文搜索，并以标题、别名、渲染纯文本和分类名称上的前缀匹配及不区分大小写子字符串匹配作为回退。空的 `q` 不返回结果。结果结构为 `{ "rows": [...], "count": number }`。
+支持的分页参数是 `page` 和 `pageSize`；`limit` 和 `offset` 不是 API 查询参数。搜索使用 PostgreSQL 全文搜索，并以标题、别名、渲染纯文本和分类名称上的前缀匹配及不区分大小写子字符串匹配作为回退。空的 `q` 不返回结果。提供 `category` 时，它必须与已存储且区分大小写的分类 `slug` 完全相等；它不是显示名称或模糊分类查询。应从 `GET /categories` 获取该值。结果结构为 `{ "rows": [...], "count": number }`。
 
 ### 分类
 
@@ -547,7 +585,7 @@ GET /api/v1/categories
 GET /api/v1/categories/{slug}
 ```
 
-分类列表和详情只包含已发布、未删除页面的关联关系。
+分类列表和详情只包含已发布、未删除页面的关联关系。`{slug}` 路由参数是区分大小写的已存储精确 slug；应使用 `GET /categories` 返回的 `slug`，而不是分类显示名称。
 
 ### 媒体
 
@@ -575,7 +613,13 @@ curl --cookie cookies.txt \
 
 上传会根据站点大小限制和 MIME 允许列表检查，并通过 `NEXTWIKI_MEDIA_DRIVER` 选择的运行时适配器存储。当 `file-type` 无法识别字节内容时，当前检测器会回退到客户端声明的 MIME 类型；部署者应维持严格的允许列表，不应把 v0.1.0 的上传检查视为完整内容验证。
 
-`GET /media/{id}` 返回 `{ "references": [...] }`，而不是文件二进制。本地存储返回持久的应用地址。使用 S3 时，当前适配器可能返回有时限的签名 `publicUrl`；长期页面内容应使用同源 `/media/{storageKey}` 应用路由，使授权和地址更新发生在读取时。如果已发布页面仍引用该资源，删除会返回 `409`，除非提供 `force=true`。
+`GET /media/{id}` 返回 `{ "references": [...] }`，而不是文件二进制。本地存储会保存持久的应用地址。
+
+使用 S3 时，上传会创建有效期一小时的签名 GET URL，并把该准确 URL 持久化到 `media_assets.publicUrl`。上传/列表响应以及当前编辑器和媒体库流程会复用已保存值，不会在读取时续期。因此，数据库行和 Markdown 可能长期保留已经过期的 URL。签名 URL 属于持有即授权的能力：签名过期前，直接 S3 请求不会重新检查 NoviqWiki 会话或 `media.read` 权限。
+
+同源 `/media/{storageKey}` 应用路由会检查 `media.read` 并创建新的签名 URL，但随后会把浏览器重定向到 S3 端点。当前 CSP 只允许从 `'self'`、`data:` 和 `blob:` 加载图片。因此，除非部署修改 CSP 以允许对应来源，否则外部 S3 来源上的直接或重定向图片都会被阻止。在当前默认值下，该路由本身并不是完整可用的持久 S3 嵌入路径。
+
+引用报告和非强制删除保护使用启发式扫描。它们只检查已发布、未删除页面的当前修订，并对持久化的 `publicUrl` 或 `safeFilename` 执行不区分大小写的子字符串匹配。它们不会检查草稿、已归档或已删除页面、历史修订，也不会检查同时省略这两个已存储字符串的 `storageKey`/同源引用；文件名作为无关文本出现时也可能产生误报。只有该扫描找到匹配时，删除才返回 `409`；`force=true` 会绕过扫描。引用列表并不是权威依赖图，应视为不完整结果。
 
 ### 管理
 
