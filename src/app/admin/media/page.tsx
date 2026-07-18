@@ -1,14 +1,14 @@
 import { deleteMediaAction, uploadMediaAction } from "@/app/actions";
+import { requireAuthenticatedPermission } from "@/app/access";
 import { MediaLibrary, type MediaLibraryItem } from "@/components/media-library";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
-import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { listMedia } from "@/modules/media/service";
 
 export default async function AdminMediaPage() {
   const site = await getPrimarySiteWithSettings();
-  const session = await getCurrentSession();
+  const session = await requireAuthenticatedPermission(site!.site.id, "media.read");
   const [canUpload, canDelete, rows, i18n] = await Promise.all([
     hasPermission(session?.user.id, site!.site.id, "media.upload"),
     hasPermission(session?.user.id, site!.site.id, "media.delete"),

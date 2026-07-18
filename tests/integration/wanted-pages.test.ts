@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { archivePage, createPage, listWantedPages, softDeletePage } from "@/modules/pages/service";
+import {
+  archivePage,
+  createPage,
+  listDeadEndPages,
+  listOrphanedPages,
+  listPageBacklinks,
+  listPageOutboundLinks,
+  listWantedPages,
+  renamePage,
+  softDeletePage
+} from "@/modules/pages/service";
 import { completeSetup } from "@/modules/setup/service";
 import { createTestDatabase } from "../helpers/test-db";
 
@@ -85,7 +95,7 @@ describe("wanted pages", () => {
       },
       test.db
     );
-    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.db);
 
     let wanted = await listWantedPages({ siteId: setup.site.id }, test.executor);
     expect(wanted).toHaveLength(1);
@@ -107,5 +117,142 @@ describe("wanted pages", () => {
     );
     wanted = await listWantedPages({ siteId: setup.site.id }, test.executor);
     expect(wanted).toHaveLength(0);
+
+    const aliasTarget = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Old Alias Target",
+        markdown: "# Old Alias Target",
+        publish: true,
+        ...actor
+      },
+      test.db
+    );
+    const aliasSource = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Alias Source",
+        markdown: "[[Old Alias Target]]",
+        publish: true,
+        ...actor
+      },
+      test.db
+    );
+    await renamePage(
+      {
+        pageId: aliasTarget.page.id,
+        newTitle: "New Alias Target",
+        createAlias: true,
+        ...actor
+      },
+      test.db
+    );
+    wanted = await listWantedPages({ siteId: setup.site.id }, test.executor);
+    expect(wanted).toHaveLength(0);
+    const outbound = await listPageOutboundLinks(
+      { siteId: setup.site.id, pageId: aliasSource.page.id },
+      test.executor
+    );
+    expect(outbound).toContainEqual(
+      expect.objectContaining({
+        targetPageId: aliasTarget.page.id,
+        targetSlug: "new-alias-target",
+        exists: true
+      })
+    );
+
+    const lateSource = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Late Binding Source",
+        markdown: "[[Late Bound Target]]",
+        publish: true,
+        ...actor
+      },
+      test.db
+    );
+    wanted = await listWantedPages({ siteId: setup.site.id }, test.executor);
+    expect(wanted).toContainEqual(
+      expect.objectContaining({ targetNormalizedTitle: "late bound target", sourceCount: 1 })
+    );
+
+    const lateTarget = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Late Bound Target",
+        markdown: "# Late Bound Target",
+        publish: true,
+        ...actor
+      },
+      test.db
+    );
+    const renamedLateTarget = await renamePage(
+      {
+        pageId: lateTarget.page.id,
+        newTitle: "Renamed Late Target",
+        newSlug: "renamed-late-route",
+        createAlias: true,
+        ...actor
+      },
+      test.db
+    );
+    expect(renamedLateTarget.slug).toBe("renamed-late-route");
+
+    wanted = await listWantedPages({ siteId: setup.site.id }, test.executor);
+    expect(wanted).not.toContainEqual(
+      expect.objectContaining({ targetNormalizedTitle: "late bound target" })
+    );
+    const lateOutbound = await listPageOutboundLinks(
+      { siteId: setup.site.id, pageId: lateSource.page.id },
+      test.executor
+    );
+    expect(lateOutbound).toContainEqual(
+      expect.objectContaining({
+        targetPageId: lateTarget.page.id,
+        targetSlug: "renamed-late-route",
+        exists: true
+      })
+    );
+    let lateBacklinks = await listPageBacklinks(
+      { siteId: setup.site.id, pageId: lateTarget.page.id },
+      test.executor
+    );
+    expect(lateBacklinks.map((row) => row.pageId)).toContain(lateSource.page.id);
+    let orphaned = await listOrphanedPages({ siteId: setup.site.id }, test.executor);
+    expect(orphaned.map((row) => row.pageId)).not.toContain(lateTarget.page.id);
+    let deadEnds = await listDeadEndPages({ siteId: setup.site.id }, test.executor);
+    expect(deadEnds.map((row) => row.pageId)).not.toContain(lateSource.page.id);
+
+    const addressSource = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Address Resolution Source",
+        markdown: "[[renamed-late-route|Actual slug]] and [[Late Bound Target|Alias]]",
+        publish: true,
+        ...actor
+      },
+      test.db
+    );
+    const addressOutbound = await listPageOutboundLinks(
+      { siteId: setup.site.id, pageId: addressSource.page.id },
+      test.executor
+    );
+    expect(addressOutbound).toHaveLength(2);
+    expect(
+      addressOutbound.every(
+        (link) => link.targetPageId === lateTarget.page.id && link.exists === true
+      )
+    ).toBe(true);
+    lateBacklinks = await listPageBacklinks(
+      { siteId: setup.site.id, pageId: lateTarget.page.id },
+      test.executor
+    );
+    expect(lateBacklinks.map((row) => row.pageId)).toEqual(
+      expect.arrayContaining([lateSource.page.id, addressSource.page.id])
+    );
+    orphaned = await listOrphanedPages({ siteId: setup.site.id }, test.executor);
+    expect(orphaned.map((row) => row.pageId)).not.toContain(lateTarget.page.id);
+    deadEnds = await listDeadEndPages({ siteId: setup.site.id }, test.executor);
+    expect(deadEnds.map((row) => row.pageId)).not.toContain(addressSource.page.id);
   });
 });

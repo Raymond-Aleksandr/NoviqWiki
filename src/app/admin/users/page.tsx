@@ -6,6 +6,7 @@ import {
   updateUserGroupsAction,
   updateUserStatusAction
 } from "@/app/actions";
+import { requireAuthenticatedPermission } from "@/app/access";
 import { ActionForm } from "@/components/ui/action-form";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -20,6 +21,9 @@ type Props = {
 
 export default async function AdminUsersPage({ searchParams }: Props) {
   const site = await getPrimarySiteWithSettings();
+  await requireAuthenticatedPermission(site!.site.id, "user.read");
+  await requireAuthenticatedPermission(site!.site.id, "group.read");
+  await requireAuthenticatedPermission(site!.site.id, "role.read");
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
   const rows = await listUsers({ query: query || undefined, limit: 200 });

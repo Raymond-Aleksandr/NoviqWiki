@@ -7,39 +7,15 @@ import {
   rolePermissions,
   roles,
   siteSettings,
+  sites,
   userGroups,
   users
 } from "@/db/schema";
-import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/errors";
 import { writeAuditLog } from "@/modules/audit/service";
+import { permissionKeys, type PermissionKey } from "./permission-keys";
 
-export const permissionKeys = [
-  "site.view",
-  "site.configure",
-  "page.read",
-  "page.create",
-  "page.edit",
-  "page.publish",
-  "page.protect",
-  "page.rename",
-  "page.delete",
-  "page.restore",
-  "page.rollback",
-  "revision.read",
-  "media.read",
-  "media.upload",
-  "media.delete",
-  "user.read",
-  "user.manage",
-  "group.read",
-  "group.manage",
-  "role.read",
-  "role.manage",
-  "audit.read",
-  "backup.create"
-] as const;
-
-export type PermissionKey = (typeof permissionKeys)[number];
+export { permissionKeys, type PermissionKey } from "./permission-keys";
 
 const anonymousReadPermissions = new Set<PermissionKey>([
   "site.view",
@@ -237,6 +213,91 @@ export async function createGroup(
   return group;
 }
 
+export async function createGroupWithRoles(
+  input: {
+    siteId: string;
+    name: string;
+    description?: string;
+    roleIds: string[];
+    actorId: string;
+    actorDisplayName?: string;
+  },
+  database: RootDatabase = db
+) {
+  return database.transaction(async (tx) => {
+    await lockAuthorizationSite(input.siteId, tx);
+    await requirePermission(input.actorId, input.siteId, "group.manage", tx);
+    const name = normalizeAuthorizationName(input.name, "group");
+    const description = normalizeAuthorizationDescription(input.description);
+    const uniqueRoleIds = normalizeAuthorizationIds(input.roleIds, "roleIds");
+    const normalizedName = name.toLowerCase();
+    const [duplicate] = await tx
+      .select({ id: groups.id })
+      .from(groups)
+      .where(and(eq(groups.siteId, input.siteId), eq(groups.normalizedName, normalizedName)))
+      .limit(1);
+    if (duplicate) {
+      throw new ConflictError("A group with that name already exists.");
+    }
+
+    const validRoles =
+      uniqueRoleIds.length > 0
+        ? await tx
+            .select({ id: roles.id, normalizedName: roles.normalizedName })
+            .from(roles)
+            .where(and(eq(roles.siteId, input.siteId), inArray(roles.id, uniqueRoleIds)))
+        : [];
+    if (validRoles.length !== uniqueRoleIds.length) {
+      throw new NotFoundError("Role not found.");
+    }
+
+    await assertGrantCeiling(
+      {
+        actorId: input.actorId,
+        siteId: input.siteId,
+        permissionKeys: await getPermissionsForRoles(uniqueRoleIds, tx),
+        grantsOwner: validRoles.some((role) => role.normalizedName === "owner")
+      },
+      tx
+    );
+
+    const [group] = await tx
+      .insert(groups)
+      .values({
+        siteId: input.siteId,
+        name,
+        normalizedName,
+        description
+      })
+      .returning();
+    if (uniqueRoleIds.length > 0) {
+      await tx
+        .insert(groupRoles)
+        .values(uniqueRoleIds.map((roleId) => ({ groupId: group.id, roleId })))
+        .onConflictDoNothing();
+    }
+
+    await writeAuditLog(
+      {
+        siteId: input.siteId,
+        actorId: input.actorId,
+        actorDisplayName: input.actorDisplayName,
+        action: "group.updated",
+        targetType: "group",
+        targetId: group.id,
+        details: {
+          name: group.name,
+          created: true,
+          roleIds: uniqueRoleIds
+        }
+      },
+      tx
+    );
+
+    return group;
+  });
+}
+
 export async function getGroupSummaries(siteId: string, database: Database = db) {
   return database
     .select({
@@ -277,6 +338,10 @@ export async function updateGroup(
   database: RootDatabase = db
 ) {
   return database.transaction(async (tx) => {
+    await lockAuthorizationSite(input.siteId, tx);
+    if (input.actorId) {
+      await requirePermission(input.actorId, input.siteId, "group.manage", tx);
+    }
     const [group] = await tx
       .select()
       .from(groups)
@@ -286,10 +351,8 @@ export async function updateGroup(
       throw new NotFoundError("Group not found.");
     }
 
-    const nextName = input.name.trim();
-    if (!nextName) {
-      throw new ConflictError("Group name is required.");
-    }
+    const nextName = normalizeAuthorizationName(input.name, "group");
+    const description = normalizeAuthorizationDescription(input.description);
     const normalizedName = nextName.toLowerCase();
     if (group.builtIn && normalizedName !== group.normalizedName) {
       throw new ForbiddenError("Built-in groups cannot be renamed.");
@@ -305,16 +368,30 @@ export async function updateGroup(
       }
     }
 
-    const uniqueRoleIds = Array.from(new Set(input.roleIds.filter(Boolean)));
+    const uniqueRoleIds = normalizeAuthorizationIds(input.roleIds, "roleIds");
     const validRoles =
       uniqueRoleIds.length > 0
         ? await tx
-            .select({ id: roles.id })
+            .select({ id: roles.id, normalizedName: roles.normalizedName })
             .from(roles)
             .where(and(eq(roles.siteId, input.siteId), inArray(roles.id, uniqueRoleIds)))
         : [];
     if (validRoles.length !== uniqueRoleIds.length) {
       throw new NotFoundError("Role not found.");
+    }
+    if (input.actorId) {
+      const grantedPermissions = await getPermissionsForRoles(uniqueRoleIds, tx);
+      const currentlyGrantsOwner = await groupHasOwnerRole(group.id, tx);
+      await assertGrantCeiling(
+        {
+          actorId: input.actorId,
+          siteId: input.siteId,
+          permissionKeys: grantedPermissions,
+          grantsOwner:
+            currentlyGrantsOwner || validRoles.some((role) => role.normalizedName === "owner")
+        },
+        tx
+      );
     }
 
     const [updated] = await tx
@@ -322,7 +399,7 @@ export async function updateGroup(
       .set({
         name: group.builtIn ? group.name : nextName,
         normalizedName: group.builtIn ? group.normalizedName : normalizedName,
-        description: input.description?.trim() ?? "",
+        description,
         updatedAt: new Date()
       })
       .where(eq(groups.id, group.id))
@@ -374,10 +451,13 @@ export async function createRole(
   database: RootDatabase = db
 ) {
   return database.transaction(async (tx) => {
-    const normalizedName = input.name.trim().toLowerCase();
-    if (!normalizedName) {
-      throw new ConflictError("Role name is required.");
+    await lockAuthorizationSite(input.siteId, tx);
+    if (input.actorId) {
+      await requirePermission(input.actorId, input.siteId, "role.manage", tx);
     }
+    const name = normalizeAuthorizationName(input.name, "role");
+    const description = normalizeAuthorizationDescription(input.description);
+    const normalizedName = name.toLowerCase();
     const [existing] = await tx
       .select({ id: roles.id, builtIn: roles.builtIn })
       .from(roles)
@@ -394,12 +474,23 @@ export async function createRole(
       .insert(roles)
       .values({
         siteId: input.siteId,
-        name: input.name.trim(),
+        name,
         normalizedName,
-        description: input.description ?? ""
+        description
       })
       .returning();
-    const selectedPermissions = Array.from(new Set(input.permissionKeys ?? []));
+    const selectedPermissions = normalizePermissionKeys(input.permissionKeys ?? []);
+    if (input.actorId) {
+      await assertGrantCeiling(
+        {
+          actorId: input.actorId,
+          siteId: input.siteId,
+          permissionKeys: selectedPermissions,
+          grantsOwner: false
+        },
+        tx
+      );
+    }
     if (selectedPermissions.length > 0) {
       await tx
         .insert(rolePermissions)
@@ -441,6 +532,10 @@ export async function updateRole(
   database: RootDatabase = db
 ) {
   return database.transaction(async (tx) => {
+    await lockAuthorizationSite(input.siteId, tx);
+    if (input.actorId) {
+      await requirePermission(input.actorId, input.siteId, "role.manage", tx);
+    }
     const [role] = await tx
       .select()
       .from(roles)
@@ -453,10 +548,8 @@ export async function updateRole(
       throw new ForbiddenError("Built-in roles cannot be edited.");
     }
 
-    const nextName = input.name.trim();
-    if (!nextName) {
-      throw new ConflictError("Role name is required.");
-    }
+    const nextName = normalizeAuthorizationName(input.name, "role");
+    const description = normalizeAuthorizationDescription(input.description);
     const normalizedName = nextName.toLowerCase();
     if (normalizedName !== role.normalizedName) {
       const [duplicate] = await tx
@@ -469,13 +562,24 @@ export async function updateRole(
       }
     }
 
-    const selectedPermissions = Array.from(new Set(input.permissionKeys));
+    const selectedPermissions = normalizePermissionKeys(input.permissionKeys);
+    if (input.actorId) {
+      await assertGrantCeiling(
+        {
+          actorId: input.actorId,
+          siteId: input.siteId,
+          permissionKeys: selectedPermissions,
+          grantsOwner: false
+        },
+        tx
+      );
+    }
     const [updated] = await tx
       .update(roles)
       .set({
         name: nextName,
         normalizedName,
-        description: input.description?.trim() ?? "",
+        description,
         updatedAt: new Date()
       })
       .where(eq(roles.id, role.id))
@@ -557,6 +661,10 @@ export async function updateUserGroups(
   database: RootDatabase = db
 ) {
   return database.transaction(async (tx) => {
+    await lockAuthorizationSite(input.siteId, tx);
+    if (input.actorId) {
+      await requirePermission(input.actorId, input.siteId, "user.manage", tx);
+    }
     const [user] = await tx.select().from(users).where(eq(users.id, input.userId)).limit(1);
     if (!user) {
       throw new NotFoundError("User not found.");
@@ -567,10 +675,24 @@ export async function updateUserGroups(
       .from(groups)
       .where(eq(groups.siteId, input.siteId));
     const siteGroupIds = new Set(siteGroups.map((group) => group.id));
-    const selectedGroupIds = Array.from(new Set(input.groupIds.filter((id) => id.trim() !== "")));
+    const selectedGroupIds = normalizeAuthorizationIds(input.groupIds, "groupIds");
     const invalidGroup = selectedGroupIds.find((groupId) => !siteGroupIds.has(groupId));
     if (invalidGroup) {
       throw new NotFoundError("Group not found.");
+    }
+
+    if (input.actorId) {
+      const selectedAccess = await getAccessForGroups(selectedGroupIds, tx);
+      const currentHasOwner = await userHasOwnerRole(input.userId, input.siteId, tx, false);
+      await assertGrantCeiling(
+        {
+          actorId: input.actorId,
+          siteId: input.siteId,
+          permissionKeys: selectedAccess.permissionKeys,
+          grantsOwner: currentHasOwner || selectedAccess.grantsOwner
+        },
+        tx
+      );
     }
 
     if (siteGroups.length > 0) {
@@ -625,10 +747,13 @@ export async function getUserPermissions(userId: string, siteId: string, databas
   const rows = await database
     .select({ key: rolePermissions.permissionKey })
     .from(userGroups)
+    .innerJoin(users, eq(users.id, userGroups.userId))
     .innerJoin(groups, eq(groups.id, userGroups.groupId))
     .innerJoin(groupRoles, eq(groupRoles.groupId, groups.id))
     .innerJoin(rolePermissions, eq(rolePermissions.roleId, groupRoles.roleId))
-    .where(and(eq(userGroups.userId, userId), eq(groups.siteId, siteId)));
+    .where(
+      and(eq(userGroups.userId, userId), eq(users.status, "active"), eq(groups.siteId, siteId))
+    );
   return new Set(rows.map((row) => row.key as PermissionKey));
 }
 
@@ -656,6 +781,53 @@ export async function requirePermission(
 ) {
   if (!(await hasPermission(userId, siteId, permission, database))) {
     throw new ForbiddenError();
+  }
+}
+
+/**
+ * Hold a stable authorization snapshot for the remainder of the caller's
+ * transaction. Authorization writers take a conflicting NO KEY UPDATE lock on
+ * the same site row, while unrelated domain mutations may share this lock.
+ */
+export async function requirePermissionsForMutation(
+  userId: string | null | undefined,
+  siteId: string,
+  requiredPermissions: readonly PermissionKey[],
+  database: Database = db
+) {
+  const [site] = await database
+    .select({ id: sites.id })
+    .from(sites)
+    .where(eq(sites.id, siteId))
+    .limit(1)
+    .for("share");
+  if (!site) {
+    throw new NotFoundError("Site not found.");
+  }
+  for (const permission of requiredPermissions) {
+    await requirePermission(userId, siteId, permission, database);
+  }
+}
+
+export async function requirePagePublishPermissions(
+  userId: string,
+  siteId: string,
+  database: Database = db
+) {
+  await requirePermission(userId, siteId, "page.edit", database);
+  await requirePermission(userId, siteId, "page.publish", database);
+}
+
+export async function requireOwnerForOwnerAccount(
+  input: { actorId?: string; targetUserId: string; siteId: string },
+  database: Database = db
+) {
+  const targetIsOwner = await userHasOwnerRole(input.targetUserId, input.siteId, database, false);
+  if (
+    targetIsOwner &&
+    (!input.actorId || !(await userHasOwnerRole(input.actorId, input.siteId, database)))
+  ) {
+    throw new ForbiddenError("Only an active Owner can manage an Owner account.");
   }
 }
 
@@ -729,6 +901,148 @@ export async function isFinalActiveOwner(userId: string, siteId: string, databas
       )
     );
   return count <= 1;
+}
+
+async function lockAuthorizationSite(siteId: string, database: Database) {
+  // Authorization changes serialize with each other. A privileged domain
+  // mutation deliberately holds SHARE on this row for its whole transaction,
+  // so this lock waits until that mutation's permission snapshot is no longer
+  // in use. Plain foreign-key checks only take the compatible KEY SHARE mode.
+  await database.execute(
+    sql`select ${sites.id} from ${sites} where ${sites.id} = ${siteId} for no key update`
+  );
+}
+
+function normalizeAuthorizationName(value: string, entity: "group" | "role") {
+  const name = value.trim();
+  if (!name) {
+    throw new ConflictError(`${entity === "group" ? "Group" : "Role"} name is required.`);
+  }
+  if (name.length > 120) {
+    throw new ValidationError({ name: "Must contain at most 120 characters." });
+  }
+  return name;
+}
+
+function normalizeAuthorizationDescription(value?: string) {
+  const description = value?.trim() ?? "";
+  if (description.length > 2_000) {
+    throw new ValidationError({ description: "Must contain at most 2000 characters." });
+  }
+  return description;
+}
+
+function normalizeAuthorizationIds(values: string[], field: "roleIds" | "groupIds") {
+  if (values.length > 100) {
+    throw new ValidationError({ [field]: "Must contain at most 100 entries." });
+  }
+  return Array.from(new Set(values.filter((value) => value.trim() !== "")));
+}
+
+function normalizePermissionKeys(values: PermissionKey[]) {
+  if (values.length > permissionKeys.length) {
+    throw new ValidationError({
+      permissionKeys: `Must contain at most ${permissionKeys.length} entries.`
+    });
+  }
+  const invalid = values.find((value) => !permissionKeys.includes(value));
+  if (invalid) {
+    throw new ValidationError({ permissionKeys: `Unknown permission: ${invalid}.` });
+  }
+  return Array.from(new Set(values));
+}
+
+async function getPermissionsForRoles(roleIds: string[], database: Database) {
+  if (roleIds.length === 0) {
+    return [];
+  }
+  const rows = await database
+    .select({ permissionKey: rolePermissions.permissionKey })
+    .from(rolePermissions)
+    .where(inArray(rolePermissions.roleId, roleIds));
+  return Array.from(new Set(rows.map((row) => row.permissionKey as PermissionKey)));
+}
+
+async function getAccessForGroups(groupIds: string[], database: Database) {
+  if (groupIds.length === 0) {
+    return { permissionKeys: [] as PermissionKey[], grantsOwner: false };
+  }
+  const rows = await database
+    .select({
+      roleNormalizedName: roles.normalizedName,
+      permissionKey: rolePermissions.permissionKey
+    })
+    .from(groups)
+    .innerJoin(groupRoles, eq(groupRoles.groupId, groups.id))
+    .innerJoin(roles, eq(roles.id, groupRoles.roleId))
+    .leftJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+    .where(inArray(groups.id, groupIds));
+  return {
+    permissionKeys: Array.from(
+      new Set(
+        rows
+          .map((row) => row.permissionKey)
+          .filter((permissionKey): permissionKey is string => permissionKey !== null)
+      )
+    ) as PermissionKey[],
+    grantsOwner: rows.some((row) => row.roleNormalizedName === "owner")
+  };
+}
+
+async function groupHasOwnerRole(groupId: string, database: Database) {
+  const [row] = await database
+    .select({ id: roles.id })
+    .from(groupRoles)
+    .innerJoin(roles, eq(roles.id, groupRoles.roleId))
+    .where(and(eq(groupRoles.groupId, groupId), eq(roles.normalizedName, "owner")))
+    .limit(1);
+  return Boolean(row);
+}
+
+async function userHasOwnerRole(
+  userId: string,
+  siteId: string,
+  database: Database,
+  requireActive = true
+) {
+  const [row] = await database
+    .select({ id: users.id })
+    .from(users)
+    .innerJoin(userGroups, eq(userGroups.userId, users.id))
+    .innerJoin(groups, eq(groups.id, userGroups.groupId))
+    .innerJoin(groupRoles, eq(groupRoles.groupId, groups.id))
+    .innerJoin(roles, eq(roles.id, groupRoles.roleId))
+    .where(
+      and(
+        eq(users.id, userId),
+        requireActive ? eq(users.status, "active") : undefined,
+        eq(groups.siteId, siteId),
+        eq(roles.normalizedName, "owner")
+      )
+    )
+    .limit(1);
+  return Boolean(row);
+}
+
+async function assertGrantCeiling(
+  input: {
+    actorId: string;
+    siteId: string;
+    permissionKeys: PermissionKey[];
+    grantsOwner: boolean;
+  },
+  database: Database
+) {
+  const actorPermissions = await getUserPermissions(input.actorId, input.siteId, database);
+  const excessivePermission = input.permissionKeys.find(
+    (permissionKey) => !actorPermissions.has(permissionKey)
+  );
+  if (excessivePermission) {
+    throw new ForbiddenError("You cannot grant permissions that you do not hold.");
+  }
+  if (input.grantsOwner && !(await userHasOwnerRole(input.actorId, input.siteId, database))) {
+    throw new ForbiddenError("Only an active Owner can add or remove Owner access.");
+  }
 }
 
 async function countActiveOwners(siteId: string, database: Database) {

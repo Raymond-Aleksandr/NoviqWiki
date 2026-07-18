@@ -1,4 +1,5 @@
 import { Plus, Save, Users } from "lucide-react";
+import { requireAuthenticatedPermission } from "@/app/access";
 import { createGroupAction, updateGroupAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -8,6 +9,8 @@ import { getGroupSummaries, getRoleSummaries } from "@/modules/authorization/per
 
 export default async function AdminGroupsPage() {
   const site = await getPrimarySiteWithSettings();
+  await requireAuthenticatedPermission(site!.site.id, "group.read");
+  await requireAuthenticatedPermission(site!.site.id, "role.read");
   const rows = await getGroupSummaries(site!.site.id);
   const roleRows = await getRoleSummaries(site!.site.id);
   const { messages } = await getRequestI18n(site!.settings?.defaultLocale);

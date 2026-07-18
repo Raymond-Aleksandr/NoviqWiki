@@ -150,7 +150,7 @@ export function MediaLibrary({
             </label>
             <label>
               {messages.altText}
-              <input className="field" name="altText" />
+              <input className="field" name="altText" maxLength={2000} />
             </label>
             <button className="primary" disabled={uploadPending}>
               <Upload size={16} aria-hidden="true" />

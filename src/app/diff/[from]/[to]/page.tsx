@@ -5,6 +5,7 @@ import { rollbackAction } from "@/app/actions";
 import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
 import { getRequestI18n } from "@/i18n/server";
 import { hasPermission } from "@/modules/authorization/permissions";
+import { rewriteLegacyMediaUrls } from "@/modules/media/service";
 import { compareRevisionsForRead } from "@/modules/pages/service";
 import { getSiteSettings } from "@/modules/settings/service";
 
@@ -19,14 +20,29 @@ export default async function DiffPage({ params }: Props) {
     toRevisionId: to
   });
   const session = await requirePageReadAccess(page.siteId);
-  const [canRollback, settings] = await Promise.all([
+  const lineCount = diff.lines.length;
+  const displayContents = [
+    ...diff.lines.map((line) => line.text),
+    ...diff.sideBySide.flatMap((row) => [row.oldText, row.newText])
+  ];
+  const [canRollback, settings, rewrittenContents] = await Promise.all([
     hasPermission(session?.user.id, page.siteId, "page.rollback"),
-    getSiteSettings(page.siteId)
+    getSiteSettings(page.siteId),
+    rewriteLegacyMediaUrls({ siteId: page.siteId, contents: displayContents })
   ]);
+  const displayLines = diff.lines.map((line, index) => ({
+    ...line,
+    text: rewrittenContents[index] ?? line.text
+  }));
+  const displaySideBySide = diff.sideBySide.map((row, index) => ({
+    ...row,
+    oldText: rewrittenContents[lineCount + index * 2] ?? row.oldText,
+    newText: rewrittenContents[lineCount + index * 2 + 1] ?? row.newText
+  }));
   const i18n = await getRequestI18n(settings?.defaultLocale);
   const { messages } = i18n;
-  const added = diff.lines.filter((line) => line.type === "add").length;
-  const removed = diff.lines.filter((line) => line.type === "remove").length;
+  const added = displayLines.filter((line) => line.type === "add").length;
+  const removed = displayLines.filter((line) => line.type === "remove").length;
   return (
     <section className="page-frame">
       <header className="diff-page-header">
@@ -78,7 +94,7 @@ export default async function DiffPage({ params }: Props) {
               {messages.newRevision} r{diff.to.revisionNumber}
             </div>
           </div>
-          {diff.sideBySide.map((row, index) => (
+          {displaySideBySide.map((row, index) => (
             <div className={`side-by-side-diff-row side-by-side-${row.type}`} key={index}>
               <div className="side-by-side-cell">
                 <span className="diff-line-number">{row.oldLineNumber ?? ""}</span>
@@ -95,7 +111,7 @@ export default async function DiffPage({ params }: Props) {
       <section className="diff-section">
         <h2>{messages.unifiedDiff}</h2>
         <div className="diff diff-panel" aria-label={messages.unifiedDiff}>
-          {diff.lines.map((line, index) => (
+          {displayLines.map((line, index) => (
             <div
               key={`${index}-${line.text}`}
               className={`diff-line ${

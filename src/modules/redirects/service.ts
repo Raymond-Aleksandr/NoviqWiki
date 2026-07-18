@@ -21,7 +21,13 @@ export type RedirectPageEntry = {
 };
 
 export async function resolvePageBySlug(
-  input: { siteId: string; slug: string; maxDepth?: number; followContentRedirects?: boolean },
+  input: {
+    siteId: string;
+    slug: string;
+    maxDepth?: number;
+    followContentRedirects?: boolean;
+    includeUnpublished?: boolean;
+  },
   database: Database = db
 ) {
   const maxDepth = input.maxDepth ?? 8;
@@ -41,6 +47,7 @@ export async function resolvePageBySlug(
       .where(and(eq(pages.siteId, input.siteId), eq(pages.slug, currentSlug)))
       .limit(1);
     if (page) {
+      assertResolvedPageVisible(page, input.includeUnpublished);
       if (followContentRedirects && shouldFollowContentRedirect(page)) {
         const directive = await getCurrentRedirectDirective(page, database);
         if (directive) {
@@ -68,10 +75,23 @@ export async function resolvePageBySlug(
     if (!target) {
       throw new NotFoundError("Redirect target not found.");
     }
+    assertResolvedPageVisible(target, input.includeUnpublished);
     redirectedFrom ??= currentSlug;
     currentSlug = target.slug;
   }
   throw new ConflictError("Redirect depth exceeded.");
+}
+
+function assertResolvedPageVisible(
+  page: Pick<Page, "deletedAt" | "status">,
+  includeUnpublished = false
+) {
+  if (
+    !includeUnpublished &&
+    ((page.status !== "published" && page.status !== "archived") || page.deletedAt)
+  ) {
+    throw new NotFoundError("Page not found.");
+  }
 }
 
 export async function listRedirectPages(

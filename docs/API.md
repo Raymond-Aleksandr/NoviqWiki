@@ -1,6 +1,6 @@
 # NoviqWiki API
 
-NoviqWiki v0.1.0 exposes versioned JSON endpoints under `/api/v1` for pages, revisions, search, categories, media, current user state, and administration reads. First-run setup, login, logout, registration, password reset, and email verification are implemented through Next.js server actions and pages rather than JSON endpoints.
+NoviqWiki v0.1.0 exposes versioned JSON endpoints under `/api/v1` for pages, revisions, search, categories, media, current user state, and administration reads. First-run setup, login, logout, registration, password reset, email verification, and verification-email resend are implemented through Next.js server actions and pages rather than JSON endpoints. Public recovery requests return generic responses and perform delivery after the response boundary.
 
 Generate the OpenAPI file with:
 
@@ -19,6 +19,10 @@ https://wiki.example.com/api/v1
 ```
 
 Responses use JSON. Media upload accepts `multipart/form-data`.
+
+Cookie-authenticated `POST`, `PATCH`, and `DELETE` requests must be same-origin and include the
+current CSRF value in `X-CSRF-Token`. Obtain it from `GET /api/v1/me`; the response exposes only
+the safe user DTO and CSRF value, never credentials or password hashes.
 
 Error shape:
 
@@ -53,7 +57,8 @@ Common status codes:
 GET /api/v1/me
 ```
 
-Returns the current authenticated user or `null`.
+Returns the current authenticated user or `null` plus the CSRF value required by mutation
+requests.
 
 ### Pages
 
@@ -68,7 +73,17 @@ GET /api/v1/pages/{id}/revisions
 GET /api/v1/pages/{id}/backlinks
 ```
 
-The API delegates to the same page services as the server-rendered UI. `POST` and `PATCH` require page permissions and validate title, Markdown, summary, publish intent, and optimistic concurrency fields. `PATCH /api/v1/pages/{id}` accepts `{"action":"archive"}` to archive a page and remove it from search when the actor has `page.delete`, `{"action":"restore"}` to restore a soft-deleted or archived page when the actor has `page.restore`, and `{"protectionLevel":"protected"}` or `{"protectionLevel":"none"}` to toggle page protection when the actor has `page.protect`. Protected pages require `page.protect` before server-side write operations such as draft saving, publication, rollback, rename, delete, archive, or restore are applied.
+The API delegates to the same page services as the server-rendered UI. Page listings default to
+published content; draft, archived, and deleted listings require elevated editing or restore
+permissions. `POST` and `PATCH` require page permissions and validate title, bounded Markdown,
+summary, publish intent, and optimistic concurrency fields. Empty or mixed-operation PATCH bodies
+are rejected. `PATCH /api/v1/pages/{id}` accepts `{"action":"archive"}` to archive a page and
+remove it from search when the actor has `page.delete`, `{"action":"restore"}` to restore a
+soft-deleted or archived page when the actor has `page.restore`, and
+`{"protectionLevel":"protected"}` or `{"protectionLevel":"none"}` to toggle page protection
+when the actor has `page.protect`. Protected pages require `page.protect` before server-side write
+operations such as draft saving, publication, rollback, rename, delete, archive, or restore are
+applied.
 
 Backlinks return published, non-deleted source pages that link to the requested page through stored wiki-link relationships.
 
@@ -84,7 +99,7 @@ Revision reads return immutable stored revision data. Diff returns unified diff 
 ### Search
 
 ```http
-GET /api/v1/search?q=term&category=docs&limit=20&offset=0
+GET /api/v1/search?q=term&category=docs&page=1&pageSize=20
 ```
 
 Search uses PostgreSQL full-text search over titles, aliases, rendered plain text, and category names.
@@ -101,12 +116,20 @@ Category detail includes pages currently associated with the category.
 ### Media
 
 ```http
-GET /api/v1/media
+GET /api/v1/media?q=term&page=1&pageSize=50
 POST /api/v1/media
-DELETE /api/v1/media/{id}
+GET /api/v1/media/{id}
+DELETE /api/v1/media/{id}?force=false
 ```
 
-Uploads are validated against configured size and MIME allowlists and stored through the configured media adapter.
+Uploads use `multipart/form-data` with a required `file` part and optional `altText` of at most
+2,000 characters. They are
+rejected before buffering beyond the configured hard limit, validated using detected safe MIME
+types, and stored through the configured media adapter. `GET /api/v1/media/{id}` lists content
+references;
+deletion is blocked while references exist unless an authorized caller explicitly sends
+`force=true`. Media URLs remain same-origin so every private read passes through authorization;
+non-inline-safe types are downloaded as attachments.
 
 ### Administration
 

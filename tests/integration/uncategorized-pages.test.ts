@@ -80,7 +80,7 @@ describe("uncategorized pages", () => {
       },
       test.db
     );
-    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.db);
 
     const rows = await listUncategorizedPages({ siteId: setup.site.id }, test.executor);
     const titles = rows.map((page) => page.title);

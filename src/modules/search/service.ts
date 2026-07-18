@@ -1,13 +1,15 @@
 import { and, desc, eq, or, sql } from "drizzle-orm";
-import { db, type Database } from "@/db/client";
+import { db, type Database, type RootDatabase } from "@/db/client";
 import {
   categories,
   pageAliases,
   pageCategories,
   pageRevisions,
   pages,
-  searchIndex
+  searchIndex,
+  sites
 } from "@/db/schema";
+import { lockSearchIndexRebuildForTransaction } from "@/db/advisory-locks";
 
 export async function upsertSearchIndex(
   input: {
@@ -19,6 +21,8 @@ export async function upsertSearchIndex(
   },
   database: Database = db
 ) {
+  // Callers that mutate page state hold the shared search writer lock; a full
+  // rebuild holds the exclusive variant for the entire replacement transaction.
   const aliases = await database
     .select({ aliasTitle: pageAliases.aliasTitle })
     .from(pageAliases)
@@ -47,6 +51,7 @@ export async function upsertSearchIndex(
 }
 
 export async function removeSearchIndex(pageId: string, database: Database = db) {
+  // See upsertSearchIndex for the caller-side search lock protocol.
   await database.delete(searchIndex).where(eq(searchIndex.pageId, pageId));
 }
 
@@ -142,32 +147,47 @@ function escapeLikePattern(value: string) {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
-export async function rebuildSearchIndex(siteId: string, database: Database = db) {
-  await database.delete(searchIndex).where(eq(searchIndex.siteId, siteId));
-  const current = await database
-    .select({
-      pageId: pages.id,
-      siteId: pages.siteId,
-      title: pages.title,
-      plainText: pageRevisions.plainText,
-      categories: pageRevisions.categories
-    })
-    .from(pages)
-    .innerJoin(pageRevisions, eq(pages.currentRevisionId, pageRevisions.id))
-    .where(
-      and(eq(pages.siteId, siteId), eq(pages.status, "published"), sql`${pages.deletedAt} is null`)
-    );
-  for (const row of current) {
-    await upsertSearchIndex(
-      {
-        siteId: row.siteId,
-        pageId: row.pageId,
-        title: row.title,
-        plainText: row.plainText,
-        categories: row.categories
-      },
-      database
-    );
-  }
-  return current.length;
+export async function rebuildSearchIndex(siteId: string, database: RootDatabase = db) {
+  return database.transaction(async (tx) => {
+    const [site] = await tx
+      .select({ id: sites.id })
+      .from(sites)
+      .where(eq(sites.id, siteId))
+      .limit(1);
+    if (!site) {
+      return 0;
+    }
+    await lockSearchIndexRebuildForTransaction(siteId, tx);
+    await tx.delete(searchIndex).where(eq(searchIndex.siteId, siteId));
+    const current = await tx
+      .select({
+        pageId: pages.id,
+        siteId: pages.siteId,
+        title: pages.title,
+        plainText: pageRevisions.plainText,
+        categories: pageRevisions.categories
+      })
+      .from(pages)
+      .innerJoin(pageRevisions, eq(pages.currentRevisionId, pageRevisions.id))
+      .where(
+        and(
+          eq(pages.siteId, siteId),
+          eq(pages.status, "published"),
+          sql`${pages.deletedAt} is null`
+        )
+      );
+    for (const row of current) {
+      await upsertSearchIndex(
+        {
+          siteId: row.siteId,
+          pageId: row.pageId,
+          title: row.title,
+          plainText: row.plainText,
+          categories: row.categories
+        },
+        tx
+      );
+    }
+    return current.length;
+  });
 }

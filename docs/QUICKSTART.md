@@ -19,40 +19,56 @@ pnpm install
 
 ## 2. Configure Environment
 
-Create a local environment file from the repository template:
+Create an environment file from the repository template:
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env
 ```
 
-For local Docker Compose evaluation, no environment file is required. If `NEXTWIKI_SECRET` is omitted, the container generates an ephemeral runtime secret so setup and login flows can run immediately. Sessions are invalidated when that container is recreated, so set a persistent secret before production use or any long-lived installation:
+Docker Compose fails closed unless the database password, complete application database URL, and
+application secret are explicitly configured. Set a strong database password and generate separate
+persistent signing and one-time setup secrets:
 
 ```bash
+POSTGRES_PASSWORD=replace-with-a-strong-hex-password
+DATABASE_URL=postgres://nextwiki:replace-with-a-strong-hex-password@db:5432/nextwiki
 NEXTWIKI_SECRET=replace-with-a-long-random-secret
+NEXTWIKI_SETUP_TOKEN=replace-with-a-separate-one-time-token
 ```
 
-If you run `pnpm dev` directly on the host while PostgreSQL runs in Docker Compose, use a host-reachable database URL:
+`POSTGRES_PASSWORD` is the raw password passed to PostgreSQL. `DATABASE_URL` is a complete URL used
+by the application and migration runner; Compose does not build it from the password. Keep the two
+values consistent, use `db` as the host inside Compose, and percent-encode reserved characters in
+the URL username or password. For example, a raw password containing `@` must use `%40` in
+`DATABASE_URL`. Hex-generated passwords need no additional encoding.
+
+The default Compose file keeps PostgreSQL on its private service network. If you run `pnpm dev`
+directly on the host, opt in to the loopback-only development override and use the configured
+database password in a host-reachable URL:
 
 ```bash
-DATABASE_URL=postgres://nextwiki:nextwiki@localhost:5432/nextwiki
+docker compose -f compose.yaml -f compose.dev.yaml up -d db
+DATABASE_URL=postgres://nextwiki:your-password@localhost:5432/nextwiki pnpm db:migrate
 ```
 
-When the application itself runs inside Docker Compose, use the Compose service host from `.env.example`.
+The override binds only to `127.0.0.1`; do not modify it to expose PostgreSQL to a network. When
+the application itself runs inside Compose, it uses the private `db` service host.
 
-Use a generated secret:
+Generate each secret separately. Hex output is safe to use as both the raw PostgreSQL password and
+the password component of the Compose database URL:
 
 ```bash
-openssl rand -base64 32
+openssl rand -hex 32
 ```
 
 See [CONFIGURATION.md](./CONFIGURATION.md) for the full configuration reference.
 
 ## 3. Start PostgreSQL
 
-Start the database service:
+For host-based development, start the database service with the loopback-only override:
 
 ```bash
-docker compose up -d db
+docker compose -f compose.yaml -f compose.dev.yaml up -d db
 ```
 
 If the Compose file uses a different service name, inspect it first:
@@ -85,7 +101,10 @@ Start the Next.js development server:
 pnpm dev
 ```
 
-Open `http://localhost:3000` and complete the setup wizard on a fresh database.
+Open `http://localhost:3000` and complete the setup wizard on a fresh database. A production
+build requires the deployment `NEXTWIKI_SETUP_TOKEN`; enter it when prompted, then remove the
+one-time variable and restart the application after the first Owner is created. Local development
+can omit the token. The database setup lock prevents setup from being repeated.
 
 ## 6. Run Verification
 

@@ -44,6 +44,9 @@ export default async function VerifyEmailPage({ searchParams }: Props) {
           <AlertCircle size={16} aria-hidden="true" />
           {messages.verificationExpiredHint}
         </div>
+        <p className="auth-secondary-link">
+          <Link href="/resend-verification">{messages.resendVerificationEmail}</Link>
+        </p>
       </div>
     </section>
   );

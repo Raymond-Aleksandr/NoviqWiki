@@ -8,6 +8,16 @@ export const passwordSchema = z
   .regex(/[A-Z]/, "Password must include an uppercase letter.")
   .regex(/[0-9]/, "Password must include a number.");
 
+export const usernameSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(80)
+  .regex(/^[A-Za-z0-9_.-]+$/);
+
+export const emailSchema = z.string().trim().email().max(320);
+export const displayNameSchema = z.string().trim().min(1).max(160);
+
 export const loginSchema = z.object({
   identifier: z.string().trim().min(1).max(320),
   password: z.string().min(1).max(200)
@@ -26,32 +36,35 @@ export const emailVerificationSchema = z.object({
   token: z.string().trim().min(20).max(300)
 });
 
+export const emailVerificationRequestSchema = z
+  .object({
+    identifier: z.string().trim().min(1).max(320)
+  })
+  .strict();
+
 export const registerSchema = z.object({
-  username: z
-    .string()
-    .trim()
-    .min(2)
-    .max(80)
-    .regex(/^[A-Za-z0-9_.-]+$/),
-  email: z.string().trim().email().max(320),
-  displayName: z.string().trim().min(1).max(160).optional(),
+  username: usernameSchema,
+  email: emailSchema,
+  displayName: displayNameSchema.optional(),
   password: passwordSchema
 });
 
 export const setupSchema = z.object({
+  setupToken: z.string().trim().max(300).optional(),
   siteName: z.string().trim().min(1).max(160),
   tagline: z.string().trim().max(240).default("A modern self-hosted wiki"),
-  baseUrl: z.string().trim().url(),
+  baseUrl: z
+    .string()
+    .trim()
+    .url()
+    .refine((value) => ["http:", "https:"].includes(new URL(value).protocol), {
+      message: "Base URL must use HTTP or HTTPS."
+    }),
   defaultLocale: z.enum(["en", "zh-CN"]).default("en"),
   registrationMode: z.enum(["open", "email_verification", "invite", "closed"]).default("closed"),
   mediaDriver: z.enum(["local", "s3"]).default("local"),
-  ownerUsername: z
-    .string()
-    .trim()
-    .min(2)
-    .max(80)
-    .regex(/^[A-Za-z0-9_.-]+$/),
-  ownerEmail: z.string().trim().email().max(320),
-  ownerDisplayName: z.string().trim().min(1).max(160).optional(),
+  ownerUsername: usernameSchema,
+  ownerEmail: emailSchema,
+  ownerDisplayName: displayNameSchema.optional(),
   ownerPassword: passwordSchema
 });

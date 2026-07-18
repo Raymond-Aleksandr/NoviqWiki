@@ -19,6 +19,8 @@ async function main() {
     NEXTWIKI_MEDIA_ROOT: mediaRoot,
     NEXTWIKI_SECRET:
       process.env.NEXTWIKI_SECRET ?? "e2e-only-secret-change-before-production-000000",
+    NEXTWIKI_SETUP_TOKEN:
+      process.env.NEXTWIKI_SETUP_TOKEN ?? "e2e-only-setup-token-change-before-production-000000",
     HOSTNAME: process.env.HOSTNAME ?? "127.0.0.1",
     PORT: process.env.PORT ?? playwrightPort,
     PLAYWRIGHT_BASE_URL: playwrightBaseUrl,

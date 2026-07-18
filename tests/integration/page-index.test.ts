@@ -91,7 +91,7 @@ describe("public page index", () => {
       },
       test.db
     );
-    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.db);
 
     const all = await listPublishedPageIndex({ siteId: setup.site.id }, test.executor);
     expect(all.count).toBe(3);

@@ -8,8 +8,8 @@ import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { decodeRouteParam } from "@/lib/route-params";
 import { getCurrentSession } from "@/modules/auth/session";
-import { requirePermission } from "@/modules/authorization/permissions";
-import { listMedia } from "@/modules/media/service";
+import { hasPermission, requirePermission } from "@/modules/authorization/permissions";
+import { listMedia, rewriteLegacyMediaUrls } from "@/modules/media/service";
 import { getDraftForEditor, getRevisionById } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
 
@@ -32,7 +32,8 @@ export default async function EditPage({ params }: Props) {
   const resolved = await resolvePageBySlug({
     siteId: site.site.id,
     slug,
-    followContentRedirects: false
+    followContentRedirects: false,
+    includeUnpublished: true
   }).catch(() => null);
   if (!resolved || resolved.page.status === "deleted") {
     notFound();
@@ -40,13 +41,17 @@ export default async function EditPage({ params }: Props) {
   const revision = resolved.page.currentRevisionId
     ? await getRevisionById(resolved.page.currentRevisionId)
     : null;
+  const canReadMedia = await hasPermission(session.user.id, site.site.id, "media.read");
   const [draft, mediaItems, i18n] = await Promise.all([
     getDraftForEditor({ pageId: resolved.page.id, editorId: session.user.id }),
-    listMedia({ siteId: site.site.id, limit: 40 }),
+    canReadMedia ? listMedia({ siteId: site.site.id, limit: 40 }) : Promise.resolve([]),
     getRequestI18n(site.settings?.defaultLocale)
   ]);
   const { messages } = i18n;
-  const editorMarkdown = draft?.markdown ?? revision?.markdown ?? "";
+  const [editorMarkdown] = await rewriteLegacyMediaUrls({
+    siteId: site.site.id,
+    contents: [draft?.markdown ?? revision?.markdown ?? ""]
+  });
   const baseRevisionId = draft?.baseRevisionId ?? resolved.page.currentRevisionId ?? "";
   return (
     <section className="page-frame editor-page">

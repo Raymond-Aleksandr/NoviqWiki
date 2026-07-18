@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mediaAssets } from "@/db/schema";
 import { listRecentChangesPage } from "@/modules/activity/service";
 import { writeAuditLog } from "@/modules/audit/service";
+import { getStableMediaUrl } from "@/modules/media/storage";
 import { createPage, softDeletePage } from "@/modules/pages/service";
 import { completeSetup } from "@/modules/setup/service";
 import { createTestDatabase } from "../helpers/test-db";
@@ -114,7 +115,8 @@ describe("recent changes", () => {
         originalFilename: "recent-image.png",
         safeFilename: "recent-image.png",
         storageKey: `${setup.site.id}/recent-image.png`,
-        publicUrl: "/media/recent-image.png",
+        publicUrl:
+          "https://s3.example.test/wiki/recent-image.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=old",
         mimeType: "image/png",
         byteSize: 128,
         contentHash: "recent-image-hash"
@@ -144,11 +146,11 @@ describe("recent changes", () => {
       targetLabel: "Linked Recent Page"
     });
     expect(mediaUploaded).toMatchObject({
-      targetHref: "/media/recent-image.png",
+      targetHref: getStableMediaUrl(`${setup.site.id}/recent-image.png`),
       targetLabel: "recent-image.png"
     });
 
-    await softDeletePage({ pageId: created.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: created.page.id, ...actor }, test.db);
     page = await listRecentChangesPage(
       { siteId: setup.site.id, publicOnly: true, limit: 10, offset: 0 },
       test.executor

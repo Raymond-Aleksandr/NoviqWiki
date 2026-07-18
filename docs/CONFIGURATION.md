@@ -16,20 +16,36 @@ Use deployment-managed environment variables for production. Do not commit files
 
 ## Required Variables
 
-| Variable            | Example                                       | Description                                                                             |
-| ------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------- |
-| `DATABASE_URL`      | `postgres://nextwiki:secret@db:5432/nextwiki` | PostgreSQL connection string used by Drizzle and server-side services.                  |
-| `NEXTWIKI_BASE_URL` | `https://wiki.example.com`                    | Canonical public URL used for redirects, links, and email.                              |
-| `NEXTWIKI_SECRET`   | generated 32 byte secret                      | Secret used for session and security-sensitive signing. Must be stable across restarts. |
-| `NODE_ENV`          | `production`                                  | Runtime mode. Use `development`, `test`, or `production`.                               |
+| Variable               | Example                                       | Description                                                                                                   |
+| ---------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`         | `postgres://nextwiki:secret@db:5432/nextwiki` | Complete PostgreSQL connection URL used by Drizzle and server-side services. Credentials must be URL-encoded. |
+| `NEXTWIKI_BASE_URL`    | `https://wiki.example.com`                    | Production-authoritative canonical HTTP(S) origin used for redirects, citations, and email links.             |
+| `NEXTWIKI_SECRET`      | generated 32 byte secret                      | Secret used for session and security-sensitive signing. Must be stable across restarts.                       |
+| `NEXTWIKI_SETUP_TOKEN` | generated 32 byte token                       | One-time deployment token required to claim an uninitialized production instance. Remove it after setup.      |
+| `NODE_ENV`             | `production`                                  | Runtime mode. Use `development`, `test`, or `production`.                                                     |
 
 Generate `NEXTWIKI_SECRET` with:
 
 ```bash
-openssl rand -base64 32
+openssl rand -hex 32
 ```
 
+Generate a separate `NEXTWIKI_SETUP_TOKEN` the same way. Enter it in the initial setup wizard, then remove the variable after setup completes.
+
 Use the Compose service host `db` when the application runs inside Docker Compose. Use `localhost` when running `pnpm dev` directly on the host against a Compose-managed PostgreSQL port.
+
+The supplied Compose file requires `DATABASE_URL` directly and does not construct it from
+`POSTGRES_PASSWORD`. Keep the raw database password and the URL password component consistent. If
+credentials contain reserved URL characters, percent-encode them only in `DATABASE_URL` (for
+example, `@` becomes `%40`).
+
+## Reverse Proxy Trust
+
+| Variable                      | Default   | Description                                                                                                            |
+| ----------------------------- | --------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `NEXTWIKI_TRUSTED_PROXY_HOPS` | _(unset)_ | Number of trusted reverse-proxy hops in `X-Forwarded-For` (1-16). Leave unset unless every request crosses those hops. |
+
+NoviqWiki ignores `X-Forwarded-For` for source-based authentication rate limits by default because clients can forge that header. Set `NEXTWIKI_TRUSTED_PROXY_HOPS` only when the application port is not directly reachable by untrusted clients and each trusted proxy overwrites or appends the address of its immediate peer. For one trusted proxy, use `1`; for an edge proxy followed by an internal proxy, use `2`. The selected entry must be a valid IPv4 or IPv6 address, otherwise the source bucket is disabled for that request. Account and global authentication limits remain active regardless of this setting.
 
 ## Development-Only Variables
 
@@ -42,26 +58,38 @@ Use the Compose service host `db` when the application runs inside Docker Compos
 
 These settings are only for local development. Production deployments should expose NoviqWiki through the configured `NEXTWIKI_BASE_URL` and reverse proxy instead.
 
+In production, `NEXTWIKI_BASE_URL` is authoritative even if the database still contains an older
+Base URL entered during setup. This prevents a stale admin setting from changing security origin
+checks or email/citation links after a deployment hostname change. The stored site Base URL remains
+a development/test fallback; keep it aligned for non-production review environments.
+
 ## Media Storage
 
 | Variable                        | Example                              | Description                                                                                 |
 | ------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------- |
 | `NEXTWIKI_MEDIA_DRIVER`         | `local`                              | Media backend. Use `local` for filesystem storage or `s3` for S3-compatible object storage. |
 | `NEXTWIKI_MEDIA_ROOT`           | `/app/media`                         | Filesystem path for local media storage inside the app container.                           |
-| `NEXTWIKI_STORAGE_PUBLIC_PATH`  | `/media`                             | Public URL path used when serving local media.                                              |
+| `NEXTWIKI_STORAGE_PUBLIC_PATH`  | `/media`                             | Fixed same-origin route used for authorized local and S3 media delivery.                    |
 | `NEXTWIKI_S3_ENDPOINT`          | `https://s3.us-east-1.amazonaws.com` | S3 or compatible endpoint.                                                                  |
 | `NEXTWIKI_S3_REGION`            | `us-east-1`                          | Bucket region.                                                                              |
 | `NEXTWIKI_S3_BUCKET`            | `noviqwiki-assets`                   | Bucket for uploaded media.                                                                  |
 | `NEXTWIKI_S3_ACCESS_KEY_ID`     | access key                           | Storage access key.                                                                         |
 | `NEXTWIKI_S3_SECRET_ACCESS_KEY` | secret                               | Storage secret key.                                                                         |
 
-Use private buckets for production and scope credentials to the media bucket. Include the media backend in backup and restore drills.
+Use private buckets for production and scope credentials to the media bucket. New S3 signatures are
+not persisted or exposed: clients use `/media/{key}`, and the application authorizes and streams
+each object. During upgrades, any legacy persisted signed URLs are mapped to the same authorized
+route at read time without changing immutable revision records. Readiness needs object read, write,
+and delete access for its `.noviqwiki-readiness/` probe prefix; versioned buckets also need
+permission to delete the exact probe version. Include the media backend in backup and restore drills.
 
-Upload size and safe MIME type allowlists are site settings managed from `/admin/settings`. The default allowlist is `image/png`, `image/jpeg`, `image/gif`, `image/webp`, and `application/pdf`; SVG remains rejected by default.
+Upload size and safe MIME type allowlists are site settings managed from `/admin/settings`. The
+application hard cap is 10 MiB. The default allowlist is `image/png`, `image/jpeg`, `image/gif`,
+`image/webp`, and `application/pdf`; SVG remains rejected by default.
 
 ## Email
 
-Email is optional. Password reset and email verification tokens are created by the application; delivery requires SMTP configuration.
+Email is optional. Password reset and email verification links are created by the application; delivery requires SMTP configuration. Setup and site settings reject the `email_verification` registration mode unless both SMTP variables below are configured, and registration also rejects an unsafe legacy configuration before creating a pending account. Pending users can request another verification message from `/resend-verification`. The public response is deliberately identical for matching and non-matching accounts. A failed resend never supersedes an older usable verification link; after restoring SMTP, retry the resend form.
 
 | Variable              | Example                                 | Description                   |
 | --------------------- | --------------------------------------- | ----------------------------- |
@@ -87,8 +115,11 @@ NODE_ENV=production
 DATABASE_URL=postgres://nextwiki:secret@postgres.example.com:5432/nextwiki
 NEXTWIKI_BASE_URL=https://wiki.example.com
 NEXTWIKI_SECRET=replace-with-generated-secret
+NEXTWIKI_SETUP_TOKEN=replace-with-separate-one-time-token
 NEXTWIKI_MEDIA_DRIVER=s3
 ```
+
+Omit `NEXTWIKI_TRUSTED_PROXY_HOPS` when the application is exposed directly or the proxy chain is not fixed and trusted.
 
 If local media storage is used in production, `NEXTWIKI_MEDIA_ROOT` must point at persistent storage, not an ephemeral container filesystem.
 

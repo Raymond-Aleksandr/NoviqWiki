@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_call:
   pull_request:
   push:
     branches:
@@ -19,6 +20,7 @@ env:
   NEXT_TELEMETRY_DISABLED: "1"
   NODE_VERSION: "22"
   DATABASE_URL: postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki_test
+  NEXTWIKI_TEST_POSTGRES_URL: postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki_test
 
 jobs:
   quality:
@@ -242,6 +244,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: quality
+    env:
+      POSTGRES_PASSWORD: 9f2c740b8447413eac9fb540aab923fc65037b428644d93a3af850791af0da12
+      DATABASE_URL: postgres://nextwiki:9f2c740b8447413eac9fb540aab923fc65037b428644d93a3af850791af0da12@db:5432/nextwiki
+      NEXTWIKI_BASE_URL: http://localhost:3000
+      NEXTWIKI_SECRET: 617e005e98f68c04e3dcf7b29e4cdd0438bcfeae91b24c6afc2d4aa5ca18f59d
     steps:
       - name: Check out repository
         uses: actions/checkout@v7

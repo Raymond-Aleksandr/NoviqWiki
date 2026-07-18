@@ -6,6 +6,7 @@ import type { ActionState } from "@/app/actions";
 import type { Messages } from "@/i18n";
 
 type SetupValues = {
+  setupToken: string;
   siteName: string;
   tagline: string;
   baseUrl: string;
@@ -23,6 +24,7 @@ type Props = {
   defaultBaseUrl: string;
   defaultMediaDriver: "local" | "s3";
   initialLocale: "en" | "zh-CN";
+  setupTokenRequired: boolean;
   messages: Messages;
 };
 
@@ -33,6 +35,7 @@ export function SetupWizard({
   defaultBaseUrl,
   defaultMediaDriver,
   initialLocale,
+  setupTokenRequired,
   messages
 }: Props) {
   const [activeStep, setActiveStep] = useState(0);
@@ -75,6 +78,7 @@ export function SetupWizard({
     [messages]
   );
   const [values, setValues] = useState<SetupValues>({
+    setupToken: "",
     siteName: "NoviqWiki",
     tagline: messages.modernSelfHostedWiki,
     baseUrl: defaultBaseUrl,
@@ -95,7 +99,7 @@ export function SetupWizard({
   }
 
   function goNext() {
-    const error = validateStep(activeStep, values, messages);
+    const error = validateStep(activeStep, values, messages, setupTokenRequired);
     if (error) {
       setLocalError(error);
       return;
@@ -259,25 +263,16 @@ export function SetupWizard({
           {activeStep === 2 ? (
             <div className="setup-choice-grid">
               <label className="setup-choice radio-row">
-                <input
-                  type="radio"
-                  checked={values.mediaDriver === "local"}
-                  onChange={() => update("mediaDriver", "local")}
-                />
+                <input type="radio" checked readOnly disabled />
                 <span>
-                  <strong>{messages.localFilesystem}</strong>
-                  <small>{messages.localFilesystemDescription}</small>
-                </span>
-              </label>
-              <label className="setup-choice radio-row">
-                <input
-                  type="radio"
-                  checked={values.mediaDriver === "s3"}
-                  onChange={() => update("mediaDriver", "s3")}
-                />
-                <span>
-                  <strong>{messages.s3Storage}</strong>
-                  <small>{messages.s3StorageDescription}</small>
+                  <strong>
+                    {values.mediaDriver === "local" ? messages.localFilesystem : messages.s3Storage}
+                  </strong>
+                  <small>
+                    {values.mediaDriver === "local"
+                      ? messages.localFilesystemDescription
+                      : messages.s3StorageDescription}
+                  </small>
                 </span>
               </label>
             </div>
@@ -285,6 +280,22 @@ export function SetupWizard({
 
           {activeStep === 3 ? (
             <div className="setup-fields">
+              {setupTokenRequired ? (
+                <label>
+                  {messages.setupToken}
+                  <input
+                    className="field"
+                    type="password"
+                    value={values.setupToken}
+                    onChange={(event) => update("setupToken", event.target.value)}
+                    autoComplete="off"
+                    aria-describedby="setup-token-description"
+                  />
+                  <small id="setup-token-description" className="muted">
+                    {messages.setupTokenDescription}
+                  </small>
+                </label>
+              ) : null}
               <label>
                 {messages.username}
                 <input
@@ -405,7 +416,12 @@ export function SetupWizard({
   );
 }
 
-function validateStep(step: number, values: SetupValues, messages: Messages) {
+function validateStep(
+  step: number,
+  values: SetupValues,
+  messages: Messages,
+  setupTokenRequired: boolean
+) {
   if (step === 0) {
     if (!values.siteName.trim()) return messages.enterSiteName;
     try {
@@ -415,6 +431,7 @@ function validateStep(step: number, values: SetupValues, messages: Messages) {
     }
   }
   if (step === 3) {
+    if (setupTokenRequired && !values.setupToken.trim()) return messages.enterSetupToken;
     if (!values.ownerUsername.trim()) return messages.enterOwnerUsername;
     if (!/^[A-Za-z0-9_.-]+$/.test(values.ownerUsername)) {
       return messages.usernameCharacters;

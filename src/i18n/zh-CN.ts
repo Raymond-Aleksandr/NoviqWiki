@@ -199,6 +199,8 @@ export const zhCN = {
   email: "邮箱",
   displayName: "显示名称",
   password: "密码",
+  setupToken: "部署初始化令牌",
+  setupTokenDescription: "请输入此部署通过 NEXTWIKI_SETUP_TOKEN 配置的一次性令牌。",
   registrationClosed: "关闭",
   registrationClosedDescription: "只有管理员可以创建账号。",
   registrationInvite: "邀请或管理员创建",
@@ -206,6 +208,7 @@ export const zhCN = {
   registrationOpen: "开放",
   registrationOpenDescription: "任何人都可以注册并获得默认权限。",
   registrationEmailVerification: "需要邮箱验证",
+  emailDeliveryRequired: "启用邮箱验证前，请先配置 NEXTWIKI_SMTP_URL 和 NEXTWIKI_EMAIL_FROM。",
   registrationEmailVerificationDescription: "配置 SMTP 后，新账号必须验证邮箱。",
   localFilesystem: "本地持久文件系统",
   localFilesystemDescription: "Docker Compose 的默认推荐方式，使用挂载的媒体卷。",
@@ -221,6 +224,7 @@ export const zhCN = {
   enterOwnerUsername: "请输入所有者用户名。",
   usernameCharacters: "用户名可以使用字母、数字、下划线、点和连字符。",
   enterOwnerEmail: "请输入有效的所有者邮箱。",
+  enterSetupToken: "请输入部署初始化令牌。",
   passwordLength: "密码至少需要 12 个字符。",
   passwordComplexity: "密码必须包含小写字母、大写字母和数字。",
   modernSelfHostedWiki: "现代自托管 wiki",
@@ -359,7 +363,11 @@ export const zhCN = {
   verifyEmailDescription: "确认与此 NoviqWiki 账号关联的邮箱地址。",
   verifyEmailAddress: "验证邮箱地址",
   verificationTokenMissing: "缺少验证令牌。",
-  verificationExpiredHint: "如果此链接已过期，请向管理员请求新的验证邮件。",
+  verificationExpiredHint: "如果此链接已过期，请请求新的验证邮件。",
+  resendVerificationEmail: "重新发送验证邮件",
+  resendVerificationDescription:
+    "输入用户名或邮箱地址。如果待验证账号匹配且已配置 SMTP，NoviqWiki 会发送新的验证链接。",
+  requestVerificationLink: "请求验证链接",
   createPageDescription: "可以先保存草稿，也可以在权限允许时立即发布。",
   unsavedChanges: "未保存更改",
   pageTitle: "页面标题",
@@ -544,6 +552,7 @@ export const zhCN = {
   previousPage: "上一页",
   nextPage: "下一页",
   passwordResetSentGeneric: "如果账号匹配且已配置邮箱，重置链接已发送。",
+  emailVerificationSentGeneric: "如果待验证账号匹配且已配置邮箱，验证链接已发送。",
   pageNotCreated: "页面未创建。",
   draftSaved: "草稿已保存。",
   publishedRevisionPrefix: "已发布修订",
@@ -609,5 +618,5 @@ export const zhCN = {
   allowedMediaTypeInvalid: "允许的媒体类型必须是安全且有效的 MIME 类型。",
   unsafeFilename: "文件名不安全。",
   mediaNotFound: "未找到媒体文件。",
-  mediaStillReferenced: "此媒体仍被已发布页面引用。"
+  mediaStillReferenced: "此媒体仍被已存储的页面修订或草稿引用。"
 } satisfies typeof en;

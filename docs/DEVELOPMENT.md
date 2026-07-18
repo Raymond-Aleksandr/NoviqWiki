@@ -40,7 +40,7 @@ pnpm install
 Configure `.env.local`:
 
 ```bash
-DATABASE_URL=postgres://nextwiki:nextwiki@db:5432/nextwiki
+DATABASE_URL=postgres://nextwiki:your-password@localhost:5432/nextwiki
 NEXTWIKI_BASE_URL=http://localhost:3000
 NEXTWIKI_SECRET=replace-with-a-long-random-secret
 NEXTWIKI_MEDIA_DRIVER=local
@@ -48,10 +48,10 @@ NEXTWIKI_MEDIA_ROOT=/app/media
 NEXTWIKI_STORAGE_PUBLIC_PATH=/media
 ```
 
-Start dependencies:
+Start PostgreSQL with the opt-in loopback-only development override:
 
 ```bash
-docker compose up -d db
+docker compose -f compose.yaml -f compose.dev.yaml up -d db
 ```
 
 Apply migrations:

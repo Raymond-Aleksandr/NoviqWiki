@@ -38,10 +38,17 @@ NODE_ENV=production
 DATABASE_URL=postgres://nextwiki:secret@postgres.example.com:5432/nextwiki
 NEXTWIKI_BASE_URL=https://wiki.example.com
 NEXTWIKI_SECRET=replace-with-generated-secret
+NEXTWIKI_SETUP_TOKEN=replace-with-separate-one-time-token
 NEXTWIKI_MEDIA_DRIVER=s3
 ```
 
-Configure SMTP and S3-compatible storage when those features are enabled. See [CONFIGURATION.md](./CONFIGURATION.md).
+Configure SMTP and S3-compatible storage when those features are enabled. Enter `NEXTWIKI_SETUP_TOKEN` during the initial Owner setup, then remove it from the deployment environment. See [CONFIGURATION.md](./CONFIGURATION.md).
+
+For the supplied Compose file, also set a unique raw `POSTGRES_PASSWORD` and set the required
+`DATABASE_URL` to a complete URL whose host is `db`. Compose does not interpolate the password into
+the URL. Percent-encode any reserved characters in the URL credentials while keeping
+`POSTGRES_PASSWORD` raw. PostgreSQL is reachable only on the private Compose network; do not
+publish its port in an internet-facing deployment.
 
 ## Database Migrations
 
@@ -51,11 +58,23 @@ Migrations are part of deployment. Apply them once per release before or during 
 pnpm db:migrate
 ```
 
+The host command is for environments where `DATABASE_URL` is reachable from the host. The supplied
+Compose database is private; run the release migration through the app image instead:
+
+```bash
+docker compose up -d db
+docker compose run --rm --no-deps app node scripts/migrate.mjs
+```
+
+The supplied image also runs this migration runner before starting the server. It uses a PostgreSQL
+advisory lock, so concurrent container starts serialize migration work and already-applied releases
+are a no-op.
+
 For production:
 
 - Back up the database first.
 - Review generated SQL before applying it.
-- Run migrations from a single release job, not every app instance.
+- Prefer a single release job where the deployment platform supports one.
 - Keep the previous container image available until post-deploy checks pass.
 
 ## Docker Compose Deployment
@@ -78,6 +97,9 @@ Start or update services:
 docker compose up -d
 ```
 
+Keep `NEXTWIKI_SECRET` stable across restarts and replicas. On a fresh installation, remove the
+one-time `NEXTWIKI_SETUP_TOKEN` after the first Owner has completed setup.
+
 Inspect runtime status:
 
 ```bash
@@ -96,11 +118,19 @@ Terminate TLS before traffic reaches the Next.js app. Forward these headers from
 - `X-Forwarded-Proto`
 - `X-Forwarded-For`
 
-Set `NEXTWIKI_BASE_URL` to the externally visible HTTPS URL. Production cookies must be secure.
+Set `NEXTWIKI_BASE_URL` to the externally visible HTTPS URL. It is the production-authoritative
+origin for request validation, redirects, email links, and citations even if the database contains
+an older Base URL from setup. Production cookies must be secure.
+
+The supplied Compose port binds to `127.0.0.1:3000` so a host reverse proxy can reach it without
+publishing the application directly. If the proxy is another Compose service, remove the host port
+mapping and route to `app:3000` over the private service network.
+
+`X-Forwarded-For` is ignored for source-based authentication rate limits unless `NEXTWIKI_TRUSTED_PROXY_HOPS` is configured. Set it to the fixed number of trusted proxies between the client and NoviqWiki (for example, `1` for one proxy). Only enable it when firewall or network policy prevents direct access to the application port and every trusted proxy overwrites or appends its immediate peer address; otherwise a client can forge its rate-limit identity. Invalid or incomplete IP chains do not enable a source bucket for that request, while account and global limits remain active.
 
 ## Health Checks
 
-At minimum, verify the application can serve `GET /` and connect to the database after deployment. Use the v0.1.0 health and readiness endpoints for load balancer checks when enabled:
+At minimum, verify the application can serve `GET /` and connect to the database after deployment. Use liveness for process monitoring and readiness for load-balancer routing. Readiness returns HTTP 503 when PostgreSQL or the configured media backend cannot be used:
 
 ```text
 GET /api/health
@@ -120,9 +150,15 @@ Application static assets are built by Next.js. User media must be stored outsid
 For S3-compatible storage:
 
 - Use a private bucket.
-- Scope credentials to the bucket.
+- Grant object read, write, and delete permissions for media keys and the
+  `.noviqwiki-readiness/` probe prefix.
+- When bucket versioning is enabled, allow deletion of the exact probe version so readiness checks
+  do not accumulate object versions or delete markers.
 - Enable bucket versioning where available.
 - Include the bucket in backup and restore drills.
+
+Successful S3 capability probes are cached for five minutes and failures for 30 seconds. Concurrent
+readiness requests share one in-flight probe.
 
 ## Observability
 

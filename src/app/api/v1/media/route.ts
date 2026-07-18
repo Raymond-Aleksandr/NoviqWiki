@@ -1,20 +1,24 @@
 import { apiError, created, ok } from "@/modules/api/responses";
 import { requireApiContext } from "@/modules/api/auth";
-import { listMedia, uploadMedia } from "@/modules/media/service";
+import { getMediaUploadMaxBytes, listMedia, uploadMedia } from "@/modules/media/service";
+import { parseBoundedMediaFormData } from "@/modules/media/request";
 import { AppError, ForbiddenError } from "@/lib/errors";
+import { paginationSchema } from "@/lib/pagination";
 
 export async function GET(request: Request) {
   try {
     const { site } = await requireApiContext("media.read");
     const url = new URL(request.url);
+    const pagination = paginationSchema.parse({
+      page: url.searchParams.get("page") ?? "1",
+      pageSize: url.searchParams.get("pageSize") ?? "50"
+    });
     return ok({
       media: await listMedia({
         siteId: site.site.id,
         query: url.searchParams.get("q") ?? undefined,
-        limit: Number(url.searchParams.get("pageSize") ?? 50),
-        offset:
-          Math.max(0, Number(url.searchParams.get("page") ?? 1) - 1) *
-          Number(url.searchParams.get("pageSize") ?? 50)
+        limit: pagination.pageSize,
+        offset: (pagination.page - 1) * pagination.pageSize
       })
     });
   } catch (error) {
@@ -24,11 +28,12 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { site, session } = await requireApiContext("media.upload");
+    const { site, session } = await requireApiContext("media.upload", request);
     if (!session) {
       throw new ForbiddenError("Authentication required.");
     }
-    const formData = await request.formData();
+    const maxFileBytes = await getMediaUploadMaxBytes(site.site.id);
+    const formData = await parseBoundedMediaFormData(request, maxFileBytes);
     const file = formData.get("file");
     if (!(file instanceof File)) {
       throw new AppError("File is required.", "missing_file", 422);

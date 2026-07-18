@@ -20,10 +20,16 @@ The project is not a MediaWiki fork, wrapper, migration utility, compatibility l
 ## Quick Start
 
 ```bash
+cp .env.example .env
+# Set POSTGRES_PASSWORD and generate separate values for
+# NEXTWIKI_SECRET and NEXTWIKI_SETUP_TOKEN before starting.
 docker compose up --build -d
 ```
 
-Open <http://localhost:3000/setup> and complete the setup wizard. Set a persistent `NEXTWIKI_SECRET` before using a production instance.
+Open <http://localhost:3000/setup>, enter `NEXTWIKI_SETUP_TOKEN`, and complete the setup wizard. Remove the one-time setup token from the environment after the first Owner is created. Production secrets are required and are never generated implicitly.
+
+The default Compose file keeps PostgreSQL on its private service network. Host-based development
+can opt in to the loopback-only port mapping in `compose.dev.yaml`.
 
 ## Development
 

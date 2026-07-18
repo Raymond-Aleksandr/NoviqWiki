@@ -21,4 +21,14 @@ describe("Markdown rendering", () => {
     expect(rendered.html).toContain("katex");
     expect(rendered.html).toContain("footnote");
   });
+
+  it("keeps wiki examples in code out of relationship metadata", async () => {
+    const rendered = await renderMarkdown(
+      "`[[Inline Example]]`\n\n```md\n[[Category:Example]]\n[[Fenced Example]]\n```\n\n[[Real Page]]"
+    );
+    expect(rendered.categories).toEqual([]);
+    expect(rendered.links.map((link) => link.target)).toEqual(["Real Page"]);
+    expect(rendered.html).toContain("[[Category:Example]]");
+    expect(rendered.html).toContain("[[Fenced Example]]");
+  });
 });

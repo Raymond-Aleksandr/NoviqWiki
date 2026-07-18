@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { and, eq } from "drizzle-orm";
-import { roles, sites } from "@/db/schema";
+import { pages, roles, sites } from "@/db/schema";
 import {
   assignRoleToGroup,
   assignUserToGroup,
-  createGroup
+  createGroup,
+  createRole,
+  ensureDefaultAuthorization
 } from "@/modules/authorization/permissions";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { completeSetup } from "@/modules/setup/service";
@@ -61,6 +63,8 @@ describe("page lifecycle integration", () => {
       .insert(sites)
       .values({ name: "Other Wiki", slug: "other-wiki", setupComplete: true })
       .returning();
+    const otherAuthorization = await ensureDefaultAuthorization(otherSite.id, test.executor);
+    await assignUserToGroup(setup.owner.id, otherAuthorization.ownerGroupId, test.executor);
     const otherSharedSlug = await createPage(
       {
         siteId: otherSite.id,
@@ -93,6 +97,92 @@ describe("page lifecycle integration", () => {
     );
     expect(resolvedSharedSlug.page.id).toBe(currentSharedSlug.page.id);
     expect(resolvedSharedSlug.page.id).not.toBe(otherSharedSlug.page.id);
+
+    const customAddress = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Canonical Address",
+        slug: "custom-route",
+        markdown: "# Canonical Address",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    const resolvedCanonicalAddress = await resolvePageBySlug(
+      { siteId: setup.site.id, slug: "canonical-address" },
+      test.executor
+    );
+    expect(resolvedCanonicalAddress.page.id).toBe(customAddress.page.id);
+    const customAddressSource = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Custom Address Source",
+        markdown: "See [[Canonical Address]].",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    const customAddressLinks = await listPageOutboundLinks(
+      { siteId: setup.site.id, pageId: customAddressSource.page.id },
+      test.executor
+    );
+    expect(customAddressLinks).toContainEqual(
+      expect.objectContaining({
+        targetPageId: customAddress.page.id,
+        targetSlug: "custom-route",
+        exists: true
+      })
+    );
+    await renamePage(
+      {
+        pageId: customAddress.page.id,
+        newTitle: "Renamed Canonical Address",
+        newSlug: "custom-route",
+        createAlias: false,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    await expect(
+      resolvePageBySlug({ siteId: setup.site.id, slug: "canonical-address" }, test.executor)
+    ).rejects.toThrow("Page not found.");
+    const renamedCanonicalAddress = await resolvePageBySlug(
+      { siteId: setup.site.id, slug: "renamed-canonical-address" },
+      test.executor
+    );
+    expect(renamedCanonicalAddress.page.id).toBe(customAddress.page.id);
+    const removedAddressLinks = await listPageOutboundLinks(
+      { siteId: setup.site.id, pageId: customAddressSource.page.id },
+      test.executor
+    );
+    expect(removedAddressLinks).toContainEqual(
+      expect.objectContaining({
+        targetTitle: "Canonical Address",
+        targetPageId: null,
+        exists: false
+      })
+    );
+    await renamePage(
+      {
+        pageId: customAddress.page.id,
+        newTitle: "Final Canonical Address",
+        newSlug: "custom-route",
+        createAlias: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    const retainedCanonicalAddress = await resolvePageBySlug(
+      { siteId: setup.site.id, slug: "renamed-canonical-address" },
+      test.executor
+    );
+    expect(retainedCanonicalAddress.page.id).toBe(customAddress.page.id);
 
     const first = await createPage(
       {
@@ -194,6 +284,63 @@ describe("page lifecycle integration", () => {
       )
     ).rejects.toThrow("Redirect loop detected.");
 
+    const restoreTarget = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Restore Loop Target",
+        markdown: "# Restore Loop Target",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    const restoreTargetRevision = "revision" in restoreTarget ? restoreTarget.revision : undefined;
+    const restoreSource = await createPage(
+      {
+        siteId: setup.site.id,
+        title: "Restore Loop Source",
+        markdown: "#REDIRECT [[Restore Loop Target]]",
+        publish: true,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    await archivePage(
+      {
+        pageId: restoreSource.page.id,
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    await publishPage(
+      {
+        pageId: restoreTarget.page.id,
+        baseRevisionId: restoreTargetRevision?.id,
+        markdown: "#REDIRECT [[Restore Loop Source]]",
+        actorId: setup.owner.id,
+        actorDisplayName: setup.owner.displayName
+      },
+      test.db
+    );
+    await expect(
+      restorePage(
+        {
+          pageId: restoreSource.page.id,
+          actorId: setup.owner.id,
+          actorDisplayName: setup.owner.displayName
+        },
+        test.db
+      )
+    ).rejects.toThrow("Redirect loop detected.");
+    const [stillArchived] = await test.executor
+      .select({ status: pages.status })
+      .from(pages)
+      .where(eq(pages.id, restoreSource.page.id));
+    expect(stillArchived?.status).toBe("archived");
+
     const draftOnly = await createPage(
       {
         siteId: setup.site.id,
@@ -207,6 +354,18 @@ describe("page lifecycle integration", () => {
       test.db
     );
     expect(draftOnly.page.status).toBe("draft");
+    await expect(
+      resolvePageBySlug({ siteId: setup.site.id, slug: draftOnly.page.slug }, test.executor)
+    ).rejects.toThrow("Page not found.");
+    const draftForManagement = await resolvePageBySlug(
+      {
+        siteId: setup.site.id,
+        slug: draftOnly.page.slug,
+        includeUnpublished: true
+      },
+      test.executor
+    );
+    expect(draftForManagement.page.id).toBe(draftOnly.page.id);
     const createdChanges = await listRecentChanges(
       {
         siteId: setup.site.id,
@@ -531,6 +690,20 @@ describe("page lifecycle integration", () => {
     expect(archivedSearch.rows).not.toContainEqual(expect.objectContaining({ pageId: page.id }));
     const archivedRevisions = await listRevisions(page.id, test.executor);
     expect(archivedRevisions).toHaveLength(3);
+    const archivedRevision = await getRevisionForRead(firstRevision.id, test.executor);
+    expect(archivedRevision.page.status).toBe("archived");
+    expect(await listRevisionsForRead(page.id, test.executor)).toHaveLength(3);
+    const archivedDiff = await compareRevisionsForRead(
+      { fromRevisionId: firstRevision.id, toRevisionId: rollback.id },
+      test.db
+    );
+    expect(archivedDiff.page.status).toBe("archived");
+    const archivedByAddress = await resolvePageBySlug(
+      { siteId: setup.site.id, slug: page.slug },
+      test.executor
+    );
+    expect(archivedByAddress.page.id).toBe(page.id);
+    expect(archivedByAddress.page.status).toBe("archived");
 
     const restoredFromArchive = await restorePage(
       {
@@ -572,6 +745,9 @@ describe("page lifecycle integration", () => {
         { fromRevisionId: firstRevision.id, toRevisionId: rollback.id },
         test.db
       )
+    ).rejects.toThrow("Page not found.");
+    await expect(
+      resolvePageBySlug({ siteId: setup.site.id, slug: page.slug }, test.executor)
     ).rejects.toThrow("Page not found.");
 
     const restored = await restorePage(
@@ -645,7 +821,16 @@ describe("page lifecycle integration", () => {
       { siteId: setup.site.id, name: "Editors", description: "Can edit and publish." },
       test.executor
     );
+    const unprotectedModerationRole = await createRole(
+      {
+        siteId: setup.site.id,
+        name: "Unprotected moderation",
+        permissionKeys: ["page.rename", "page.rollback", "page.delete"]
+      },
+      test.db
+    );
     await assignRoleToGroup(editorGroup.id, editorRole.id, test.executor);
+    await assignRoleToGroup(editorGroup.id, unprotectedModerationRole.id, test.executor);
     await assignUserToGroup(editor.id, editorGroup.id, test.executor);
 
     const created = await createPage(
@@ -686,7 +871,7 @@ describe("page lifecycle integration", () => {
         actorId: setup.owner.id,
         actorDisplayName: setup.owner.displayName
       },
-      test.executor
+      test.db
     );
     expect(protectedPage.protectionLevel).toBe("protected");
 
@@ -698,7 +883,7 @@ describe("page lifecycle integration", () => {
           actorId: editor.id,
           actorDisplayName: editor.displayName
         },
-        test.executor
+        test.db
       )
     ).rejects.toThrow("You do not have permission to perform this action.");
 
@@ -762,7 +947,7 @@ describe("page lifecycle integration", () => {
           actorId: editor.id,
           actorDisplayName: editor.displayName
         },
-        test.executor
+        test.db
       )
     ).rejects.toThrow("This page is protected.");
 
@@ -797,7 +982,7 @@ describe("page lifecycle integration", () => {
         actorId: setup.owner.id,
         actorDisplayName: setup.owner.displayName
       },
-      test.executor
+      test.db
     );
     expect(unprotectedPage.protectionLevel).toBe("none");
 

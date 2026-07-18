@@ -16,6 +16,7 @@ const exactMessageKeys: Record<string, MessageKey> = {
   "This account is not active.": "accountNotActive",
   "Site setup is required before registration.": "setupRequired",
   "Public registration is closed.": "registrationClosedError",
+  "Email verification requires NEXTWIKI_SMTP_URL and NEXTWIKI_EMAIL_FROM.": "emailDeliveryRequired",
   "Too many attempts. Try again later.": "rateLimited",
   "Verification link is invalid or expired.": "invalidOrExpiredLink",
   "Reset link is invalid or expired.": "invalidOrExpiredLink",
@@ -50,7 +51,7 @@ const exactMessageKeys: Record<string, MessageKey> = {
   "Allowed media types must be valid safe MIME types.": "allowedMediaTypeInvalid",
   "Unsafe filename.": "unsafeFilename",
   "Media asset not found.": "mediaNotFound",
-  "Media is still referenced by published pages.": "mediaStillReferenced"
+  "Media is still referenced by stored page revisions or drafts.": "mediaStillReferenced"
 };
 
 const codeMessageKeys: Record<string, MessageKey> = {
@@ -59,6 +60,7 @@ const codeMessageKeys: Record<string, MessageKey> = {
   conflict: "resourceConflict",
   validation_error: "requestInvalid",
   setup_required: "setupRequired",
+  email_unavailable: "emailDeliveryRequired",
   invalid_credentials: "invalidCredentials",
   rate_limited: "rateLimited",
   invalid_token: "invalidOrExpiredLink",

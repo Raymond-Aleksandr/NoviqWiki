@@ -80,7 +80,7 @@ describe("orphaned pages", () => {
       },
       test.db
     );
-    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.db);
 
     let orphaned = await listOrphanedPages({ siteId: setup.site.id }, test.executor);
     expect(orphaned.map((page) => page.title)).toContain("Lonely Topic");

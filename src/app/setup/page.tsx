@@ -17,6 +17,7 @@ export default async function SetupPage() {
       defaultBaseUrl={env.NEXTWIKI_BASE_URL}
       defaultMediaDriver={env.NEXTWIKI_MEDIA_DRIVER}
       initialLocale={locale}
+      setupTokenRequired={env.NODE_ENV === "production" || Boolean(env.NEXTWIKI_SETUP_TOKEN)}
       messages={messages}
     />
   );

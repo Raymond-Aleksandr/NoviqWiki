@@ -6,6 +6,7 @@ import { getPrimarySiteWithSettings } from "@/db/site";
 import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
 import { listCategories } from "@/modules/categories/service";
+import { rewriteLegacyMediaUrls } from "@/modules/media/service";
 import { getRevisionById, listPages, listPagesBySlugs } from "@/modules/pages/service";
 import { listRecentChangesWithTargets } from "@/modules/activity/service";
 import { collectHomepageContributions } from "@/modules/plugins/registry";
@@ -31,7 +32,7 @@ export default async function HomePage() {
   ]);
   const { locale, messages } = await getRequestI18n(settings?.defaultLocale);
   const featuredPages = configuredPages.length > 0 ? configuredPages : recentPages.slice(0, 3);
-  const featuredCoverByPageId = await getFeaturedCoverByPageId(featuredPages);
+  const featuredCoverByPageId = await getFeaturedCoverByPageId(site.site.id, featuredPages);
   const featuredCategories = prioritizeCategories(
     categories,
     settings?.homepageFeaturedCategories ?? []
@@ -210,6 +211,7 @@ export default async function HomePage() {
 }
 
 async function getFeaturedCoverByPageId(
+  siteId: string,
   featuredPages: Array<{ id: string; title: string; currentRevisionId: string | null }>
 ) {
   const entries = await Promise.all(
@@ -218,11 +220,21 @@ async function getFeaturedCoverByPageId(
         return [page.id, null] as const;
       }
       const revision = await getRevisionById(page.currentRevisionId).catch(() => null);
-      return [page.id, revision ? extractFirstMarkdownImage(revision.markdown) : null] as const;
+      return [page.id, revision?.markdown ?? null] as const;
     })
   );
+  const markdownEntries = entries.filter(
+    (entry): entry is readonly [string, string] => entry[1] !== null
+  );
+  const rewrittenMarkdown = await rewriteLegacyMediaUrls({
+    siteId,
+    contents: markdownEntries.map(([, markdown]) => markdown)
+  });
   return new Map(
-    entries.filter((entry): entry is [string, { src: string; alt: string }] => Boolean(entry[1]))
+    markdownEntries.flatMap(([pageId], index) => {
+      const cover = extractFirstMarkdownImage(rewrittenMarkdown[index] ?? "");
+      return cover ? ([[pageId, cover]] as const) : [];
+    })
   );
 }
 

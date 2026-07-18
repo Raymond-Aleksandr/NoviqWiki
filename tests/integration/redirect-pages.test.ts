@@ -66,7 +66,7 @@ describe("redirect maintenance", () => {
       },
       test.db
     );
-    await softDeletePage({ pageId: deletedTarget.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: deletedTarget.page.id, ...actor }, test.db);
 
     await createRedirect("Intermediate Redirect", "Valid Target");
     await createRedirect("Valid Redirect", "Valid Target");

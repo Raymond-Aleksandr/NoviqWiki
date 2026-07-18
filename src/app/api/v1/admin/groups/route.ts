@@ -2,13 +2,15 @@ import { z } from "zod";
 import { ForbiddenError } from "@/lib/errors";
 import { apiError, created, ok } from "@/modules/api/responses";
 import { requireApiContext } from "@/modules/api/auth";
-import { createGroup, getGroupSummaries, updateGroup } from "@/modules/authorization/permissions";
+import { createGroupWithRoles, getGroupSummaries } from "@/modules/authorization/permissions";
 
-const createGroupSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  roleIds: z.array(z.string().uuid()).default([])
-});
+const createGroupSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    description: z.string().trim().max(2_000).optional(),
+    roleIds: z.array(z.string().uuid()).max(100).default([])
+  })
+  .strict();
 
 export async function GET() {
   try {
@@ -21,27 +23,19 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { site, session } = await requireApiContext("group.manage");
+    const { site, session } = await requireApiContext("group.manage", request);
     if (!session) {
       throw new ForbiddenError("Authentication required.");
     }
     const body = createGroupSchema.parse(await request.json());
-    const group = await createGroup({
+    const group = await createGroupWithRoles({
       siteId: site.site.id,
       name: body.name,
-      description: body.description
+      description: body.description,
+      roleIds: body.roleIds,
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
     });
-    if (body.roleIds.length > 0) {
-      await updateGroup({
-        siteId: site.site.id,
-        groupId: group.id,
-        name: group.name,
-        description: group.description,
-        roleIds: body.roleIds,
-        actorId: session.user.id,
-        actorDisplayName: session.user.displayName
-      });
-    }
     return created({ group });
   } catch (error) {
     return apiError(error);

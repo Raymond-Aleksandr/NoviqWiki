@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
 import { auditLogs, mediaAssets, pages, type AuditLog } from "@/db/schema";
+import { rewriteLegacyMediaUrlsInContent } from "@/modules/media/service";
 
 const publicRecentChangeActions = [
   "page.created",
@@ -142,6 +143,7 @@ export async function listRecentChangesWithTargets(
           .select({
             id: mediaAssets.id,
             safeFilename: mediaAssets.safeFilename,
+            storageKey: mediaAssets.storageKey,
             publicUrl: mediaAssets.publicUrl,
             deletedAt: mediaAssets.deletedAt
           })
@@ -152,7 +154,7 @@ export async function listRecentChangesWithTargets(
     mediaRows.map((asset) => [
       asset.id,
       {
-        href: asset.deletedAt ? null : asset.publicUrl,
+        href: asset.deletedAt ? null : rewriteLegacyMediaUrlsInContent(asset.publicUrl, [asset]),
         label: asset.safeFilename
       }
     ])

@@ -35,6 +35,7 @@ export function ArticleView({
   backlinkCount = 0,
   revisionCount = revision.revisionNumber,
   currentRevisionNumber = revision.revisionNumber,
+  renderedHtml,
   canWatch = false,
   watched = false,
   locale,
@@ -50,13 +51,18 @@ export function ArticleView({
   backlinkCount?: number;
   revisionCount?: number;
   currentRevisionNumber?: number;
+  renderedHtml?: string;
   canWatch?: boolean;
   watched?: boolean;
   locale: string;
   messages: Messages;
 }) {
   const isHistoricalRevision = revision.revisionNumber !== currentRevisionNumber;
-  const articleHtml = decorateWikiLinkHtml(revision.html, outboundLinks, canCreatePage);
+  const articleHtml = decorateWikiLinkHtml(
+    renderedHtml ?? revision.html,
+    outboundLinks,
+    canCreatePage
+  );
   const displayedDate = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short"

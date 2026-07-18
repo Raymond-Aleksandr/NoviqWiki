@@ -137,7 +137,7 @@ describe("watchlist", () => {
         actorId: setup.owner.id,
         actorDisplayName: setup.owner.displayName
       },
-      test.executor
+      test.db
     );
     await expect(
       countWatchedPages({ siteId: setup.site.id, userId: setup.owner.id }, test.executor)
