@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { Check, Plus, Save } from "lucide-react";
+import { requireAuthenticatedPermission } from "@/app/access";
 import { createRoleAction, updateRoleAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
@@ -9,6 +10,7 @@ import { getRoleSummaries, permissionKeys } from "@/modules/authorization/permis
 
 export default async function AdminRolesPage() {
   const site = await getPrimarySiteWithSettings();
+  await requireAuthenticatedPermission(site!.site.id, "role.read");
   const rows = await getRoleSummaries(site!.site.id);
   const matrixStyle = { "--role-count": rows.length } as CSSProperties;
   const { messages } = await getRequestI18n(site!.settings?.defaultLocale);

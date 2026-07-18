@@ -19,6 +19,7 @@ export default async function SetupPage() {
       defaultMediaDriver={env.NOVIQWIKI_MEDIA_DRIVER}
       defaultSiteName={setup.site?.name ?? "NoviqWiki"}
       initialLocale={locale}
+      setupTokenRequired={env.NODE_ENV === "production" || Boolean(env.NOVIQWIKI_SETUP_TOKEN)}
       messages={messages}
       ownerOnly={setup.mode === "owner"}
     />

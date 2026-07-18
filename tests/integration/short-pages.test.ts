@@ -95,7 +95,7 @@ describe("short pages", () => {
       },
       test.db
     );
-    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.db);
 
     const strictRows = await listShortPages(
       { siteId: setup.site.id, maxLength: 200 },

@@ -23,7 +23,7 @@ NoviqWiki is a TypeScript modular monolith built with the Next.js App Router, Po
 | `drizzle`           | Generated, reviewed SQL migrations and Drizzle migration metadata.                                                                           |
 | `scripts`           | Operational and verification entry points for migrations, seed, search reindex, backup, restore, OpenAPI, e2e, and UI audit.                 |
 | `tests/unit`        | Fast unit and small rendering/component-boundary tests.                                                                                      |
-| `tests/integration` | Service and migration-SQL tests using an in-process PGlite database.                                                                         |
+| `tests/integration` | Service and migration-SQL tests, mostly on in-process PGlite with selected PostgreSQL migration/concurrency cases.                           |
 | `tests/e2e`         | Browser workflows against a disposable real PostgreSQL database and a production build by default.                                           |
 | `docs`              | User, operator, architecture, API, development, and verification guidance.                                                                   |
 
@@ -48,10 +48,18 @@ Install dependencies:
 pnpm install
 ```
 
-Start the repository PostgreSQL service:
+Create the Compose environment file:
 
 ```bash
-docker compose up -d db
+cp .env.example .env
+```
+
+Set `POSTGRES_PASSWORD`, a matching complete `DATABASE_URL` that uses `db` as its host, `NOVIQWIKI_BASE_URL`, and an explicit `NOVIQWIKI_SECRET`. Compose validates these required values even when only the database service is started; it does not generate a fallback signing secret or mount a secrets volume.
+
+Start PostgreSQL with the opt-in loopback-only development override:
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up -d db
 ```
 
 Create a Next.js local environment file:
@@ -91,7 +99,7 @@ Start the application:
 pnpm dev
 ```
 
-Open `http://localhost:3000/setup` on a fresh database and complete the setup wizard. A database with no site uses the full flow. If an existing site has zero users, the same route enters an Owner-only bootstrap that preserves existing content, media, and settings while creating the first Owner. Keep that application isolated from untrusted networks until bootstrap completes.
+Open `http://localhost:3000/setup` on a fresh database and complete the setup wizard. A database with no site uses the full flow. If an existing site has no active Owner, the same route enters an Owner-only bootstrap that preserves existing content, media, settings, and non-Owner accounts while creating an active Owner. Keep that application isolated from untrusted networks until bootstrap completes.
 
 ## Full Compose Evaluation
 
@@ -101,9 +109,7 @@ To run both the application and PostgreSQL inside Compose instead of running `pn
 docker compose up --build -d
 ```
 
-When `NOVIQWIKI_SECRET` is unset or empty, the entrypoint reuses `/app/secrets/noviqwiki-secret` from the persistent `noviqwiki-secrets` volume or generates that fallback if it is missing. An explicitly supplied environment value is used directly, is never written to the fallback file or an environment file, and causes startup to proactively delete any old fallback file. If the explicit value is later removed, the next start generates a new fallback; the secret change invalidates existing HMAC-backed sessions, email-verification tokens, and password-reset tokens. This fallback is convenient for evaluation, but production should explicitly provide a stable managed secret. `docker compose down` preserves the volume; `docker compose down -v` deletes it together with the database, media, and backup volumes, and `pnpm backup` does not copy it.
-
-The committed Compose service correctly uses `db` and `/app/media` inside the container. It is an evaluation configuration with example credentials and published ports, not a production security baseline. See [DEPLOYMENT.md](./DEPLOYMENT.md).
+Before starting Compose, set `POSTGRES_PASSWORD`, a matching complete `DATABASE_URL`, `NOVIQWIKI_BASE_URL`, and a stable `NOVIQWIKI_SECRET` in an untracked `.env`; production secrets are never generated implicitly, and there is no fallback secret or secrets volume. The committed Compose service uses `db` and `/app/media` inside the container, keeps PostgreSQL private, and binds the application to loopback. See [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ## Seed Data
 
@@ -125,7 +131,7 @@ NOVIQWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
 
 Replace `192.168.1.20` with the host IP. Review devices must be on a permitted network, and the workstation firewall must allow the selected port. Do not expose a development server directly to the public internet.
 
-If links or recovery URLs need to use the LAN address, update both `NOVIQWIKI_BASE_URL` before setup and the stored base URL in `/admin/settings` after setup. The `NOVIQWIKI_BASE_URL` scheme, not `NODE_ENV`, controls the session and CSRF cookies' `Secure` attribute: `https:` enables it and `http:` disables it.
+If links or recovery URLs need to use the LAN address, update `NOVIQWIKI_BASE_URL`. In production it is the authoritative origin for request validation, redirects, citations, and email links; in development, keep the stored site URL aligned as well. Use HTTPS for production so session and CSRF cookies are secure.
 
 ## Feature Workflow
 
@@ -155,7 +161,7 @@ pnpm db:generate
 DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki pnpm db:migrate
 ```
 
-Review generated SQL before applying it. Confirm constraints, defaults, indexes, foreign-key behavior, data backfills, lock duration, and compatibility with the previous application version. Integration tests execute the migration SQL in PGlite, while e2e and deployment validation provide the real PostgreSQL layer; use a representative PostgreSQL staging copy for risky migrations.
+Review generated SQL before applying it. Confirm constraints, defaults, indexes, foreign-key behavior, data backfills, lock duration, and compatibility with the previous application version. Most integration tests execute against PGlite; when `NOVIQWIKI_TEST_POSTGRES_URL` is supplied, selected migration and concurrency cases run against PostgreSQL. The CI quality job supplies PostgreSQL 17. E2e and deployment validation provide additional real-PostgreSQL layers, but risky migrations still require a representative staging copy.
 
 For any production-affecting migration, document forward behavior, backward compatibility, rollout ordering, and the backup/restore rollback plan.
 
@@ -221,6 +227,8 @@ docker compose build
 
 Use `pnpm format:check` when a read-only formatting check is required. `pnpm format` writes formatting changes.
 
+Most integration cases use PGlite. Export `NOVIQWIKI_TEST_POSTGRES_URL` for a dedicated PostgreSQL 17 test database to run the PostgreSQL-specific migration and concurrency cases; the CI quality job starts PostgreSQL 17 and supplies this variable.
+
 Use `docker compose config --quiet` for a human gate. Plain `docker compose config` renders resolved environment values, including secrets, and must not be saved in logs or review artifacts.
 
 The live UI audit is additional and requires a running server:
@@ -262,7 +270,7 @@ NoviqWiki 是使用 Next.js App Router、PostgreSQL 和 Drizzle ORM 构建的 Ty
 | `drizzle`           | 已生成并审查的 SQL 迁移及 Drizzle 迁移元数据。                                         |
 | `scripts`           | 迁移、种子、搜索重建、备份、恢复、OpenAPI、e2e 和 UI 审计的运维与验证入口。            |
 | `tests/unit`        | 快速单元测试以及小型渲染或组件边界测试。                                               |
-| `tests/integration` | 使用进程内 PGlite 数据库的服务和迁移 SQL 测试。                                        |
+| `tests/integration` | 服务和迁移 SQL 测试；主要使用进程内 PGlite，部分迁移与并发用例使用 PostgreSQL。        |
 | `tests/e2e`         | 默认针对可丢弃真实 PostgreSQL 数据库和生产构建运行的浏览器流程。                       |
 | `docs`              | 用户、运维、架构、API、开发和验证说明。                                                |
 
@@ -287,10 +295,18 @@ NoviqWiki 是使用 Next.js App Router、PostgreSQL 和 Drizzle ORM 构建的 Ty
 pnpm install
 ```
 
-启动仓库 PostgreSQL 服务：
+创建 Compose 环境文件：
 
 ```bash
-docker compose up -d db
+cp .env.example .env
+```
+
+设置 `POSTGRES_PASSWORD`、以 `db` 为主机且密码匹配的完整 `DATABASE_URL`、`NOVIQWIKI_BASE_URL` 和显式 `NOVIQWIKI_SECRET`。即使只启动数据库服务，Compose 也会校验这些必填值；它不会生成回退签名密钥或挂载密钥卷。
+
+使用显式启用的仅回环地址开发覆盖启动 PostgreSQL：
+
+```bash
+docker compose -f compose.yaml -f compose.dev.yaml up -d db
 ```
 
 创建 Next.js 本地环境文件：
@@ -330,7 +346,7 @@ DOTENV_CONFIG_PATH=.env.local pnpm db:migrate
 pnpm dev
 ```
 
-在全新数据库上打开 `http://localhost:3000/setup` 并完成设置向导。没有站点的数据库使用完整流程。如果现有站点的用户数为零，同一路由会进入仅限 Owner 的引导流程；它会保留现有内容、媒体和设置，只创建首个 Owner。在引导完成前，应让该应用与不受信任网络隔离。
+在全新数据库上打开 `http://localhost:3000/setup` 并完成设置向导。没有站点的数据库使用完整流程。如果现有站点没有 active Owner，同一路由会进入仅限 Owner 的引导流程；它会保留现有内容、媒体、设置和非 Owner 账号，并创建 active Owner。在引导完成前，应让该应用与不受信任网络隔离。
 
 ### 完整 Compose 评估
 
@@ -340,9 +356,7 @@ pnpm dev
 docker compose up --build -d
 ```
 
-未设置 `NOVIQWIKI_SECRET` 或其值为空时，入口会从持久化 `noviqwiki-secrets` 卷复用 `/app/secrets/noviqwiki-secret`；若该回退文件不存在，则生成它。显式提供的环境值会直接使用，绝不会写入回退文件或环境文件，并且启动时会主动删除任何旧回退文件。如果后来移除显式值，下次启动会生成新回退；密钥变化会使现有依赖 HMAC 的会话、电子邮件验证令牌和密码重置令牌失效。此回退行为便于评估，但生产环境应显式提供稳定的受管密钥。`docker compose down` 会保留该卷；`docker compose down -v` 会将它与数据库、媒体和备份卷一并删除，而 `pnpm backup` 不会复制它。
-
-提交的 Compose 服务在容器内正确使用 `db` 和 `/app/media`。它使用示例凭据和公开端口，只适合评估，不是生产安全基线。参见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
+启动 Compose 前，应在未跟踪的 `.env` 中设置 `POSTGRES_PASSWORD`、匹配的完整 `DATABASE_URL`、`NOVIQWIKI_BASE_URL` 和稳定的 `NOVIQWIKI_SECRET`；生产密钥不会隐式生成，也不存在回退密钥或密钥卷。提交的 Compose 服务在容器内使用 `db` 和 `/app/media`，保持 PostgreSQL 私有，并只把应用绑定到回环地址。参见 [DEPLOYMENT.md](./DEPLOYMENT.md)。
 
 ### 种子数据
 
@@ -364,7 +378,7 @@ NOVIQWIKI_ALLOWED_DEV_ORIGINS=192.168.1.20 pnpm exec next dev -H 0.0.0.0 -p 3100
 
 将 `192.168.1.20` 替换为主机 IP。检查设备必须处于允许的网络中，工作站防火墙也必须允许所选端口。不要把开发服务器直接暴露到公共互联网。
 
-若链接或恢复 URL 需要使用局域网地址，请在设置前更新 `NOVIQWIKI_BASE_URL`，并在设置后通过 `/admin/settings` 更新已存储的基础 URL。会话和 CSRF Cookie 的 `Secure` 属性由 `NOVIQWIKI_BASE_URL` 的协议决定，而不是 `NODE_ENV`：`https:` 会启用它，`http:` 会禁用它。
+若链接或恢复 URL 需要使用局域网地址，请更新 `NOVIQWIKI_BASE_URL`。生产环境将其作为请求校验、重定向、引用和邮件链接的权威源；开发环境也应保持数据库中的站点 URL 一致。生产必须使用 HTTPS。
 
 ### 功能开发流程
 
@@ -394,7 +408,7 @@ pnpm db:generate
 DATABASE_URL=postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki pnpm db:migrate
 ```
 
-应用前检查生成的 SQL。确认约束、默认值、索引、外键行为、数据回填、锁定时间以及与旧应用版本的兼容性。集成测试在 PGlite 中执行迁移 SQL，而 e2e 和部署验证提供真实 PostgreSQL 层；高风险迁移应使用有代表性的 PostgreSQL 预发布副本。
+应用前检查生成的 SQL。确认约束、默认值、索引、外键行为、数据回填、锁定时间以及与旧应用版本的兼容性。大多数集成测试使用 PGlite；设置 `NOVIQWIKI_TEST_POSTGRES_URL` 后，部分迁移与并发用例会在 PostgreSQL 上运行，CI 质量作业会提供 PostgreSQL 17。E2e 和部署验证提供其他真实 PostgreSQL 层，但高风险迁移仍应使用有代表性的预发布副本。
 
 任何影响生产的迁移都应记录向前行为、向后兼容性、发布顺序和备份恢复回滚方案。
 
@@ -459,6 +473,8 @@ docker compose build
 ```
 
 需要只读格式检查时使用 `pnpm format:check`。`pnpm format` 会写入格式化变更。
+
+大多数集成用例使用 PGlite。将 `NOVIQWIKI_TEST_POSTGRES_URL` 导出为专用 PostgreSQL 17 测试数据库地址后，会运行 PostgreSQL 专属的迁移与并发用例；CI 质量作业会启动 PostgreSQL 17 并提供该变量。
 
 人类门禁应使用 `docker compose config --quiet`。普通 `docker compose config` 会渲染解析后的环境变量值，包括密钥，不得把其输出保存到日志或审查制品中。
 

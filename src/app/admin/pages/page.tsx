@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronDown, History, Pencil, Plus, RotateCcw, Search, X } from "lucide-react";
+import { requireAuthenticatedPermission } from "@/app/access";
 import {
   archivePageAction,
   deletePageAction,
@@ -21,6 +22,7 @@ type PageStatusFilter = "draft" | "published" | "archived" | "deleted";
 
 export default async function AdminPagesPage({ searchParams }: Props) {
   const site = await getPrimarySiteWithSettings();
+  await requireAuthenticatedPermission(site!.site.id, "page.edit");
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
   const status = pageStatusFilterValue(params.status);

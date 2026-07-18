@@ -1,31 +1,26 @@
-import { z } from "zod";
 import { created, ok, apiError } from "@/modules/api/responses";
 import { requireApiContext } from "@/modules/api/auth";
+import { createPageApiSchema, listPagesApiQuerySchema } from "@/modules/api/page-schemas";
 import { createPage, listPages } from "@/modules/pages/service";
 import { ForbiddenError } from "@/lib/errors";
-
-const createPageSchema = z.object({
-  title: z.string().min(1),
-  slug: z.string().optional(),
-  markdown: z.string().default(""),
-  editSummary: z.string().optional(),
-  publish: z.boolean().default(false)
-});
 
 export async function GET(request: Request) {
   try {
     const { site } = await requireApiContext("page.read");
     const url = new URL(request.url);
+    const query = listPagesApiQuerySchema.parse(Object.fromEntries(url.searchParams));
+    if (query.status === "draft") {
+      await requireApiContext("page.edit");
+    } else if (query.status === "archived" || query.status === "deleted") {
+      await requireApiContext("page.restore");
+    }
     const pages = await listPages({
       siteId: site.site.id,
-      query: url.searchParams.get("q") ?? undefined,
-      status:
-        (url.searchParams.get("status") as "draft" | "published" | "archived" | "deleted" | null) ??
-        undefined,
-      limit: Number(url.searchParams.get("pageSize") ?? 50),
-      offset:
-        Math.max(0, Number(url.searchParams.get("page") ?? 1) - 1) *
-        Number(url.searchParams.get("pageSize") ?? 50)
+      query: query.q,
+      status: query.status,
+      includeDeleted: query.status === "deleted",
+      limit: query.pageSize,
+      offset: (query.page - 1) * query.pageSize
     });
     return ok({ pages });
   } catch (error) {
@@ -35,11 +30,11 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { site, session } = await requireApiContext("page.create");
+    const { site, session } = await requireApiContext("page.create", request);
     if (!session) {
       throw new ForbiddenError("Authentication required.");
     }
-    const body = createPageSchema.parse(await request.json());
+    const body = createPageApiSchema.parse(await request.json());
     if (body.publish) {
       await requireApiContext("page.publish");
     }

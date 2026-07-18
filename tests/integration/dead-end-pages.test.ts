@@ -125,7 +125,7 @@ describe("dead-end pages", () => {
       },
       test.db
     );
-    await softDeletePage({ pageId: deletedTarget.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: deletedTarget.page.id, ...actor }, test.db);
     await createPage(
       {
         siteId: setup.site.id,
@@ -168,7 +168,7 @@ describe("dead-end pages", () => {
       },
       test.db
     );
-    await softDeletePage({ pageId: deletedSource.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: deletedSource.page.id, ...actor }, test.db);
 
     const deadEnds = await listDeadEndPages({ siteId: setup.site.id }, test.executor);
     const titles = deadEnds.map((page) => page.title);

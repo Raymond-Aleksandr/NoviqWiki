@@ -1,3 +1,4 @@
+import { isIP } from "node:net";
 import { cookies, headers } from "next/headers";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
@@ -22,7 +23,13 @@ export async function createSession(
   const token = randomToken(48);
   const csrfToken = randomToken(32);
   const userAgent = input.request?.headers.get("user-agent") ?? null;
-  const ipHash = input.request ? hmac(getClientIp(input.request)) : null;
+  const clientIp = input.request
+    ? resolveTrustedClientIp(
+        input.request.headers.get("x-forwarded-for"),
+        getEnv().NOVIQWIKI_TRUSTED_PROXY_HOPS
+      )
+    : null;
+  const ipHash = clientIp ? hmac(clientIp) : null;
   const [session] = await database
     .insert(sessions)
     .values({
@@ -136,23 +143,33 @@ export async function assertCsrf(request: Request, session: CurrentSession) {
 }
 
 export async function getRequestMetadata(request?: Request) {
+  const trustedProxyHops = getEnv().NOVIQWIKI_TRUSTED_PROXY_HOPS;
   if (request) {
+    const clientIp = resolveTrustedClientIp(
+      request.headers.get("x-forwarded-for"),
+      trustedProxyHops
+    );
     return {
       userAgent: request.headers.get("user-agent"),
-      ipHash: hmac(getClientIp(request))
+      ipHash: clientIp ? hmac(clientIp) : null
     };
   }
   const headerStore = await headers();
+  const clientIp = resolveTrustedClientIp(headerStore.get("x-forwarded-for"), trustedProxyHops);
   return {
     userAgent: headerStore.get("user-agent"),
-    ipHash: hmac(headerStore.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown")
+    ipHash: clientIp ? hmac(clientIp) : null
   };
 }
 
-function getClientIp(request: Request) {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
-    "unknown"
-  );
+export function resolveTrustedClientIp(
+  forwardedFor: string | null,
+  trustedProxyHops: number | undefined
+) {
+  if (!forwardedFor || !trustedProxyHops) {
+    return null;
+  }
+  const chain = forwardedFor.split(",").map((part) => part.trim());
+  const candidate = chain[chain.length - trustedProxyHops];
+  return candidate && isIP(candidate) !== 0 ? candidate : null;
 }

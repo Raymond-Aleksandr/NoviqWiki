@@ -4,11 +4,13 @@ import { apiError, ok } from "@/modules/api/responses";
 import { requireApiContext } from "@/modules/api/auth";
 import { createRole, getRoleSummaries, permissionKeys } from "@/modules/authorization/permissions";
 
-const createRoleSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  permissionKeys: z.array(z.enum(permissionKeys)).default([])
-});
+const createRoleSchema = z
+  .object({
+    name: z.string().trim().min(1).max(120),
+    description: z.string().trim().max(2_000).optional(),
+    permissionKeys: z.array(z.enum(permissionKeys)).max(permissionKeys.length).default([])
+  })
+  .strict();
 
 export async function GET() {
   try {
@@ -21,7 +23,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { site, session } = await requireApiContext("role.manage");
+    const { site, session } = await requireApiContext("role.manage", request);
     if (!session) {
       throw new ForbiddenError("Authentication required.");
     }

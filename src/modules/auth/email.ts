@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { getEnv } from "@/lib/env";
+import { AppError } from "@/lib/errors";
 
 type MailInput = {
   to: string;
@@ -20,4 +21,19 @@ export async function sendSystemEmail(input: MailInput) {
     text: input.text
   });
   return true;
+}
+
+export function isSystemEmailConfigured() {
+  const env = getEnv();
+  return Boolean(env.NOVIQWIKI_SMTP_URL?.trim() && env.NOVIQWIKI_EMAIL_FROM?.trim());
+}
+
+export function requireSystemEmailConfigured() {
+  if (!isSystemEmailConfigured()) {
+    throw new AppError(
+      "Email verification requires NOVIQWIKI_SMTP_URL and NOVIQWIKI_EMAIL_FROM.",
+      "email_unavailable",
+      503
+    );
+  }
 }

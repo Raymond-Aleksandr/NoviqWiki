@@ -27,7 +27,7 @@ Do not run these commands over an uncommitted production working tree. Build rel
 2. Confirm the target Node.js, pnpm, PostgreSQL, Docker, and browser-test requirements.
 3. Compare `package.json`, `.env.example`, `compose.yaml`, `Dockerfile`, and deployment overrides with the installed version.
 4. Review every new SQL file in `drizzle/`, including locks, backfills, defaults, indexes, and backward compatibility.
-5. Back up PostgreSQL and the active local or S3 media store as one recovery point, and separately preserve the managed `NOVIQWIKI_SECRET` or the `noviqwiki-secrets` volume when it is the only copy.
+5. Back up PostgreSQL and the active local or S3 media store as one recovery point, and separately preserve the managed `NOVIQWIKI_SECRET`.
 6. Record the running image digest or source commit and preserve the previous artifact.
 7. Restore the backup into a separate environment and verify it.
 8. Run the full target-version verification suite in staging with representative data.
@@ -41,23 +41,23 @@ Check for added, removed, renamed, defaulted, or newly required environment vari
 
 ### NoviqWiki Identifier Migration
 
-All project-owned environment variables now use the `NOVIQWIKI_*` prefix. The committed defaults also use `noviqwiki` for the PostgreSQL user and database, Compose volume keys, runtime operating-system account, fallback-secret filename, E2E database, and target-bound operational labels. Earlier draft checkouts used a provisional internal identifier; those names are not accepted as environment-variable aliases and Docker does not automatically treat their volumes as the new volumes.
+All project-owned environment variables now use the `NOVIQWIKI_*` prefix. The committed defaults also use `noviqwiki` for the PostgreSQL user and database, Compose volume keys, runtime operating-system account, E2E database, and target-bound operational labels. Earlier draft checkouts used a provisional internal identifier; those names are not accepted as aliases and Docker does not automatically treat their volumes as the new volumes.
 
 For an earlier draft deployment, stop writes and preserve a verified recovery point before changing identifiers. Then:
 
 1. Compare the deployment manifest with the target `.env.example` and rename every project-owned environment key.
-2. Decide whether `DATABASE_URL` will continue to point at the existing PostgreSQL user/database or whether the backup will be imported into the new defaults. A customized existing target remains valid through `DATABASE_URL`, but the fixed Compose fallback intentionally targets only the committed `noviqwiki` database identity.
+2. Decide whether `DATABASE_URL` will continue to point at the existing PostgreSQL user/database or whether the backup will be imported into the new defaults. A customized existing target remains valid through `DATABASE_URL`; only the exact committed `noviqwiki@db:5432/noviqwiki` target uses Compose database tools.
 3. Copy or restore retained local media and backup artifacts into the new volumes. A newly created empty Compose volume is not evidence that the earlier data was migrated.
-4. Supply the previously managed secret through `NOVIQWIKI_SECRET`, or deliberately move the protected fallback value into the new secret volume before startup. Starting with a different secret invalidates existing sessions and outstanding recovery or verification tokens.
+4. Supply the previously managed secret through `NOVIQWIKI_SECRET`. Starting with a different secret invalidates existing sessions and outstanding recovery or verification tokens.
 5. Run `docker compose config --quiet`, inspect the resolved volume attachments without exposing secret values, and rehearse the upgrade against a copy before changing production.
 
-The `NOVIQWIKI_BASE_URL` scheme, not `NODE_ENV`, controls whether session and CSRF cookies use the `Secure` attribute. Verify that the upgraded production origin remains `https:` before testing authentication.
+Verify that the upgraded production `NOVIQWIKI_BASE_URL` remains HTTPS and that session and CSRF cookies are secure before testing authentication. Local HTTP development may use non-secure cookies.
 
-When `NOVIQWIKI_SECRET` is unset or empty, the committed Compose stack reuses the fallback in the `noviqwiki-secrets` volume or generates it if missing. `pnpm backup` does not include that volume. Prefer a stable, explicitly managed production secret: an explicit environment value is never written to the fallback file or an environment file, and startup proactively deletes any old fallback. If that explicit value is later removed, the next start generates a new fallback and invalidates existing HMAC-backed sessions, email-verification tokens, and password-reset tokens.
+The committed Compose stack fails closed when `NOVIQWIKI_SECRET` is missing or empty. Keep one stable value in the deployment secret manager across every replica and restart.
 
 Operational scripts load `.env` by default through `dotenv/config`, not `.env.local`. Export the production values through the deployment system; do not assume a Next.js local file will be used by migrations or search reindexing.
 
-After setup, the base URL stored in PostgreSQL is authoritative for recovery email links. If the public origin changes during an upgrade, update both `NOVIQWIKI_BASE_URL` and `/admin/settings`.
+In production, `NOVIQWIKI_BASE_URL` is authoritative for request validation and generated links. Update it whenever the public origin changes; keep the stored site value aligned for development and test environments.
 
 Changing `NOVIQWIKI_MEDIA_DRIVER` is a data migration, not a configuration-only change. Copy and verify every object before switching drivers.
 
@@ -94,21 +94,83 @@ DATABASE_URL=postgres://noviqwiki:secret@postgres.example.com:5432/noviqwiki pnp
 
 The committed `compose.yaml` uses `build: .`; it does not reference a remote application image. Therefore `docker compose build` builds the **current checkout**, and `docker compose pull` does not select a target NoviqWiki application release for this file.
 
-For the repository Compose evaluation path:
+### Preserve credentials for existing volumes
+
+The supplied Compose file no longer uses an implicit example database password or an ephemeral application signing secret. Before recreating containers, put the credentials for the existing database volume, the canonical base URL, and a stable application secret in `.env`:
+
+```bash
+POSTGRES_USER=noviqwiki
+POSTGRES_DB=noviqwiki
+POSTGRES_PASSWORD=current-database-password
+DATABASE_URL=postgres://noviqwiki:current-database-password@db:5432/noviqwiki
+NOVIQWIKI_BASE_URL=https://wiki.example.com
+NOVIQWIKI_SECRET=replace-with-a-stable-32-byte-or-longer-secret
+```
+
+`POSTGRES_PASSWORD` contains the raw password used by the database container. `DATABASE_URL` is now
+an independent, required Compose setting; it must be a complete URL using the private `db` service
+host. Percent-encode reserved characters in the URL username or password (for example, encode `@`
+as `%40`) while leaving `POSTGRES_PASSWORD` raw. Compose no longer interpolates the raw password
+into the connection URL.
+
+Keep an already configured `NOVIQWIKI_SECRET` unchanged. If an older container generated its secret at startup, generate and persist a new managed value now; existing sessions will be invalidated once, but subsequent restarts will keep sessions valid. `NOVIQWIKI_SETUP_TOKEN` is needed only for a database where initial Owner setup has not completed.
+
+PostgreSQL applies `POSTGRES_PASSWORD` only when it initializes an empty data directory. Changing
+the variable does not change the password inside an existing named volume. For an untouched volume
+created by the older default Compose file, the current password is `noviqwiki`. Use that current
+value for the first upgraded database start, then rotate it deliberately:
+
+```bash
+docker compose stop app
+docker compose up -d db
+docker compose exec db sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+At the `psql` prompt, run `\password` for the configured database user, enter a new random password
+twice, and then run `\quit`. Update `POSTGRES_PASSWORD` in `.env` to the same raw value and update
+the password component of `DATABASE_URL` to its percent-encoded form before starting the
+application. Do not delete or recreate the database volume during this process.
+
+Validate configuration:
+
+```bash
+docker compose config
+```
+
+Compose rejects a missing or empty `DATABASE_URL`, `POSTGRES_PASSWORD`, `NOVIQWIKI_BASE_URL`, or
+`NOVIQWIKI_SECRET`. Set `NOVIQWIKI_BASE_URL` to the externally visible canonical origin, including
+`https://` in production; it controls generated email links and same-origin validation for writes.
+
+For the repository Compose path, check out the target source and build it:
 
 ```bash
 git checkout <release-tag-or-commit>
 export NOVIQWIKI_SECRET=<existing-stable-secret>
 docker compose config --quiet
 docker compose build
+```
+
+Back up data. The application image runs the migration runner under a PostgreSQL advisory lock
+before starting the server. To apply migrations as an explicit Compose release step, use the
+private service network rather than a host `DATABASE_URL`:
+
+```bash
+docker compose up -d db
+docker compose run --rm --no-deps app node scripts/migrate.mjs
+```
+
+Then update services. Re-running the migration runner during application startup is safe and is a
+no-op after the release migrations have been recorded:
+
+```bash
 docker compose up -d
 ```
 
 Use `--quiet` because plain `docker compose config` renders resolved environment values, including the exported secret. Never capture that expanded output in an upgrade record.
 
-The command above is the recommended managed-secret path; keep supplying the same value on every subsequent start because its first use deletes any old fallback file. If an evaluation deployment instead relies only on the automatically generated secret, preserve the existing `noviqwiki-secrets` volume throughout the upgrade and do not start the container with an explicit value. In either mode, verify session and verification/reset-token continuity deliberately.
+Keep supplying the same managed `NOVIQWIKI_SECRET` on every subsequent start, and verify session and verification/reset-token continuity deliberately.
 
-The stock Docker image runs `scripts/migrate.ts` automatically before starting the standalone server. Its advisory lock serializes concurrent migration attempts. If the production deployment uses a dedicated migration job, customize the startup contract so the image does not create ambiguous duplicate migration ownership.
+The stock Docker image runs `scripts/migrate.mjs` automatically before starting the standalone server. Its advisory lock serializes concurrent migration attempts. If the production deployment uses a dedicated migration job, customize the startup contract so the image does not create ambiguous duplicate migration ownership.
 
 Inspect the rollout:
 
@@ -119,7 +181,17 @@ docker compose logs --tail=200 app
 
 For a production override that uses a published image, update the pinned tag or digest in that deployment definition, pull it, and verify the resolved configuration before rollout. Do not infer those steps from the committed build-only Compose file.
 
-Never use `docker compose down -v` during an upgrade of retained data; it deletes the database, media, backup, and `noviqwiki-secrets` named volumes.
+Never use `docker compose down -v` during an upgrade of retained data; it deletes the database, media, and backup named volumes.
+
+The default application port is bound to `127.0.0.1:3000`. Keep that loopback binding when a reverse
+proxy runs on the host. A proxy running in Compose should reach `app:3000` on the private service
+network rather than publishing the application port on every host interface.
+
+Older S3-backed revisions may contain persisted pre-signed object URLs. The upgraded application
+maps those URLs to authorized same-origin `/media/...` routes while rendering current or historical
+articles, visual revision diffs, editors, homepage covers, and activity links. Canonical revision
+API responses keep the stored Markdown, HTML, and matching content hash unchanged; the compatibility
+view does not rewrite immutable revision records.
 
 ## Post-Upgrade Checks
 
@@ -127,7 +199,7 @@ Verify all of the following before reopening normal writes or declaring success:
 
 - `GET /api/health` and `GET /api/ready` return success.
 - Existing setup remains complete and the expected site loads.
-- Confirm that the upgraded database has at least one user. A site with zero users intentionally opens an Owner-only bootstrap that preserves existing content and settings; keep the deployment isolated from untrusted networks until an Owner completes it and setup returns to the completed mode.
+- Confirm that the upgraded site has an active Owner. A site with no active Owner intentionally opens Owner recovery/bootstrap while preserving existing users, content, and settings; keep the deployment isolated until an authorized Owner completes it and setup returns to completed mode.
 - Login and logout work through the production HTTPS origin.
 - Public and restricted pages enforce the expected access policy.
 - Existing Markdown renders from stored sanitized HTML.
@@ -244,7 +316,7 @@ pnpm install --frozen-lockfile
 2. 确认目标 Node.js、pnpm、PostgreSQL、Docker 和浏览器测试要求。
 3. 将 `package.json`、`.env.example`、`compose.yaml`、`Dockerfile` 和部署覆盖与已安装版本比较。
 4. 检查 `drizzle/` 中每个新 SQL 文件，包括锁、回填、默认值、索引和向后兼容性。
-5. 将 PostgreSQL 与当前本地或 S3 媒体存储作为同一个恢复点备份；若受管 `NOVIQWIKI_SECRET` 或 `noviqwiki-secrets` 卷是唯一副本，还要单独保留它。
+5. 将 PostgreSQL 与当前本地或 S3 媒体存储作为同一个恢复点备份，并单独保留受管 `NOVIQWIKI_SECRET`。
 6. 记录运行中的镜像摘要或源提交并保留旧制品。
 7. 将备份恢复到独立环境并验证。
 8. 使用代表性数据在预发布环境运行目标版本的完整验证套件。
@@ -258,23 +330,23 @@ pnpm install --frozen-lockfile
 
 #### NoviqWiki 标识迁移
 
-所有项目专属环境变量现统一使用 `NOVIQWIKI_*` 前缀。仓库默认配置也统一以 `noviqwiki` 作为 PostgreSQL 用户与数据库、Compose 卷键、运行时操作系统账户、回退密钥文件名、E2E 数据库及目标绑定运维标签。更早草稿检出使用了临时内部标识；当前版本不会把那些名称作为环境变量别名，Docker 也不会自动把旧卷视为新卷。
+所有项目专属环境变量现统一使用 `NOVIQWIKI_*` 前缀。仓库默认配置也统一以 `noviqwiki` 作为 PostgreSQL 用户与数据库、Compose 卷键、运行时操作系统账户、E2E 数据库及目标绑定运维标签。更早草稿检出使用了临时内部标识；当前版本不会把那些名称作为别名，Docker 也不会自动把旧卷视为新卷。
 
 升级更早草稿部署时，应先停止写入并保留经过验证的恢复点，然后：
 
 1. 将部署清单与目标版本 `.env.example` 对比，重命名所有项目专属环境变量键。
-2. 决定 `DATABASE_URL` 是继续指向现有 PostgreSQL 用户/数据库，还是把备份导入新默认目标。通过 `DATABASE_URL` 仍可使用自定义现有目标，但固定 Compose 回退只会有意指向仓库提交的 `noviqwiki` 数据库身份。
+2. 决定 `DATABASE_URL` 是继续指向现有 PostgreSQL 用户/数据库，还是把备份导入新默认目标。自定义现有目标仍可使用；只有精确的 `noviqwiki@db:5432/noviqwiki` 目标使用 Compose 数据库工具。
 3. 将保留的本地媒体和备份制品复制或恢复到新卷。新建的空 Compose 卷不能证明旧数据已经迁移。
-4. 通过 `NOVIQWIKI_SECRET` 提供此前受管的密钥，或在启动前有计划地把受保护的回退值迁入新密钥卷。使用不同密钥启动会使现有会话以及尚未使用的恢复/验证令牌失效。
+4. 通过 `NOVIQWIKI_SECRET` 提供此前受管的密钥。使用不同密钥启动会使现有会话以及尚未使用的恢复/验证令牌失效。
 5. 运行 `docker compose config --quiet`，在不暴露密钥值的前提下检查解析后的卷挂载，并先针对副本演练升级，再修改生产环境。
 
-会话和 CSRF Cookie 是否使用 `Secure` 属性由 `NOVIQWIKI_BASE_URL` 的协议决定，而不是 `NODE_ENV`。测试身份验证前，应确认升级后的生产来源仍为 `https:`。
+测试身份验证前，应确认升级后的生产 `NOVIQWIKI_BASE_URL` 仍为 HTTPS，且会话与 CSRF Cookie 均为安全 Cookie。本地 HTTP 开发可使用非安全 Cookie。
 
-未设置 `NOVIQWIKI_SECRET` 或其值为空时，提交的 Compose 栈会复用 `noviqwiki-secrets` 卷中的回退密钥；若其不存在，则生成它。`pnpm backup` 不包含该卷。生产环境应优先使用稳定的显式受管密钥：显式环境值绝不会写入回退文件或环境文件，并且启动时会主动删除任何旧回退。如果后来移除该显式值，下次启动会生成新回退，并使现有依赖 HMAC 的会话、电子邮件验证令牌和密码重置令牌失效。
+缺少或清空 `NOVIQWIKI_SECRET` 时，提交的 Compose 栈会立即失败。所有副本与重启都必须持续使用部署密钥管理器中的同一稳定值。
 
 运维脚本通过 `dotenv/config` 默认加载 `.env`，不是 `.env.local`。应通过部署系统导出生产值；不要假设迁移或搜索重建会使用 Next.js 本地文件。
 
-完成设置后，PostgreSQL 中保存的基础 URL 是恢复邮件链接的权威值。如果升级期间公共源发生变化，应同时更新 `NOVIQWIKI_BASE_URL` 和 `/admin/settings`。
+生产环境中 `NOVIQWIKI_BASE_URL` 是请求校验和生成链接的权威源；公共源变化时必须更新它，开发与测试环境还应保持站点存储值一致。
 
 更改 `NOVIQWIKI_MEDIA_DRIVER` 属于数据迁移，不是单纯配置变更。切换驱动前必须复制并验证每个对象。
 
@@ -323,9 +395,9 @@ docker compose up -d
 
 应使用 `--quiet`，因为普通的 `docker compose config` 会渲染解析后的环境变量值，包括已导出的密钥。不得把这类展开后的输出保存到升级记录中。
 
-以上命令是推荐的受管密钥路径；首次使用显式值时会删除任何旧回退文件，因此后续每次启动都必须继续提供同一值。如果评估部署仅依赖自动生成的密钥，则升级全过程必须保留现有 `noviqwiki-secrets` 卷，而且不得使用显式值启动容器。无论采用哪种模式，都应明确验证会话以及验证/重置令牌的连续性。
+后续每次启动都必须继续提供同一受管 `NOVIQWIKI_SECRET`，并明确验证会话以及验证/重置令牌的连续性。
 
-原始 Docker 镜像会在启动独立服务器前自动运行 `scripts/migrate.ts`，其 advisory lock 会串行处理并发迁移尝试。如果生产部署使用专用迁移任务，应自定义启动契约，避免镜像产生含糊的重复迁移责任。
+原始 Docker 镜像会在启动独立服务器前自动运行 `scripts/migrate.mjs`，其 advisory lock 会串行处理并发迁移尝试。如果生产部署使用专用迁移任务，应自定义启动契约，避免镜像产生含糊的重复迁移责任。
 
 检查发布：
 
@@ -336,7 +408,7 @@ docker compose logs --tail=200 app
 
 若生产覆盖使用已发布镜像，应在部署定义中更新固定标签或摘要，拉取镜像，并在发布前验证解析后的配置。不要从提交的仅构建 Compose 文件推断这些步骤。
 
-升级保留数据时绝不能使用 `docker compose down -v`；它会删除数据库、媒体、备份和 `noviqwiki-secrets` 命名卷。
+升级保留数据时绝不能使用 `docker compose down -v`；它会删除数据库、媒体和备份命名卷。
 
 ### 升级后检查
 
@@ -344,7 +416,7 @@ docker compose logs --tail=200 app
 
 - `GET /api/health` 和 `GET /api/ready` 成功。
 - 现有设置保持完成，预期站点可以加载。
-- 确认升级后的数据库至少有一个用户。零用户站点会有意打开仅限 Owner 的引导流程，并保留现有内容和设置；在 Owner 完成引导、设置回到已完成模式前，必须让部署与不受信任网络隔离。
+- 确认升级后的站点存在活跃 Owner。没有活跃 Owner 的站点会有意打开 Owner 恢复/引导流程，并保留现有用户、内容和设置；在获授权 Owner 完成流程、设置回到已完成模式前，必须让部署与不受信任网络隔离。
 - 通过生产 HTTPS 源登录和退出正常。
 - 公共和受限页面执行预期访问策略。
 - 现有 Markdown 从已存储的清理 HTML 正常渲染。

@@ -73,6 +73,7 @@ export default async function LoginPage({ searchParams }: Props) {
           </ActionForm>
           <div className="auth-links">
             <Link href="/forgot-password">{messages.forgotPassword}</Link>
+            <Link href="/resend-verification">{messages.resendVerificationEmail}</Link>
             {site.settings?.registrationMode === "open" ||
             site.settings?.registrationMode === "email_verification" ? (
               <Link href="/register">{messages.createAccount}</Link>

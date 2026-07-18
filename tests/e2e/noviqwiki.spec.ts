@@ -15,6 +15,10 @@ test("fresh setup and core wiki workflow", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Storage" })).toBeVisible();
   await page.getByRole("button", { name: "Continue" }).click();
   await expect(page.getByRole("heading", { name: "Owner" })).toBeVisible();
+  const setupToken = page.getByLabel("Deployment setup token");
+  if (await setupToken.isVisible()) {
+    await setupToken.fill("e2e-only-setup-token-change-before-production-000000");
+  }
   await page.getByLabel("Username").fill("owner");
   await page.getByRole("textbox", { name: "Email" }).fill("owner@example.test");
   await page.getByLabel("Display name").fill("Owner");

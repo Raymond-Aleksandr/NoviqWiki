@@ -1,4 +1,8 @@
 import { and, asc, desc, eq, ilike, inArray, isNull, max, or, sql } from "drizzle-orm";
+import {
+  lockPageGraphForTransaction,
+  lockSearchIndexWriterForTransaction
+} from "@/db/advisory-locks";
 import { db, type Database, type RootDatabase } from "@/db/client";
 import {
   categories,
@@ -15,8 +19,8 @@ import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/errors";
 import { contentHash } from "@/lib/crypto";
 import { normalizeTitle, slugifyTitle } from "@/lib/normalize";
 import { writeAuditLog } from "@/modules/audit/service";
-import { hasPermission } from "@/modules/authorization/permissions";
-import { renderMarkdown } from "@/modules/rendering/markdown";
+import { hasPermission, requirePermissionsForMutation } from "@/modules/authorization/permissions";
+import { renderMarkdown, type RenderedHeading } from "@/modules/rendering/markdown";
 import { assertNoRedirectLoopForRevision } from "@/modules/redirects/service";
 import { parseRedirectDirective } from "@/modules/redirects/directive";
 import {
@@ -29,6 +33,9 @@ import { derivePageIdentity } from "./title";
 
 export type PublicationState = "draft" | "published";
 export type PageProtectionLevel = "none" | "protected";
+export const MAX_PAGE_MARKDOWN_LENGTH = 1_000_000;
+export const MAX_PAGE_RELATIONSHIPS = 500;
+export const MAX_PAGE_EDIT_SUMMARY_LENGTH = 1_000;
 
 export async function createPage(
   input: {
@@ -43,15 +50,33 @@ export async function createPage(
   },
   database: RootDatabase = db
 ) {
+  assertMarkdownWithinLimits(input.markdown);
+  assertEditSummaryWithinLimits(input.editSummary, "editSummary");
+  const identity = derivePageIdentity(input.title, input.slug);
+  const canonicalTitleSlug = slugifyTitle(identity.title);
+  const preparedRevision = input.publish ? await prepareRevision(input.markdown) : null;
   return database.transaction(async (tx) => {
-    const identity = derivePageIdentity(input.title, input.slug);
+    await requirePermissionsForMutation(
+      input.actorId,
+      input.siteId,
+      input.publish ? ["page.create", "page.publish"] : ["page.create"],
+      tx
+    );
+    if (input.publish) {
+      await lockSearchIndexWriterForTransaction(input.siteId, tx);
+    }
+    await lockPageGraphForTransaction(input.siteId, tx);
     const duplicate = await tx
       .select({ id: pages.id })
       .from(pages)
       .where(
         and(
           eq(pages.siteId, input.siteId),
-          or(eq(pages.slug, identity.slug), eq(pages.normalizedTitle, identity.normalizedTitle))
+          or(
+            eq(pages.slug, identity.slug),
+            eq(pages.slug, canonicalTitleSlug),
+            eq(pages.normalizedTitle, identity.normalizedTitle)
+          )
         )
       )
       .limit(1);
@@ -59,6 +84,12 @@ export async function createPage(
       throw new ConflictError("A page with this title or slug already exists.");
     }
     await assertAliasSlugAvailable({ siteId: input.siteId, slug: identity.slug, pageId: null }, tx);
+    if (canonicalTitleSlug !== identity.slug) {
+      await assertAliasSlugAvailable(
+        { siteId: input.siteId, slug: canonicalTitleSlug, pageId: null },
+        tx
+      );
+    }
 
     const [page] = await tx
       .insert(pages)
@@ -72,7 +103,20 @@ export async function createPage(
       })
       .returning();
 
+    if (canonicalTitleSlug !== identity.slug) {
+      await tx.insert(pageAliases).values({
+        siteId: input.siteId,
+        pageId: page.id,
+        aliasSlug: canonicalTitleSlug,
+        aliasTitle: identity.title
+      });
+    }
+    await bindUnresolvedPageLinks(page, tx);
+
     if (input.publish) {
+      if (!preparedRevision) {
+        throw new Error("Published page content was not prepared.");
+      }
       await assertNoRedirectLoopForRevision(
         {
           siteId: input.siteId,
@@ -84,9 +128,8 @@ export async function createPage(
       );
       const revision = await createRevision(
         {
-          siteId: input.siteId,
           page,
-          markdown: input.markdown,
+          prepared: preparedRevision,
           parentRevisionId: null,
           revisionNumber: 1,
           actorId: input.actorId,
@@ -178,43 +221,49 @@ export async function saveDraft(
   },
   database: RootDatabase = db
 ) {
-  const page = await getPageById(input.pageId, database);
-  if (page.deletedAt || page.status === "deleted") {
-    throw new ConflictError("Deleted pages must be restored before editing.");
-  }
-  await assertProtectedWriteAllowed(page, input.actorId, database);
-  const [draft] = await database
-    .insert(pageDrafts)
-    .values({
-      pageId: input.pageId,
-      baseRevisionId: input.baseRevisionId ?? page.currentRevisionId,
-      markdown: input.markdown,
-      editorId: input.actorId,
-      editSummary: input.editSummary ?? ""
-    })
-    .onConflictDoUpdate({
-      target: [pageDrafts.pageId, pageDrafts.editorId],
-      set: {
+  assertMarkdownWithinLimits(input.markdown);
+  assertEditSummaryWithinLimits(input.editSummary, "editSummary");
+  return database.transaction(async (tx) => {
+    const page = await getPageForMutation(input.pageId, tx);
+    await requirePermissionsForMutation(input.actorId, page.siteId, ["page.edit"], tx);
+    if (page.deletedAt || page.status === "deleted") {
+      throw new ConflictError("Deleted pages must be restored before editing.");
+    }
+    await assertProtectedWriteAllowed(page, input.actorId, tx);
+    await lockPageGraphForTransaction(page.siteId, tx);
+    const [draft] = await tx
+      .insert(pageDrafts)
+      .values({
+        pageId: input.pageId,
         baseRevisionId: input.baseRevisionId ?? page.currentRevisionId,
         markdown: input.markdown,
-        editSummary: input.editSummary ?? "",
-        updatedAt: new Date()
-      }
-    })
-    .returning();
-  await writeAuditLog(
-    {
-      siteId: page.siteId,
-      actorId: input.actorId,
-      actorDisplayName: input.actorDisplayName,
-      action: "page.draft_saved",
-      targetType: "page",
-      targetId: page.id,
-      details: { draftId: draft.id }
-    },
-    database
-  );
-  return draft;
+        editorId: input.actorId,
+        editSummary: input.editSummary ?? ""
+      })
+      .onConflictDoUpdate({
+        target: [pageDrafts.pageId, pageDrafts.editorId],
+        set: {
+          baseRevisionId: input.baseRevisionId ?? page.currentRevisionId,
+          markdown: input.markdown,
+          editSummary: input.editSummary ?? "",
+          updatedAt: new Date()
+        }
+      })
+      .returning();
+    await writeAuditLog(
+      {
+        siteId: page.siteId,
+        actorId: input.actorId,
+        actorDisplayName: input.actorDisplayName,
+        action: "page.draft_saved",
+        targetType: "page",
+        targetId: page.id,
+        details: { draftId: draft.id }
+      },
+      tx
+    );
+    return draft;
+  });
 }
 
 export async function publishPage(
@@ -228,8 +277,17 @@ export async function publishPage(
   },
   database: RootDatabase = db
 ) {
+  assertMarkdownWithinLimits(input.markdown);
+  assertEditSummaryWithinLimits(input.editSummary, "editSummary");
+  const preparedRevision = await prepareRevision(input.markdown);
   return database.transaction(async (tx) => {
-    const page = await getPageById(input.pageId, tx);
+    const page = await getPageForMutation(input.pageId, tx);
+    await requirePermissionsForMutation(
+      input.actorId,
+      page.siteId,
+      ["page.edit", "page.publish"],
+      tx
+    );
     if (page.deletedAt || page.status === "deleted") {
       throw new ConflictError("Deleted pages must be restored before editing.");
     }
@@ -238,21 +296,13 @@ export async function publishPage(
     if ((page.currentRevisionId ?? null) !== expectedBase) {
       throw new ConflictError("The page changed after this editor loaded it.");
     }
-    await assertNoRedirectLoopForRevision(
-      {
-        siteId: page.siteId,
-        pageId: page.id,
-        pageSlug: page.slug,
-        markdown: input.markdown
-      },
-      tx
-    );
+    await lockSearchIndexWriterForTransaction(page.siteId, tx);
+    await lockPageGraphForTransaction(page.siteId, tx);
     const revisionNumber = await getNextRevisionNumber(page.id, tx);
     const revision = await createRevision(
       {
-        siteId: page.siteId,
         page,
-        markdown: input.markdown,
+        prepared: preparedRevision,
         parentRevisionId: page.currentRevisionId,
         revisionNumber,
         actorId: input.actorId,
@@ -262,7 +312,16 @@ export async function publishPage(
       },
       tx
     );
-    await tx
+    await assertNoRedirectLoopForRevision(
+      {
+        siteId: page.siteId,
+        pageId: page.id,
+        pageSlug: page.slug,
+        markdown: preparedRevision.markdown
+      },
+      tx
+    );
+    const updated = await tx
       .update(pages)
       .set({
         currentRevisionId: revision.id,
@@ -270,7 +329,19 @@ export async function publishPage(
         archivedAt: null,
         updatedAt: new Date()
       })
-      .where(eq(pages.id, page.id));
+      .where(
+        and(
+          eq(pages.id, page.id),
+          expectedBase
+            ? eq(pages.currentRevisionId, expectedBase)
+            : isNull(pages.currentRevisionId),
+          isNull(pages.deletedAt)
+        )
+      )
+      .returning({ id: pages.id });
+    if (updated.length !== 1) {
+      throw new ConflictError("The page changed after this editor loaded it.");
+    }
     await tx
       .delete(pageDrafts)
       .where(and(eq(pageDrafts.pageId, page.id), eq(pageDrafts.editorId, input.actorId)));
@@ -552,6 +623,7 @@ export async function listPageOutboundLinks(
     return [];
   }
 
+  const targetPageIds = rows.flatMap((row) => (row.targetPageId ? [row.targetPageId] : []));
   const targetPages = await database
     .select({
       id: pages.id,
@@ -564,16 +636,27 @@ export async function listPageOutboundLinks(
     .where(
       and(
         eq(pages.siteId, input.siteId),
-        inArray(
-          pages.normalizedTitle,
-          rows.map((row) => row.targetNormalizedTitle)
-        )
+        targetPageIds.length > 0
+          ? or(
+              inArray(
+                pages.normalizedTitle,
+                rows.map((row) => row.targetNormalizedTitle)
+              ),
+              inArray(pages.id, targetPageIds)
+            )
+          : inArray(
+              pages.normalizedTitle,
+              rows.map((row) => row.targetNormalizedTitle)
+            )
       )
     );
-  const targets = new Map(targetPages.map((page) => [page.normalizedTitle, page]));
+  const targetsByTitle = new Map(targetPages.map((page) => [page.normalizedTitle, page]));
+  const targetsById = new Map(targetPages.map((page) => [page.id, page]));
 
   return rows.map((row) => {
-    const target = targets.get(row.targetNormalizedTitle);
+    const target =
+      (row.targetPageId ? targetsById.get(row.targetPageId) : undefined) ??
+      targetsByTitle.get(row.targetNormalizedTitle);
     const exists = Boolean(target && target.status === "published" && !target.deletedAt);
     return {
       targetTitle: row.targetTitle,
@@ -607,7 +690,10 @@ export async function listWantedPages(
           select 1
           from ${pages} as wanted_target
           where wanted_target.site_id = ${input.siteId}
-            and wanted_target.normalized_title = ${pageLinks.targetNormalizedTitle}
+            and (
+              wanted_target.id = ${pageLinks.targetPageId}
+              or wanted_target.normalized_title = ${pageLinks.targetNormalizedTitle}
+            )
             and wanted_target.status = 'published'
             and wanted_target.deleted_at is null
         )`
@@ -891,36 +977,41 @@ export async function rollbackPage(
   },
   database: RootDatabase = db
 ) {
+  assertEditSummaryWithinLimits(input.reason, "reason");
+  const targetSnapshot = await getRevisionById(input.targetRevisionId, database);
+  if (targetSnapshot.pageId !== input.pageId) {
+    throw new ConflictError("Target revision belongs to another page.");
+  }
+  const preparedRevision = await prepareRevision(targetSnapshot.markdown);
   return database.transaction(async (tx) => {
-    const page = await getPageById(input.pageId, tx);
+    const page = await getPageForMutation(input.pageId, tx);
+    await requirePermissionsForMutation(input.actorId, page.siteId, ["page.rollback"], tx);
     if (page.deletedAt || page.status === "deleted") {
       throw new ConflictError("Deleted pages must be restored before editing.");
     }
     await assertProtectedWriteAllowed(page, input.actorId, tx);
-    const target = await getRevisionById(input.targetRevisionId, tx);
-    if (target.pageId !== page.id) {
-      throw new ConflictError("Target revision belongs to another page.");
-    }
-    await assertNoRedirectLoopForRevision(
-      {
-        siteId: page.siteId,
-        pageId: page.id,
-        pageSlug: page.slug,
-        markdown: target.markdown
-      },
-      tx
-    );
+    const target = targetSnapshot;
+    await lockSearchIndexWriterForTransaction(page.siteId, tx);
+    await lockPageGraphForTransaction(page.siteId, tx);
     const revision = await createRevision(
       {
-        siteId: page.siteId,
         page,
-        markdown: target.markdown,
+        prepared: preparedRevision,
         parentRevisionId: page.currentRevisionId,
         revisionNumber: await getNextRevisionNumber(page.id, tx),
         actorId: input.actorId,
         actorDisplayName: input.actorDisplayName,
         editSummary: input.reason || `Rollback r${target.revisionNumber}`,
         state: "published"
+      },
+      tx
+    );
+    await assertNoRedirectLoopForRevision(
+      {
+        siteId: page.siteId,
+        pageId: page.id,
+        pageSlug: page.slug,
+        markdown: preparedRevision.markdown
       },
       tx
     );
@@ -967,35 +1058,39 @@ export async function rollbackPage(
 
 export async function softDeletePage(
   input: { pageId: string; actorId: string; actorDisplayName: string },
-  database: Database = db
+  database: RootDatabase = db
 ) {
-  const page = await getPageById(input.pageId, database);
-  await assertProtectedWriteAllowed(page, input.actorId, database);
-  const [updated] = await database
-    .update(pages)
-    .set({
-      status: "deleted",
-      deletedAt: new Date(),
-      deletedById: input.actorId,
-      archivedAt: null,
-      updatedAt: new Date()
-    })
-    .where(eq(pages.id, input.pageId))
-    .returning();
-  await removeSearchIndex(input.pageId, database);
-  await writeAuditLog(
-    {
-      siteId: page.siteId,
-      actorId: input.actorId,
-      actorDisplayName: input.actorDisplayName,
-      action: "page.deleted",
-      targetType: "page",
-      targetId: page.id,
-      details: { title: page.title }
-    },
-    database
-  );
-  return updated;
+  return database.transaction(async (tx) => {
+    const page = await getPageForMutation(input.pageId, tx);
+    await requirePermissionsForMutation(input.actorId, page.siteId, ["page.delete"], tx);
+    await assertProtectedWriteAllowed(page, input.actorId, tx);
+    await lockSearchIndexWriterForTransaction(page.siteId, tx);
+    const [updated] = await tx
+      .update(pages)
+      .set({
+        status: "deleted",
+        deletedAt: new Date(),
+        deletedById: input.actorId,
+        archivedAt: null,
+        updatedAt: new Date()
+      })
+      .where(eq(pages.id, input.pageId))
+      .returning();
+    await removeSearchIndex(input.pageId, tx);
+    await writeAuditLog(
+      {
+        siteId: page.siteId,
+        actorId: input.actorId,
+        actorDisplayName: input.actorDisplayName,
+        action: "page.deleted",
+        targetType: "page",
+        targetId: page.id,
+        details: { title: page.title }
+      },
+      tx
+    );
+    return updated;
+  });
 }
 
 export async function archivePage(
@@ -1003,7 +1098,8 @@ export async function archivePage(
   database: RootDatabase = db
 ) {
   return database.transaction(async (tx) => {
-    const page = await getPageById(input.pageId, tx);
+    const page = await getPageForMutation(input.pageId, tx);
+    await requirePermissionsForMutation(input.actorId, page.siteId, ["page.delete"], tx);
     if (page.deletedAt || page.status === "deleted") {
       throw new ConflictError("Deleted pages must be restored before archiving.");
     }
@@ -1011,6 +1107,7 @@ export async function archivePage(
     if (page.status === "archived") {
       return page;
     }
+    await lockSearchIndexWriterForTransaction(page.siteId, tx);
     const [updated] = await tx
       .update(pages)
       .set({ status: "archived", archivedAt: new Date(), updatedAt: new Date() })
@@ -1035,46 +1132,65 @@ export async function archivePage(
 
 export async function restorePage(
   input: { pageId: string; actorId: string; actorDisplayName: string },
-  database: Database = db
+  database: RootDatabase = db
 ) {
-  const { page, revision } = await getPageWithCurrentRevision(input.pageId, database);
-  await assertProtectedWriteAllowed(page, input.actorId, database);
-  const [updated] = await database
-    .update(pages)
-    .set({
-      status: revision ? "published" : "draft",
-      deletedAt: null,
-      deletedById: null,
-      archivedAt: null,
-      updatedAt: new Date()
-    })
-    .where(eq(pages.id, input.pageId))
-    .returning();
-  if (revision) {
-    await upsertSearchIndex(
+  return database.transaction(async (tx) => {
+    const page = await getPageForMutation(input.pageId, tx);
+    await requirePermissionsForMutation(input.actorId, page.siteId, ["page.restore"], tx);
+    await assertProtectedWriteAllowed(page, input.actorId, tx);
+    const revision = page.currentRevisionId
+      ? await getRevisionById(page.currentRevisionId, tx)
+      : null;
+    if (revision) {
+      await lockSearchIndexWriterForTransaction(page.siteId, tx);
+      await lockPageGraphForTransaction(page.siteId, tx);
+      await assertNoRedirectLoopForRevision(
+        {
+          siteId: page.siteId,
+          pageId: page.id,
+          pageSlug: page.slug,
+          markdown: revision.markdown
+        },
+        tx
+      );
+    }
+    const [updated] = await tx
+      .update(pages)
+      .set({
+        status: revision ? "published" : "draft",
+        deletedAt: null,
+        deletedById: null,
+        archivedAt: null,
+        updatedAt: new Date()
+      })
+      .where(eq(pages.id, input.pageId))
+      .returning();
+    if (revision) {
+      await upsertSearchIndex(
+        {
+          siteId: page.siteId,
+          pageId: page.id,
+          title: page.title,
+          plainText: revision.plainText,
+          categories: revision.categories
+        },
+        tx
+      );
+    }
+    await writeAuditLog(
       {
         siteId: page.siteId,
-        pageId: page.id,
-        title: page.title,
-        plainText: revision.plainText,
-        categories: revision.categories
+        actorId: input.actorId,
+        actorDisplayName: input.actorDisplayName,
+        action: "page.restored",
+        targetType: "page",
+        targetId: page.id,
+        details: { title: page.title }
       },
-      database
+      tx
     );
-  }
-  await writeAuditLog(
-    {
-      siteId: page.siteId,
-      actorId: input.actorId,
-      actorDisplayName: input.actorDisplayName,
-      action: "page.restored",
-      targetType: "page",
-      targetId: page.id,
-      details: { title: page.title }
-    },
-    database
-  );
-  return updated;
+    return updated;
+  });
 }
 
 export async function renamePage(
@@ -1088,17 +1204,37 @@ export async function renamePage(
   },
   database: RootDatabase = db
 ) {
+  const identity = derivePageIdentity(input.newTitle, input.newSlug);
+  const canonicalTitleSlug = slugifyTitle(identity.title);
   return database.transaction(async (tx) => {
-    const page = await getPageById(input.pageId, tx);
+    const page = await getPageForMutation(input.pageId, tx);
+    await requirePermissionsForMutation(
+      input.actorId,
+      page.siteId,
+      ["page.edit", "page.rename"],
+      tx
+    );
     await assertProtectedWriteAllowed(page, input.actorId, tx);
-    const identity = derivePageIdentity(input.newTitle, input.newSlug);
+    const currentRevision = page.currentRevisionId
+      ? await getRevisionById(page.currentRevisionId, tx)
+      : null;
+    const shouldIndex = Boolean(currentRevision && page.status === "published" && !page.deletedAt);
+    if (shouldIndex) {
+      await lockSearchIndexWriterForTransaction(page.siteId, tx);
+    }
+    await lockPageGraphForTransaction(page.siteId, tx);
+    const previousCanonicalTitleSlug = slugifyTitle(page.title);
     const duplicate = await tx
       .select({ id: pages.id })
       .from(pages)
       .where(
         and(
           eq(pages.siteId, page.siteId),
-          or(eq(pages.slug, identity.slug), eq(pages.normalizedTitle, identity.normalizedTitle)),
+          or(
+            eq(pages.slug, identity.slug),
+            eq(pages.slug, canonicalTitleSlug),
+            eq(pages.normalizedTitle, identity.normalizedTitle)
+          ),
           sql`${pages.id} <> ${page.id}`
         )
       )
@@ -1110,6 +1246,23 @@ export async function renamePage(
       { siteId: page.siteId, slug: identity.slug, pageId: page.id },
       tx
     );
+    if (canonicalTitleSlug !== identity.slug) {
+      await assertAliasSlugAvailable(
+        { siteId: page.siteId, slug: canonicalTitleSlug, pageId: page.id },
+        tx
+      );
+    }
+    if (!input.createAlias) {
+      await tx
+        .delete(pageAliases)
+        .where(
+          and(
+            eq(pageAliases.siteId, page.siteId),
+            eq(pageAliases.pageId, page.id),
+            eq(pageAliases.aliasSlug, previousCanonicalTitleSlug)
+          )
+        );
+    }
     if (input.createAlias) {
       await tx
         .insert(pageAliases)
@@ -1140,15 +1293,43 @@ export async function renamePage(
       })
       .where(eq(pages.id, page.id))
       .returning();
-    if (page.currentRevisionId) {
-      const revision = await getRevisionById(page.currentRevisionId, tx);
+    if (canonicalTitleSlug !== identity.slug) {
+      await tx
+        .insert(pageAliases)
+        .values({
+          siteId: page.siteId,
+          pageId: page.id,
+          aliasSlug: canonicalTitleSlug,
+          aliasTitle: identity.title
+        })
+        .onConflictDoUpdate({
+          target: [pageAliases.siteId, pageAliases.aliasSlug],
+          set: { aliasTitle: identity.title }
+        });
+    }
+    await reconcileIncomingPageLinks(page.id, page.siteId, tx);
+    await bindUnresolvedPageLinks(updated, tx);
+    if (currentRevision) {
+      if (updated.status === "published" && !updated.deletedAt) {
+        await assertNoRedirectLoopForRevision(
+          {
+            siteId: page.siteId,
+            pageId: page.id,
+            pageSlug: updated.slug,
+            markdown: currentRevision.markdown
+          },
+          tx
+        );
+      }
+    }
+    if (currentRevision && shouldIndex) {
       await upsertSearchIndex(
         {
           siteId: page.siteId,
           pageId: page.id,
           title: updated.title,
-          plainText: revision.plainText,
-          categories: revision.categories
+          plainText: currentRevision.plainText,
+          categories: currentRevision.categories
         },
         tx
       );
@@ -1176,45 +1357,73 @@ export async function setPageProtection(
     actorId: string;
     actorDisplayName: string;
   },
-  database: Database = db
+  database: RootDatabase = db
 ) {
-  const page = await getPageById(input.pageId, database);
-  if (!(await hasPermission(input.actorId, page.siteId, "page.protect", database))) {
-    throw new ForbiddenError();
-  }
   const protectionLevel = normalizeProtectionLevel(input.protectionLevel);
-  if (normalizeProtectionLevel(page.protectionLevel) === protectionLevel) {
-    return page;
+  return database.transaction(async (tx) => {
+    const page = await getPageForMutation(input.pageId, tx);
+    await requirePermissionsForMutation(input.actorId, page.siteId, ["page.protect"], tx);
+    if (normalizeProtectionLevel(page.protectionLevel) === protectionLevel) {
+      return page;
+    }
+    const [updated] = await tx
+      .update(pages)
+      .set({ protectionLevel, updatedAt: new Date() })
+      .where(eq(pages.id, page.id))
+      .returning();
+    await writeAuditLog(
+      {
+        siteId: page.siteId,
+        actorId: input.actorId,
+        actorDisplayName: input.actorDisplayName,
+        action: "page.updated",
+        targetType: "page",
+        targetId: page.id,
+        details: {
+          title: page.title,
+          previousProtectionLevel: normalizeProtectionLevel(page.protectionLevel),
+          protectionLevel
+        }
+      },
+      tx
+    );
+    return updated;
+  });
+}
+
+type PreparedRevision = {
+  markdown: string;
+  html: string;
+  plainText: string;
+  contentHash: string;
+  headings: RenderedHeading[];
+  categories: string[];
+  outboundLinks: string[];
+};
+
+async function prepareRevision(markdown: string): Promise<PreparedRevision> {
+  assertMarkdownWithinLimits(markdown);
+  const rendered = await renderMarkdown(markdown);
+  if (rendered.categories.length + rendered.links.length > MAX_PAGE_RELATIONSHIPS) {
+    throw new ConflictError(
+      `A page may contain at most ${MAX_PAGE_RELATIONSHIPS} unique categories and wiki links.`
+    );
   }
-  const [updated] = await database
-    .update(pages)
-    .set({ protectionLevel, updatedAt: new Date() })
-    .where(eq(pages.id, page.id))
-    .returning();
-  await writeAuditLog(
-    {
-      siteId: page.siteId,
-      actorId: input.actorId,
-      actorDisplayName: input.actorDisplayName,
-      action: "page.updated",
-      targetType: "page",
-      targetId: page.id,
-      details: {
-        title: page.title,
-        previousProtectionLevel: normalizeProtectionLevel(page.protectionLevel),
-        protectionLevel
-      }
-    },
-    database
-  );
-  return updated;
+  return {
+    markdown,
+    html: rendered.html,
+    plainText: rendered.plainText,
+    contentHash: contentHash(markdown),
+    headings: rendered.headings,
+    categories: rendered.categories.map((category) => category.name),
+    outboundLinks: rendered.links.map((link) => link.target)
+  };
 }
 
 async function createRevision(
   input: {
-    siteId: string;
     page: Page;
-    markdown: string;
+    prepared: PreparedRevision;
     parentRevisionId: string | null;
     revisionNumber: number;
     actorId: string;
@@ -1224,24 +1433,23 @@ async function createRevision(
   },
   database: Database
 ) {
-  const rendered = await renderMarkdown(input.markdown);
   const [revision] = await database
     .insert(pageRevisions)
     .values({
       pageId: input.page.id,
       parentRevisionId: input.parentRevisionId,
       revisionNumber: input.revisionNumber,
-      markdown: input.markdown,
-      html: rendered.html,
-      plainText: rendered.plainText,
-      contentHash: contentHash(input.markdown),
+      markdown: input.prepared.markdown,
+      html: input.prepared.html,
+      plainText: input.prepared.plainText,
+      contentHash: input.prepared.contentHash,
       editorId: input.actorId,
       editorDisplayName: input.actorDisplayName,
       editSummary: input.editSummary,
       state: input.state,
-      headings: rendered.headings,
-      categories: rendered.categories.map((category) => category.name),
-      outboundLinks: rendered.links.map((link) => link.target)
+      headings: input.prepared.headings,
+      categories: input.prepared.categories,
+      outboundLinks: input.prepared.outboundLinks
     })
     .returning();
   return revision;
@@ -1260,9 +1468,42 @@ function normalizeProtectionLevel(value: string | null | undefined): PageProtect
 }
 
 export function assertPageVisibleForRead(page: Pick<Page, "status" | "deletedAt">) {
-  if (page.status === "deleted" || page.deletedAt) {
+  if ((page.status !== "published" && page.status !== "archived") || page.deletedAt) {
     throw new NotFoundError("Page not found.");
   }
+}
+
+function assertMarkdownWithinLimits(markdown: string) {
+  if (markdown.length > MAX_PAGE_MARKDOWN_LENGTH) {
+    throw new ConflictError(`Markdown must not exceed ${MAX_PAGE_MARKDOWN_LENGTH} characters.`);
+  }
+}
+
+function assertEditSummaryWithinLimits(value: string | undefined, field: "editSummary" | "reason") {
+  if (value && value.length > MAX_PAGE_EDIT_SUMMARY_LENGTH) {
+    throw new ConflictError(
+      `${field === "reason" ? "Rollback reason" : "Edit summary"} must not exceed ${MAX_PAGE_EDIT_SUMMARY_LENGTH} characters.`
+    );
+  }
+}
+
+async function getPageByIdForUpdate(pageId: string, database: Database) {
+  // Serialize writes to this page without blocking graph updates that only need
+  // a foreign-key KEY SHARE lock on a different page in the same site.
+  const [page] = await database
+    .select()
+    .from(pages)
+    .where(eq(pages.id, pageId))
+    .limit(1)
+    .for("no key update");
+  if (!page) {
+    throw new NotFoundError("Page not found.");
+  }
+  return page;
+}
+
+async function getPageForMutation(pageId: string, database: Database) {
+  return getPageByIdForUpdate(pageId, database);
 }
 
 async function assertAliasSlugAvailable(
@@ -1320,11 +1561,7 @@ async function updateRelationships(
 
   for (const target of revision.outboundLinks) {
     const normalized = normalizeTitle(target);
-    const [targetPage] = await database
-      .select({ id: pages.id })
-      .from(pages)
-      .where(and(eq(pages.siteId, siteId), eq(pages.normalizedTitle, normalized)))
-      .limit(1);
+    const targetPage = await findWikiLinkTarget(siteId, target, database);
     await database
       .insert(pageLinks)
       .values({
@@ -1339,6 +1576,119 @@ async function updateRelationships(
         set: { targetPageId: targetPage?.id ?? null, label: target }
       });
   }
+}
+
+async function findWikiLinkTarget(siteId: string, target: string, database: Database) {
+  const targetSlug = slugifyTitle(target);
+  const [slugTarget] = await database
+    .select({ id: pages.id })
+    .from(pages)
+    .where(and(eq(pages.siteId, siteId), eq(pages.slug, targetSlug)))
+    .limit(1);
+  if (slugTarget) {
+    return slugTarget;
+  }
+
+  const [aliasTarget] = await database
+    .select({ id: pages.id })
+    .from(pageAliases)
+    .innerJoin(pages, eq(pages.id, pageAliases.pageId))
+    .where(and(eq(pageAliases.siteId, siteId), eq(pageAliases.aliasSlug, targetSlug)))
+    .limit(1);
+  if (aliasTarget) {
+    return aliasTarget;
+  }
+
+  const [titleTarget] = await database
+    .select({ id: pages.id })
+    .from(pages)
+    .where(and(eq(pages.siteId, siteId), eq(pages.normalizedTitle, normalizeTitle(target))))
+    .limit(1);
+  return titleTarget;
+}
+
+async function reconcileIncomingPageLinks(pageId: string, siteId: string, database: Database) {
+  const incoming = await database
+    .select({
+      targetTitle: pageLinks.targetTitle,
+      targetNormalizedTitle: pageLinks.targetNormalizedTitle
+    })
+    .from(pageLinks)
+    .innerJoin(pages, eq(pages.id, pageLinks.sourcePageId))
+    .where(and(eq(pages.siteId, siteId), eq(pageLinks.targetPageId, pageId)));
+  const distinctTargets = new Map(
+    incoming.map((link) => [link.targetNormalizedTitle, link.targetTitle])
+  );
+  for (const [targetNormalizedTitle, targetTitle] of distinctTargets) {
+    const resolved = await findWikiLinkTarget(siteId, targetTitle, database);
+    if (resolved?.id === pageId) {
+      continue;
+    }
+    await database
+      .update(pageLinks)
+      .set({ targetPageId: resolved?.id ?? null })
+      .where(
+        and(
+          eq(pageLinks.targetPageId, pageId),
+          eq(pageLinks.targetNormalizedTitle, targetNormalizedTitle),
+          sql`exists (
+            select 1
+            from ${pages} as incoming_source
+            where incoming_source.id = ${pageLinks.sourcePageId}
+              and incoming_source.site_id = ${siteId}
+          )`
+        )
+      );
+  }
+}
+
+async function bindUnresolvedPageLinks(
+  page: Pick<Page, "id" | "siteId" | "slug" | "normalizedTitle">,
+  database: Database
+) {
+  const aliases = await database
+    .select({ aliasSlug: pageAliases.aliasSlug })
+    .from(pageAliases)
+    .where(and(eq(pageAliases.siteId, page.siteId), eq(pageAliases.pageId, page.id)));
+  const addressSlugs = new Set([page.slug, ...aliases.map((alias) => alias.aliasSlug)]);
+  const unresolved = await database
+    .select({
+      targetTitle: pageLinks.targetTitle,
+      targetNormalizedTitle: pageLinks.targetNormalizedTitle
+    })
+    .from(pageLinks)
+    .innerJoin(pages, eq(pages.id, pageLinks.sourcePageId))
+    .where(and(eq(pages.siteId, page.siteId), isNull(pageLinks.targetPageId)));
+  const matchedTargets = Array.from(
+    new Set(
+      unresolved
+        .filter(
+          (link) =>
+            link.targetNormalizedTitle === page.normalizedTitle ||
+            addressSlugs.has(slugifyTitle(link.targetTitle))
+        )
+        .map((link) => link.targetNormalizedTitle)
+    )
+  );
+  if (matchedTargets.length === 0) {
+    return;
+  }
+
+  await database
+    .update(pageLinks)
+    .set({ targetPageId: page.id })
+    .where(
+      and(
+        isNull(pageLinks.targetPageId),
+        inArray(pageLinks.targetNormalizedTitle, matchedTargets),
+        sql`exists (
+          select 1
+          from ${pages} as unresolved_source
+          where unresolved_source.id = ${pageLinks.sourcePageId}
+            and unresolved_source.site_id = ${page.siteId}
+        )`
+      )
+    );
 }
 
 function publishedPageIndexWhere(input: { siteId: string; query?: string; prefix?: string }) {

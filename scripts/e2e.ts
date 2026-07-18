@@ -24,6 +24,8 @@ async function main() {
     NOVIQWIKI_MEDIA_ROOT: mediaRoot,
     NOVIQWIKI_SECRET:
       process.env.NOVIQWIKI_SECRET ?? "e2e-only-secret-change-before-production-000000",
+    NOVIQWIKI_SETUP_TOKEN:
+      process.env.NOVIQWIKI_SETUP_TOKEN ?? "e2e-only-setup-token-change-before-production-000000",
     HOSTNAME: process.env.HOSTNAME ?? "127.0.0.1",
     PORT: process.env.PORT ?? playwrightPort,
     PLAYWRIGHT_BASE_URL: playwrightBaseUrl,

@@ -18,4 +18,48 @@ describe("wiki links", () => {
       "[Start](/page/home"
     );
   });
+
+  it("does not extract or rewrite wiki syntax inside code", () => {
+    const markdown = [
+      "`[[Inline Example]]` [[Real Page]]",
+      "",
+      "```md",
+      "[[Category:Example]]",
+      "[[Fenced Example]]",
+      "```"
+    ].join("\n");
+    const parsed = parseWikiLinks(markdown);
+    expect(parsed.links.map((link) => link.target)).toEqual(["Real Page"]);
+    expect(parsed.categories).toEqual([]);
+
+    const replaced = replaceWikiLinksWithMarkdown(markdown);
+    expect(replaced).toContain("`[[Inline Example]]`");
+    expect(replaced).toContain("[[Category:Example]]\n[[Fenced Example]]");
+    expect(replaced).toContain("[Real Page](/page/real-page");
+  });
+
+  it("does not close fenced code when a fence marker has trailing content", () => {
+    const markdown = [
+      "```md",
+      "```not-a-closing-fence",
+      "[[Category:Secret]] [[Still Code]]",
+      "```   ",
+      "[[Visible Page]]"
+    ].join("\n");
+
+    const parsed = parseWikiLinks(markdown);
+    expect(parsed.links.map((link) => link.target)).toEqual(["Visible Page"]);
+    expect(parsed.categories).toEqual([]);
+    expect(replaceWikiLinksWithMarkdown(markdown)).toContain("[[Category:Secret]] [[Still Code]]");
+  });
+
+  it("requires an exact backtick run length to close an inline code span", () => {
+    const markdown = "``[[Hidden Before]]```[[Hidden After Longer Run]]`` [[Visible Page]]";
+
+    const parsed = parseWikiLinks(markdown);
+    expect(parsed.links.map((link) => link.target)).toEqual(["Visible Page"]);
+    expect(replaceWikiLinksWithMarkdown(markdown)).toContain(
+      "``[[Hidden Before]]```[[Hidden After Longer Run]]``"
+    );
+  });
 });

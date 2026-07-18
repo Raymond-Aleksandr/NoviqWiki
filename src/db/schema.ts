@@ -606,6 +606,21 @@ export const rateLimitEvents = pgTable(
   })
 );
 
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    scope: varchar("scope", { length: 80 }).notNull(),
+    keyHash: varchar("key_hash", { length: 128 }).notNull(),
+    windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow()
+  },
+  (table) => ({
+    rateLimitBucketPk: primaryKey({ columns: [table.scope, table.keyHash] }),
+    updatedIdx: index("rate_limit_buckets_updated_idx").on(table.updatedAt)
+  })
+);
+
 export const siteRelations = relations(sites, ({ one, many }) => ({
   settings: one(siteSettings, { fields: [sites.id], references: [siteSettings.siteId] }),
   pages: many(pages),

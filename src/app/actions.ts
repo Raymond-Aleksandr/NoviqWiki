@@ -2,14 +2,15 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { ZodError } from "zod";
 import { db } from "@/db/client";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { localizeErrorMessage } from "@/i18n/errors";
 import { getRequestI18n } from "@/i18n/server";
 import { AppError, ForbiddenError } from "@/lib/errors";
-import { requirePermission } from "@/modules/authorization/permissions";
 import {
+  emailVerificationRequestSchema,
   emailVerificationSchema,
   loginSchema,
   passwordResetRequestSchema,
@@ -20,15 +21,17 @@ import {
 } from "@/modules/auth/schemas";
 import { login, registerUser } from "@/modules/auth/service";
 import {
+  requestEmailVerification,
   requestPasswordReset,
   resetPasswordWithToken,
   verifyEmailToken
 } from "@/modules/auth/recovery";
 import {
   clearSessionCookies,
+  createSession,
   getCurrentSession,
+  getRequestMetadata,
   invalidateCurrentSession,
-  invalidateUserSessions,
   setSessionCookies
 } from "@/modules/auth/session";
 import { deleteMedia, uploadMedia } from "@/modules/media/service";
@@ -45,18 +48,25 @@ import {
   softDeletePage
 } from "@/modules/pages/service";
 import { bootstrapOwner, completeSetup, getSetupMode } from "@/modules/setup/service";
-import { normalizeAllowedMediaTypes, updateSiteSettings } from "@/modules/settings/service";
+import { settingsFormSchema } from "@/modules/settings/schemas";
+import { updateSiteSettings } from "@/modules/settings/service";
 import { unwatchPage, watchPage } from "@/modules/watchlist/service";
 import {
-  assignUserToGroup,
-  createGroup,
+  createGroupWithRoles,
   createRole,
   permissionKeys,
+  requirePagePublishPermissions,
+  requirePermission,
   updateGroup,
   updateRole,
   updateUserGroups
 } from "@/modules/authorization/permissions";
-import { createUser, setUserStatus } from "@/modules/users/service";
+import {
+  createManagedUser,
+  resetManagedUserSessions,
+  setUserStatus
+} from "@/modules/users/service";
+import { managedUserSchema } from "@/modules/users/schemas";
 
 export async function setupAction(_state: ActionState, formData: FormData): Promise<ActionState> {
   try {
@@ -65,12 +75,11 @@ export async function setupAction(_state: ActionState, formData: FormData): Prom
     if (mode === "complete") {
       throw new Error("Setup has already been completed.");
     }
-    const setup =
+    const { owner } =
       mode === "owner"
         ? await bootstrapOwner(ownerSetupSchema.parse(values))
         : await completeSetup(setupSchema.parse(values));
-    const ownerPassword = String(values.ownerPassword ?? "");
-    const session = await login({ identifier: setup.owner.username, password: ownerPassword });
+    const session = await createSession({ userId: owner.id });
     await setSessionCookies(session.token, session.csrfToken);
   } catch (error) {
     return actionError(error);
@@ -81,7 +90,8 @@ export async function setupAction(_state: ActionState, formData: FormData): Prom
 export async function loginAction(_state: ActionState, formData: FormData): Promise<ActionState> {
   try {
     const parsed = loginSchema.parse(Object.fromEntries(formData.entries()));
-    const session = await login(parsed);
+    const metadata = await getRequestMetadata();
+    const session = await login({ ...parsed, clientKey: metadata.ipHash ?? undefined });
     await setSessionCookies(session.token, session.csrfToken);
   } catch (error) {
     return actionError(error);
@@ -95,7 +105,8 @@ export async function registerAction(
 ): Promise<ActionState> {
   try {
     const parsed = registerSchema.parse(Object.fromEntries(formData.entries()));
-    await registerUser(parsed);
+    const metadata = await getRequestMetadata();
+    await registerUser({ ...parsed, clientKey: metadata.ipHash ?? undefined });
   } catch (error) {
     return actionError(error);
   }
@@ -114,11 +125,42 @@ export async function requestPasswordResetAction(
 ): Promise<ActionState> {
   try {
     const parsed = passwordResetRequestSchema.parse(Object.fromEntries(formData.entries()));
-    await requestPasswordReset(parsed.identifier);
+    const metadata = await getRequestMetadata();
+    const resetRequest = {
+      identifier: parsed.identifier,
+      clientKey: metadata.ipHash ?? undefined
+    };
+    after(async () => {
+      await requestPasswordReset(resetRequest).catch(() => undefined);
+    });
     const messages = await getActionMessages();
     return {
       ok: true,
       message: messages.passwordResetSentGeneric
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function requestEmailVerificationAction(
+  _state: ActionState,
+  formData: FormData
+): Promise<ActionState> {
+  try {
+    const parsed = emailVerificationRequestSchema.parse(Object.fromEntries(formData.entries()));
+    const metadata = await getRequestMetadata();
+    const verificationRequest = {
+      identifier: parsed.identifier,
+      clientKey: metadata.ipHash ?? undefined
+    };
+    after(async () => {
+      await requestEmailVerification(verificationRequest).catch(() => undefined);
+    });
+    const messages = await getActionMessages();
+    return {
+      ok: true,
+      message: messages.emailVerificationSentGeneric
     };
   } catch (error) {
     return actionError(error);
@@ -217,7 +259,7 @@ export async function publishPageAction(
   try {
     const session = await requireSession();
     const site = await requireSite();
-    await requirePermission(session.user.id, site.site.id, "page.publish");
+    await requirePagePublishPermissions(session.user.id, site.site.id);
     const revision = await publishPage({
       pageId: stringValue(formData, "pageId"),
       baseRevisionId: optionalString(formData, "baseRevisionId"),
@@ -355,6 +397,7 @@ export async function renamePageAction(
   try {
     const session = await requireSession();
     const site = await requireSite();
+    await requirePermission(session.user.id, site.site.id, "page.edit");
     await requirePermission(session.user.id, site.site.id, "page.rename");
     const oldSlug = optionalString(formData, "oldSlug");
     const renamedPage = await renamePage({
@@ -445,43 +488,16 @@ export async function updateSettingsAction(
     const session = await requireSession();
     const site = await requireSite();
     await requirePermission(session.user.id, site.site.id, "site.configure");
-    const defaultLocale = localeValue(formData, "defaultLocale");
+    const values = settingsFormSchema.parse(Object.fromEntries(formData.entries()));
     await updateSiteSettings({
       siteId: site.site.id,
       actorId: session.user.id,
       actorDisplayName: session.user.displayName,
-      values: {
-        tagline: stringValue(formData, "tagline"),
-        baseUrl: stringValue(formData, "baseUrl"),
-        logoUrl: optionalPublicUrl(formData, "logoUrl"),
-        faviconUrl: optionalPublicUrl(formData, "faviconUrl"),
-        defaultLocale,
-        registrationMode: formData.get("registrationMode") as
-          "open" | "email_verification" | "invite" | "closed",
-        publicMode: formData.get("publicMode") === "on",
-        defaultHomepage: stringValue(formData, "defaultHomepage"),
-        homepageTitle: stringValue(formData, "homepageTitle"),
-        homepageIntro: stringValue(formData, "homepageIntro"),
-        homepageFeaturedPages: commaListValue(formData, "homepageFeaturedPages"),
-        homepageFeaturedCategories: commaListValue(formData, "homepageFeaturedCategories"),
-        homepageSections: {
-          search: formData.get("homepageSearch") === "on",
-          featured: formData.get("homepageFeatured") === "on",
-          recent: formData.get("homepageRecent") === "on",
-          categories: formData.get("homepageCategories") === "on",
-          layout: homepageLayoutValue(formData, "homepageLayout"),
-          showLogo: formData.get("homepageShowLogo") === "on"
-        },
-        footerContent: optionalString(formData, "footerContent") ?? "",
-        uploadMaxBytes: Number(formData.get("uploadMaxBytes") ?? 5242880),
-        allowedMediaTypes: normalizeAllowedMediaTypes(stringValue(formData, "allowedMediaTypes")),
-        seoTitle: optionalString(formData, "seoTitle") ?? null,
-        seoDescription: optionalString(formData, "seoDescription") ?? null
-      }
+      values
     });
     revalidatePath("/");
     revalidatePath("/admin/settings");
-    const { messages } = await getRequestI18n(defaultLocale);
+    const { messages } = await getRequestI18n(values.defaultLocale);
     return { ok: true, message: messages.settingsUpdated };
   } catch (error) {
     return actionError(error);
@@ -553,18 +569,20 @@ export async function createUserAction(
     const session = await requireSession();
     const site = await requireSite();
     await requirePermission(session.user.id, site.site.id, "user.manage");
-    const user = await createUser({
+    const input = managedUserSchema.parse({
       username: stringValue(formData, "username"),
       email: stringValue(formData, "email"),
       displayName: optionalString(formData, "displayName"),
       password: stringValue(formData, "password"),
-      status: "active",
-      locale: site.settings?.defaultLocale ?? "en"
+      locale: site.settings?.defaultLocale ?? "en",
+      groupId: optionalString(formData, "groupId")
     });
-    const groupId = optionalString(formData, "groupId");
-    if (groupId) {
-      await assignUserToGroup(user.id, groupId);
-    }
+    await createManagedUser({
+      siteId: site.site.id,
+      ...input,
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
+    });
     revalidatePath("/admin/users");
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
     return { ok: true, message: messages.userCreated };
@@ -581,10 +599,16 @@ export async function updateUserStatusAction(
     const session = await requireSession();
     const site = await requireSite();
     await requirePermission(session.user.id, site.site.id, "user.manage");
+    const status = stringValue(formData, "status");
+    if (status !== "active" && status !== "suspended") {
+      throw new AppError("Invalid user status.", "validation_error", 422);
+    }
     await setUserStatus({
       siteId: site.site.id,
       userId: stringValue(formData, "userId"),
-      status: stringValue(formData, "status") as "active" | "suspended" | "pending"
+      status,
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
     });
     revalidatePath("/admin/users");
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
@@ -602,7 +626,12 @@ export async function resetUserSessionsAction(
     const session = await requireSession();
     const site = await requireSite();
     await requirePermission(session.user.id, site.site.id, "user.manage");
-    await invalidateUserSessions(stringValue(formData, "userId"));
+    await resetManagedUserSessions({
+      siteId: site.site.id,
+      userId: stringValue(formData, "userId"),
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
+    });
     revalidatePath("/admin/users");
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
     return { ok: true, message: messages.sessionsResetMessage };
@@ -646,23 +675,15 @@ export async function createGroupAction(
     const session = await requireSession();
     const site = await requireSite();
     await requirePermission(session.user.id, site.site.id, "group.manage");
-    const group = await createGroup({
+    const roleId = optionalString(formData, "roleId");
+    await createGroupWithRoles({
       siteId: site.site.id,
       name: stringValue(formData, "name"),
-      description: optionalString(formData, "description")
+      description: optionalString(formData, "description"),
+      roleIds: roleId ? [roleId] : [],
+      actorId: session.user.id,
+      actorDisplayName: session.user.displayName
     });
-    const roleId = optionalString(formData, "roleId");
-    if (roleId) {
-      await updateGroup({
-        siteId: site.site.id,
-        groupId: group.id,
-        name: group.name,
-        description: group.description,
-        roleIds: [roleId],
-        actorId: session.user.id,
-        actorDisplayName: session.user.displayName
-      });
-    }
     revalidatePath("/admin/groups");
     const { messages } = await getRequestI18n(site.settings?.defaultLocale);
     return { ok: true, message: messages.groupCreated };
@@ -791,50 +812,9 @@ function optionalString(formData: FormData, key: string) {
   return value.trim();
 }
 
-function optionalPublicUrl(formData: FormData, key: string) {
-  const value = optionalString(formData, key);
-  if (!value) return null;
-  if (value.startsWith("/") && !value.startsWith("//")) {
-    return value;
-  }
-  try {
-    const parsed = new URL(value);
-    if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-      return value;
-    }
-  } catch {
-    throw new AppError(`Invalid URL: ${key}`, "validation_error", 422);
-  }
-  throw new AppError(`Invalid URL: ${key}`, "validation_error", 422);
-}
-
 function safeReturnPath(value: string | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
     return undefined;
-  }
-  return value;
-}
-
-function commaListValue(formData: FormData, key: string) {
-  return (optionalString(formData, key) ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .slice(0, 12);
-}
-
-function homepageLayoutValue(formData: FormData, key: string): "classic" | "portal" | "compact" {
-  const value = stringValue(formData, key);
-  if (value === "classic" || value === "portal" || value === "compact") {
-    return value;
-  }
-  throw new AppError(`Invalid homepage layout: ${value}`, "validation_error", 422);
-}
-
-function localeValue(formData: FormData, key: string): "en" | "zh-CN" {
-  const value = stringValue(formData, key);
-  if (value !== "en" && value !== "zh-CN") {
-    throw new AppError(`Invalid locale: ${value}`, "validation_error", 422);
   }
   return value;
 }

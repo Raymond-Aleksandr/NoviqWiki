@@ -70,7 +70,7 @@ describe("random published page", () => {
       },
       test.db
     );
-    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.executor);
+    await softDeletePage({ pageId: deleted.page.id, ...actor }, test.db);
     await createPage(
       {
         siteId: setup.site.id,

@@ -20,10 +20,10 @@ Next.js application
    PostgreSQL        local filesystem or S3-compatible storage
 ```
 
-- Next.js serves public wiki pages, authenticated editing/workspace pages, administration pages, direct local-media reads, and JSON routes.
+- Next.js serves public wiki pages, authenticated editing/workspace pages, administration pages, authorized same-origin media streams backed by local or S3 storage, and JSON routes.
 - PostgreSQL stores the primary site and settings, identities and sessions, RBAC, content state, immutable revisions, per-user drafts, current link/category/search projections, watchlists, media metadata, audit events, and rate-limit events.
 - Local media bytes live in `NOVIQWIKI_MEDIA_ROOT`; S3-compatible media bytes live in the configured bucket.
-- `compose.yaml` runs the application and PostgreSQL, with named volumes for the database, local media, backups, and the container-generated fallback secret.
+- `compose.yaml` runs the application and PostgreSQL, with named volumes for the database, local media, and backups. It requires an explicit stable `NOVIQWIKI_SECRET`; there is no generated fallback secret or secret volume.
 - The runtime currently loads one primary site through `getPrimarySiteWithSettings`. Many tables carry `siteId` for isolation and future multi-site work, but v0.1.0 is operated as a single-site application.
 
 ## Request and Mutation Flow
@@ -82,7 +82,7 @@ Known boundary exceptions include direct database reads in `src/app/admin/status
 
 - `media_assets` stores metadata and a storage key; the object bytes remain in the selected storage backend.
 - `audit_logs` stores structured action events. `requestId`, `ipHash`, and `userAgent` columns exist, but current domain write sites generally do not populate request metadata.
-- `rate_limit_events` currently supports login attempt limiting.
+- `rate_limit_events` stores atomic authentication-abuse buckets for login, registration, recovery, and verification workflows.
 
 ## Publication Transaction
 
@@ -118,24 +118,25 @@ Published pages update a dedicated `search_index` table. PostgreSQL uses a gener
 ## Authentication and Authorization
 
 - Local username/email credentials are hashed with Argon2id.
-- Setup has three database-derived modes: no site runs full initial setup; an existing site with zero users runs an Owner-only bootstrap that preserves site/content records; any user row closes setup. Public registration uses a no-lock fast path after setup, but an incomplete-state preflight is rechecked under the same advisory lock as Owner creation; it therefore cannot create the first account. Because the zero-user mode is unauthenticated first-Owner provisioning, isolate the instance until a trusted administrator completes it.
+- Setup has three database-derived modes: no site runs full initial setup; an existing site with no active Owner runs an Owner-only bootstrap that preserves site/content records; and the presence of an active Owner closes setup. Public registration uses a fast path after setup, but an incomplete-state preflight is rechecked under the same advisory lock as Owner creation; it therefore cannot race Owner bootstrap. Because the no-active-Owner mode is an unauthenticated administrative recovery boundary, isolate the instance until a trusted administrator completes it.
 - Successful login creates a 14-day database session and sets `noviqwiki_session` (`HttpOnly`) plus `noviqwiki_csrf` (readable by the browser), both `SameSite=Lax`. They are `Secure` when the environment `NOVIQWIKI_BASE_URL` uses `https:`, independent of `NODE_ENV` and the base URL stored in PostgreSQL.
 - Permission evaluation unions the permissions of every role assigned to every group containing the user.
 - Anonymous users receive only `site.view`, `page.read`, `revision.read`, and `media.read`, and only while `publicMode` is enabled. If the primary site has no `site_settings` row, the current permission helper defaults `publicMode` to enabled.
 - Built-in Administrator and Owner roles currently receive every permission key. Owner is additionally protected by the final-active-Owner invariant.
-- `/admin/**` has an outer `site.configure` layout gate. That permission is sufficient to render every admin read page; those page components do not additionally require narrower read permissions such as `user.read`, `audit.read`, or `media.read`. Conversely, narrow permissions may authorize JSON routes but do not grant access to the corresponding admin page. Mutating actions still perform their own management-permission checks.
+- `/admin/**` has an outer `site.configure` layout gate. Data-bearing admin pages additionally enforce their narrower read permissions, such as `user.read`, `audit.read`, or `media.read`; therefore both the outer gate and the page-specific permission are required. Mutating actions also perform their own management-permission checks.
 
 See [Authorization](./AUTHORIZATION.md) for the exact role grants, protected-page rules, and current enforcement gaps.
 
 ## Media Architecture
 
-`StorageAdapter` defines `put`, `delete`, `getPublicUrl`, and `isReady`.
+`StorageAdapter` defines `put`, `delete`, `getPublicUrl`, `read`, and `isReady`.
 
-- `LocalStorageAdapter` uses randomized storage keys below `NOVIQWIKI_MEDIA_ROOT`, rejects traversal outside that root, and serves bytes through `/media/[...key]` after `media.read` authorization. The current local response is marked `public, max-age=31536000, immutable`. Private deployments must disable shared proxy/CDN caching. Deployments that require immediate revocation after logout, permission removal, a private-mode change, or deletion must change the route to `Cache-Control: private, no-store` and purge already cached objects or rotate previously distributed URLs.
-- `S3StorageAdapter` uses an S3-compatible endpoint. Its signed GET URLs last one hour and do not re-check application authorization after issuance. Upload currently persists that temporary URL in `media_assets.publicUrl`, and the media picker/editor can copy or insert it. The same-origin `/media/[...key]` route performs `media.read` authorization but then redirects to the external signed URL; the default `img-src 'self' data: blob:` policy blocks that external image unless deployment CSP is extended. Reference discovery scans only the current published Markdown for `publicUrl` or `safeFilename` substrings, not `storageKey`, so stable same-origin S3 references can be missed and delete-conflict detection is not a reliable integrity guarantee.
+- `LocalStorageAdapter` uses randomized storage keys below `NOVIQWIKI_MEDIA_ROOT`. It rejects lexical traversal, validates canonical containment through every path segment, refuses a symlink as the final object, and opens reads without following the final path. The authorized `/media/[...key]` route streams the object through the application.
+- `S3StorageAdapter` uses an S3-compatible endpoint but exposes the same stable `/media/[...key]` URL. The application authorizes `media.read`, reads the S3 object, and streams it in the same-origin response. It neither persists presigned URLs nor redirects clients to object storage.
+- Every media response re-evaluates authorization. It sends `Cache-Control: public, max-age=0, must-revalidate` only when an anonymous actor has `media.read`; otherwise it sends `private, no-store, max-age=0`.
 - Runtime adapter selection uses `NOVIQWIKI_MEDIA_DRIVER`. The `site_settings.media_driver` value collected during setup is persisted but is not consulted by `getStorageAdapter`; deployments must configure the environment variable consistently.
-- Local readiness only creates the media directory and does not perform a read/write probe. S3 readiness currently checks only that a bucket name exists and does not contact S3.
-- Upload validation enforces size and an allowlist. When byte detection fails, it currently falls back to the client-declared MIME type; this is a known hardening gap, not full content verification.
+- Local readiness performs a safe write/read/delete probe under the canonical media root. S3 readiness performs a unique-object put/get/content-check/delete probe and caches the result briefly; failed cleanup makes the probe fail.
+- Upload validation enforces size and a safe MIME allowlist. It derives binary types from the bytes, recognizes valid UTF-8 plain text explicitly, and otherwise uses `application/octet-stream`; it does not trust the client-declared MIME type.
 
 ## Internationalization
 
@@ -161,9 +162,9 @@ The root layout currently uses cookie, active user, then site default and does n
 ## Deployment and Operations
 
 - The production image builds a Next.js standalone bundle, runs as the non-root `noviqwiki` user, applies migrations at startup, and then starts the server.
-- Production requires a stable `NOVIQWIKI_SECRET` of at least 32 characters. When Compose leaves it empty, the container entrypoint generates `/app/secrets/noviqwiki-secret`; the committed `noviqwiki-secrets` volume preserves it across container recreation. An explicit value is not written there and removes any old fallback, so later removing the explicit value creates a new fallback and rotates HMAC-derived sessions/tokens. Removing the volume has the same rotation effect while fallback mode is active, and `pnpm backup` does not include it. Production should inject one stable managed secret instead.
+- Production requires an explicitly configured stable `NOVIQWIKI_SECRET` of at least 32 characters. Compose also requires the value before configuration can start. Neither path generates a fallback secret or uses a secret volume; inject and preserve the value through the deployment's secret manager.
 - `/api/health` checks process liveness. `/api/ready` queries PostgreSQL and checks the storage adapter as described above.
-- Backup and restore are CLI operations in `scripts/backup.ts` and `scripts/restore.ts`; the `backup.create` permission is not consulted by those operating-system commands. They read only their database/media/restore variables rather than validating unrelated web-runtime secrets. Local database tools receive a normalized URL target without ambient libpq routing overrides or a password in argv. A missing local PostgreSQL client can use the repository-anchored Docker `default` context, `noviqwiki` project, and `db/noviqwiki` service/database only with explicit `NOVIQWIKI_COMPOSE_FALLBACK=1`; connection or SQL failures never switch targets. Restore preflights recognized complete plain SQL and safe media inputs, binds confirmation to the selected target, and sends the schema reset plus import through one `ON_ERROR_STOP=1` transaction. A following local-media extraction is necessarily outside that database transaction.
+- Backup and restore are CLI operations in `scripts/backup.ts` and `scripts/restore.ts`; the `backup.create` permission is not consulted by those operating-system commands. Local database tools receive a normalized URL target without ambient libpq routing overrides or a password in argv. Docker Compose tooling is selected only when `DATABASE_URL` exactly targets the configured `db:5432` service, user, and database; there is no `NOVIQWIKI_COMPOSE_FALLBACK` switch and failures never change targets. Restore preflights a complete PostgreSQL dump and safe media input, binds confirmation to the exact database and canonical media root, and executes schema reset plus import in one `ON_ERROR_STOP=1` database transaction. Local media is staged and promoted separately; if the database restore fails, the previous media tree is rolled back before the command exits.
 - There is no background worker or queue. Email delivery and media work happen in the request/command process.
 
 ## Current Security and Integration Boundaries
@@ -171,10 +172,10 @@ The root layout currently uses cookie, active user, then site default and does n
 The architecture describes the implemented system, including these v0.1.0 boundaries:
 
 - The JSON resource API has no stable cross-origin, API-key, or API-token contract. Keep it same-origin and limited to trusted application integrations; deployments with untrusted accounts must not treat it as a general-purpose or multi-tenant API boundary.
-- `GET /api/v1/me` currently returns the full internal user row, including `passwordHash` and normalized identifiers, plus the CSRF token; `GET /api/v1/admin/users` returns full user rows including `passwordHash`. These are not stable or minimized public DTOs, so consumers and logs must allowlist only required fields.
-- `assertCsrf` has no callers. Cookie-authenticated `/api/v1` mutations and `POST /logout` do not currently validate `Origin` or `x-csrf-token`; their primary browser-side CSRF mitigation is `SameSite=Lax`.
-- Page resource reads can expose draft/archived records to any actor with `page.read`. Search, category, and maintenance discovery paths are published-only, but a known archived slug can still resolve through direct article/history UI; archival status is not a confidentiality boundary.
-- Upload detection can trust the declared MIME type when byte detection returns no result.
+- User-facing API responses use an allowlisted safe user DTO and never return `passwordHash`; `/api/v1/me` also returns the session's CSRF token for same-origin API writes.
+- Cookie-authenticated unsafe `/api/v1` methods require the matching `x-csrf-token` and reject a conflicting `Origin` or cross-site Fetch Metadata signal. The API still has no cross-origin or API-token contract.
+- Page list reads default to published records; draft listings require `page.edit`, and archived/deleted listings require `page.restore`. A known archived slug can still resolve through direct article/history UI for an actor with `page.read`, so archival status is not a confidentiality boundary.
+- Upload detection does not trust the declared MIME type when byte detection returns no result.
 - Request IDs are added to response headers, but audit write sites generally do not attach them to `audit_logs`.
 
 Do not present those areas as stronger guarantees in deployment or security documentation until code and tests prove the guarantees.
@@ -203,10 +204,10 @@ Next.js 应用
    PostgreSQL        本地文件系统或 S3 兼容存储
 ```
 
-- Next.js 提供公开 Wiki 页面、已登录编辑/工作区页面、管理页面、本地媒体直接读取和 JSON 路由。
+- Next.js 提供公开 Wiki 页面、已登录编辑/工作区页面、管理页面、由本地或 S3 存储支持的已授权同源媒体流，以及 JSON 路由。
 - PostgreSQL 存储主站点及设置、身份与会话、RBAC、内容状态、不可变修订、每用户草稿、当前链接/分类/搜索投影、监视列表、媒体元数据、审计事件和限流事件。
 - 本地媒体字节位于 `NOVIQWIKI_MEDIA_ROOT`；S3 兼容媒体字节位于配置的存储桶。
-- `compose.yaml` 运行应用和 PostgreSQL，并为数据库、本地媒体、备份及容器生成的回退密钥使用命名卷。
+- `compose.yaml` 运行应用和 PostgreSQL，并为数据库、本地媒体和备份使用命名卷。它要求显式提供稳定的 `NOVIQWIKI_SECRET`；不存在生成的回退密钥或密钥卷。
 - 运行时目前通过 `getPrimarySiteWithSettings` 加载一个主站点。许多表带有 `siteId`，用于隔离和未来多站点工作，但 v0.1.0 按单站点应用运行。
 
 ### 请求与写操作流程
@@ -265,7 +266,7 @@ Next.js 应用
 
 - `media_assets` 保存元数据和存储键；对象字节保留在所选存储后端。
 - `audit_logs` 保存结构化操作事件。虽然存在 `requestId`、`ipHash` 和 `userAgent` 列，但当前领域写入点通常不会填充请求元数据。
-- `rate_limit_events` 当前用于登录尝试限流。
+- `rate_limit_events` 为登录、注册、恢复和验证流程保存原子身份验证滥用限流桶。
 
 ### 发布事务
 
@@ -301,24 +302,25 @@ Markdown
 ### 身份验证与授权
 
 - 本地用户名/邮箱凭据使用 Argon2id 哈希。
-- 设置有三种由数据库状态决定的模式：没有站点时运行完整初始设置；已有站点但用户数为零时运行仅 Owner 引导并保留站点/内容记录；存在任意用户记录后关闭设置。设置完成后的公开注册走无锁快速路径；若预检发现状态不完整，则会在与 Owner 创建相同的 advisory lock 内重新检查，因此不能创建首个账户。零用户模式本质上是未经身份验证的首个 Owner 配置，因此受信管理员完成前必须隔离实例。
+- 设置有三种由数据库状态决定的模式：没有站点时运行完整初始设置；已有站点但没有活跃 Owner 时运行仅 Owner 引导并保留站点/内容记录；存在活跃 Owner 后关闭设置。设置完成后的公开注册走快速路径；若预检发现状态不完整，则会在与 Owner 创建相同的 advisory lock 内重新检查，因此不能与 Owner 引导竞争。无活跃 Owner 模式属于未经身份验证的管理恢复边界，因此受信管理员完成前必须隔离实例。
 - 登录成功会创建 14 天数据库会话，并设置 `noviqwiki_session`（`HttpOnly`）及 `noviqwiki_csrf`（浏览器可读）；两者均为 `SameSite=Lax`。只有环境变量 `NOVIQWIKI_BASE_URL` 使用 `https:` 时才启用 `Secure`，与 `NODE_ENV` 及 PostgreSQL 中保存的基础 URL 无关。
 - 权限计算会合并用户所在所有用户组所分配全部角色的权限。
 - 匿名用户只能获得 `site.view`、`page.read`、`revision.read` 和 `media.read`，且仅在启用 `publicMode` 时有效。若主站点缺少 `site_settings` 记录，当前权限辅助函数会默认把 `publicMode` 视为启用。
 - 内置 Administrator 和 Owner 角色目前都拥有全部权限键。Owner 还受“至少保留一个活跃 Owner”不变量保护。
-- `/admin/**` 外层布局要求 `site.configure`。仅此权限就足以渲染所有管理读取页面；页面组件不会再要求 `user.read`、`audit.read` 或 `media.read` 等较窄读取权限。反过来，较窄权限可能允许 JSON 路由，但不会授予相应管理页面访问权。写操作仍会执行各自的管理权限检查。
+- `/admin/**` 外层布局要求 `site.configure`。承载数据的管理页面还会执行 `user.read`、`audit.read` 或 `media.read` 等较窄读取权限，因此必须同时通过外层和页面级检查。写操作还会执行各自的管理权限检查。
 
 准确角色授权、受保护页面规则和当前执行缺口见[授权](./AUTHORIZATION.md)。
 
 ### 媒体架构
 
-`StorageAdapter` 定义 `put`、`delete`、`getPublicUrl` 和 `isReady`。
+`StorageAdapter` 定义 `put`、`delete`、`getPublicUrl`、`read` 和 `isReady`。
 
-- `LocalStorageAdapter` 在 `NOVIQWIKI_MEDIA_ROOT` 下使用随机存储键，拒绝根目录外的路径穿越，并在校验 `media.read` 后通过 `/media/[...key]` 提供字节。当前本地响应带有 `public, max-age=31536000, immutable`。私有部署必须禁用代理/CDN 共享缓存。若部署要求在退出登录、移除权限、切换私有模式或删除后立即撤销访问，则必须把该路由改为 `Cache-Control: private, no-store`，并清除已缓存对象或轮换此前分发的 URL。
-- `S3StorageAdapter` 使用 S3 兼容端点。签名 GET URL 的有效期为一小时，签发后不会再次检查应用权限。上传当前会把该临时 URL 持久化到 `media_assets.publicUrl`，媒体选择器/编辑器也可以复制或插入它。同源 `/media/[...key]` 路由会检查 `media.read`，但随后重定向到外部签名 URL；除非部署扩展 CSP，否则默认 `img-src 'self' data: blob:` 会阻止该外部图片。引用发现只扫描当前已发布 Markdown 中 `publicUrl` 或 `safeFilename` 的子字符串，不扫描 `storageKey`，因此稳定的同源 S3 引用可能漏检，删除冲突检测也不是可靠的完整性保证。
+- `LocalStorageAdapter` 在 `NOVIQWIKI_MEDIA_ROOT` 下使用随机存储键。它会拒绝词法路径穿越，逐段验证规范路径仍位于根目录内，拒绝最终对象为符号链接，并在读取时禁止跟随最终路径。已授权的 `/media/[...key]` 路由通过应用流式返回对象。
+- `S3StorageAdapter` 使用 S3 兼容端点，但同样公开稳定的 `/media/[...key]` 地址。应用检查 `media.read`，读取 S3 对象，再通过同源响应流式返回；不会持久化预签名 URL，也不会把客户端重定向到对象存储。
+- 每次媒体响应都会重新判断授权。只有匿名主体拥有 `media.read` 时才发送 `Cache-Control: public, max-age=0, must-revalidate`；其他情况发送 `private, no-store, max-age=0`。
 - 运行时适配器由 `NOVIQWIKI_MEDIA_DRIVER` 选择。设置时采集的 `site_settings.media_driver` 会持久化，但 `getStorageAdapter` 不会读取它；部署必须保持环境变量配置一致。
-- 本地就绪检查只会创建媒体目录，不执行读写探测。S3 就绪检查目前只确认存在存储桶名称，不会联系 S3。
-- 上传校验执行大小和允许列表检查。当字节检测失败时，目前会回退到客户端声明的 MIME 类型；这是已知加固缺口，不是完整内容验证。
+- 本地就绪检查会在规范媒体根目录下执行安全的写入/读取/删除探测。S3 就绪检查会对唯一对象执行上传、读取及内容比对、删除，并短暂缓存结果；清理失败也会让探测失败。
+- 上传校验执行大小和安全 MIME 允许列表检查。二进制类型从字节派生，有效 UTF-8 纯文本会被明确识别，其他无法识别的内容使用 `application/octet-stream`；不会信任客户端声明的 MIME 类型。
 
 ### 国际化
 
@@ -344,9 +346,9 @@ Markdown
 ### 部署与运维
 
 - 生产镜像构建 Next.js standalone 包，以非 root 用户 `noviqwiki` 运行，在启动服务器前应用迁移。
-- 生产环境要求至少 32 个字符的稳定 `NOVIQWIKI_SECRET`。当 Compose 留空时，容器入口会生成 `/app/secrets/noviqwiki-secret`；提交的 `noviqwiki-secrets` 卷会在容器重建后保留它。显式值不会写入该文件，并会删除任何旧回退；因此日后移除显式值会创建新回退并轮换 HMAC 派生的会话/Token。使用回退模式时删除该卷也会产生相同轮换效果，且 `pnpm backup` 不包含此卷。生产环境应改为注入单一稳定的受管密钥。
+- 生产环境要求显式配置至少 32 个字符的稳定 `NOVIQWIKI_SECRET`，Compose 也会在配置启动前要求该值。两条路径都不会生成回退密钥，也不使用密钥卷；应通过部署的密钥管理系统注入并持久保留该值。
 - `/api/health` 检查进程存活。`/api/ready` 查询 PostgreSQL，并按上述方式检查存储适配器。
-- 备份和恢复是 `scripts/backup.ts` 与 `scripts/restore.ts` 中的 CLI 操作；这些操作系统命令不会检查 `backup.create` 权限。它们只读取数据库、媒体与恢复相关变量，不会校验无关的 Web 运行时密钥。本地数据库工具会收到规范化 URL 目标，不继承环境中的 libpq 路由覆盖，密码也不会出现在 argv 中。只有本机缺少 PostgreSQL 客户端且显式设置 `NOVIQWIKI_COMPOSE_FALLBACK=1` 时，才可使用锚定到本仓库的 Docker `default` context、`noviqwiki` 项目与 `db/noviqwiki` 服务/数据库；连接或 SQL 失败绝不会切换目标。恢复会预检可识别的完整纯 SQL 与安全媒体输入，把确认值绑定到所选目标，并在同一个 `ON_ERROR_STOP=1` 事务中执行 Schema 重置与导入；后续本地媒体解压必然位于该数据库事务之外。
+- 备份和恢复是 `scripts/backup.ts` 与 `scripts/restore.ts` 中的 CLI 操作；这些操作系统命令不会检查 `backup.create` 权限。本地数据库工具会收到规范化 URL 目标，不继承环境中的 libpq 路由覆盖，密码也不会出现在 argv 中。仅当 `DATABASE_URL` 精确指向已配置的 `db:5432` 服务、用户和数据库时才会选择 Docker Compose 工具；不存在 `NOVIQWIKI_COMPOSE_FALLBACK` 开关，失败也绝不会切换目标。恢复会预检完整 PostgreSQL dump 与安全媒体输入，把确认值绑定到确切数据库和规范媒体根目录，并在同一个 `ON_ERROR_STOP=1` 数据库事务中执行 Schema 重置与导入。本地媒体会单独暂存和提升；若数据库恢复失败，命令退出前会回滚到此前媒体树。
 - 没有后台 Worker 或队列。邮件投递和媒体工作都在请求/命令进程中完成。
 
 ### 当前安全与集成边界
@@ -354,10 +356,10 @@ Markdown
 本架构描述已实现系统，也包括以下 v0.1.0 边界：
 
 - JSON 资源 API 没有稳定的跨域、API 密钥或 API Token 契约。应保持同源并限于受信任的应用集成；包含不受信任账户的部署不得把它当作通用或多租户 API 边界。
-- `GET /api/v1/me` 当前返回完整内部用户记录（包括 `passwordHash` 和规范化标识）及 CSRF Token；`GET /api/v1/admin/users` 返回包括 `passwordHash` 在内的完整用户记录。这些不是稳定、最小化的公开 DTO，因此消费者和日志必须通过允许列表只使用所需字段。
-- `assertCsrf` 当前没有调用方。使用 Cookie 鉴权的 `/api/v1` 写操作和 `POST /logout` 不校验 `Origin` 或 `x-csrf-token`；它们目前主要依赖浏览器侧的 `SameSite=Lax` 缓解 CSRF。
-- 页面资源读取可能向任何具有 `page.read` 的操作者暴露草稿/已归档记录。搜索、分类和维护发现路径仅包含已发布内容，但已知的归档 slug 仍可通过直接条目/历史界面解析；归档状态不是保密边界。
-- 当字节检测没有结果时，上传检测可能信任声明的 MIME 类型。
+- 面向用户的 API 响应使用允许列表定义的安全用户 DTO，绝不会返回 `passwordHash`；`/api/v1/me` 还会返回会话 CSRF Token，供同源 API 写操作使用。
+- 使用 Cookie 鉴权的非安全 `/api/v1` 方法要求匹配的 `x-csrf-token`，并拒绝冲突的 `Origin` 或跨站 Fetch Metadata 信号。API 仍没有跨域或 API Token 契约。
+- 页面列表读取默认只返回已发布记录；草稿列表要求 `page.edit`，已归档/已删除列表要求 `page.restore`。具有 `page.read` 的操作者仍可通过直接条目/历史界面解析已知的归档 slug，因此归档状态不是保密边界。
+- 当字节检测没有结果时，上传检测不会信任声明的 MIME 类型。
 - 请求 ID 会添加到响应头，但审计写入点通常不会把它附加到 `audit_logs`。
 
 在代码和测试证明相关保证前，不应在部署或安全文档中把这些方面描述得更强。

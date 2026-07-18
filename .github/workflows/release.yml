@@ -23,10 +23,17 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
+  verify:
+    name: Verify release commit
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   publish-image:
     name: Publish GHCR image
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    needs: verify
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

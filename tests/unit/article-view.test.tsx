@@ -36,6 +36,19 @@ describe("ArticleView", () => {
     expect(html).toContain("/page/moved-topic");
   });
 
+  it("shows the page protection state in article information", () => {
+    const html = renderToStaticMarkup(
+      <ArticleView
+        page={{ ...page, protectionLevel: "protected" }}
+        revision={revision}
+        locale="en"
+        messages={en}
+      />
+    );
+
+    expect(html).toContain(en.pageProtected);
+  });
+
   it("renders missing wiki links as page creation links for authorized users", () => {
     const html = renderToStaticMarkup(
       <ArticleView
@@ -61,6 +74,21 @@ describe("ArticleView", () => {
 
     expect(html).toContain("/edit/new?title=Missing%20Topic");
     expect(html).toContain("wiki-link-missing");
+  });
+
+  it("renders a read-time media URL rewrite without mutating the revision", () => {
+    const html = renderToStaticMarkup(
+      <ArticleView
+        page={page}
+        revision={revision}
+        renderedHtml={'<p><img src="/media/site/image.png" alt="cover"></p>'}
+        locale="en"
+        messages={en}
+      />
+    );
+
+    expect(html).toContain("/media/site/image.png");
+    expect(revision.html).toBe("<p>Moved body.</p>");
   });
 });
 

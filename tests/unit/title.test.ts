@@ -18,5 +18,8 @@ describe("title normalization", () => {
       normalizedTitle: "project home",
       slug: "project-home"
     });
+    expect(() => derivePageIdentity("Project Home", "s".repeat(241))).toThrow(
+      "Slug must be 240 characters or less."
+    );
   });
 });

@@ -4,6 +4,7 @@ import { ArrowLeft, History, Link2, Quote } from "lucide-react";
 import { requirePageReadAccess } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
+import { canonicalApplicationBaseUrl } from "@/lib/env";
 import { decodeRouteParam } from "@/lib/route-params";
 import { buildPageCitations } from "@/modules/pages/citations";
 import { getRevisionById } from "@/modules/pages/service";
@@ -42,7 +43,7 @@ export default async function CitePage({ params }: Props) {
     revisionNumber: revision.revisionNumber,
     revisionCreatedAt: revision.createdAt,
     siteName: site.site.name,
-    baseUrl: site.settings?.baseUrl ?? "http://localhost:3000",
+    baseUrl: canonicalApplicationBaseUrl(undefined, site.settings?.baseUrl),
     pageSlug: resolved.page.slug,
     accessedAt: new Date()
   });

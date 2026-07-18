@@ -12,9 +12,9 @@ This guide describes the current NoviqWiki `0.1.0` deployment model: a Next.js s
 - HTTPS termination through a reverse proxy, load balancer, or platform ingress.
 - Deployment-managed secrets and environment variables.
 - Database and media backup, monitoring, alerting, and a tested restore procedure.
-- A single public origin matching the base URL stored in the NoviqWiki site settings.
+- A single public origin matching the deployment-managed `NOVIQWIKI_BASE_URL`.
 
-The repository's `compose.yaml` is a local/evaluation baseline, not a hardened production definition. As committed, it publishes PostgreSQL on host port `5432`, uses the example database password `noviqwiki`, serves HTTP on port `3000`, hard-codes local media, and mounts `noviqwiki-secrets` so the image can persist an automatically generated secret when no explicit value is supplied. Create a deployment-specific override or platform definition before internet-facing use.
+The repository's `compose.yaml` is a secure local baseline: it requires explicit database and application secrets, keeps PostgreSQL private, and binds HTTP to `127.0.0.1:3000`. An internet-facing deployment still needs HTTPS termination, managed secrets, backups, observability, resource limits, and a deployment-specific image policy.
 
 ## Verify a Release Candidate
 
@@ -37,6 +37,8 @@ docker compose build
 
 `pnpm test:ui` is a separate live-server audit. When it is part of the release decision, run it with the prerequisites and authenticated coverage described in [TESTING.md](./TESTING.md#ui-release-audit). Do not insert an unprepared bare `pnpm test:ui` into a batch command because it expects an already running server.
 
+CI provisions PostgreSQL 17 for integration tests and runs the real PostgreSQL migration and concurrency coverage. Supply the documented disposable test database URL when reproducing that subset locally.
+
 Record results only after running them in the current checkout. Pin the deployed source commit or container digest so the artifact can be correlated with those results.
 
 ## Production Environment
@@ -48,6 +50,7 @@ NODE_ENV=production
 DATABASE_URL=postgres://noviqwiki:secret@postgres.example.com:5432/noviqwiki
 NOVIQWIKI_BASE_URL=https://wiki.example.com
 NOVIQWIKI_SECRET=replace-with-generated-secret-of-at-least-32-characters
+NOVIQWIKI_SETUP_TOKEN=replace-with-separate-one-time-token
 NOVIQWIKI_MEDIA_DRIVER=local
 NOVIQWIKI_MEDIA_ROOT=/app/media
 NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
@@ -66,19 +69,25 @@ NOVIQWIKI_S3_SECRET_ACCESS_KEY=replace-with-secret-key
 
 The current S3 adapter requires the endpoint, bucket, access key, and secret key and uses path-style requests. Validate the chosen provider and browser delivery path before rollout. Configure both SMTP variables when email verification or password-reset delivery is required.
 
-The setup wizard writes a base URL into PostgreSQL. After setup, changing only `NOVIQWIKI_BASE_URL` does not update that stored value; update `/admin/settings` as well. The stored URL is authoritative for generated application and recovery links, but it does not control cookie security. Session and CSRF cookies receive `Secure` only when the environment `NOVIQWIKI_BASE_URL` has the `https:` scheme, regardless of `NODE_ENV`. See [CONFIGURATION.md](./CONFIGURATION.md) for environment-loading rules and the full variable reference.
+In production, `NOVIQWIKI_BASE_URL` is authoritative for request validation, redirects, citations, and email links even if PostgreSQL contains an older setup value. Use HTTPS in production. Enter `NOVIQWIKI_SETUP_TOKEN` during initial Owner setup, then remove it from the deployment environment and restart. See [CONFIGURATION.md](./CONFIGURATION.md) for environment-loading rules and the full variable reference.
 
 ## Setup Modes and Exposure
 
 The `/setup` route has three database-derived modes:
 
-| Mode       | Database state                                 | Result                                                                                                                 |
-| ---------- | ---------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `initial`  | No site exists                                 | Full site configuration and first-Owner setup are available.                                                           |
-| `owner`    | A site exists and the total user count is zero | Only first-Owner bootstrap is available; existing site settings, pages, revisions, and media references are preserved. |
-| `complete` | At least one user exists                       | Setup is closed and `/setup` redirects away.                                                                           |
+| Mode       | Database state                        | Result                                                                                                                           |
+| ---------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `initial`  | No site exists                        | Full site configuration and first-Owner setup are available.                                                                     |
+| `owner`    | A site exists but has no active Owner | Only Owner recovery/bootstrap is available; existing site settings, pages, revisions, users, and media references are preserved. |
+| `complete` | The site has an active Owner          | Setup is closed and `/setup` redirects away.                                                                                     |
 
-Keep the application or `/setup` isolated from untrusted networks until a trusted administrator completes setup. In particular, a restored or preloaded database with a site but zero users enters `owner` mode. Public registration remains blocked, but any visitor who can reach `/setup` during that window can claim the first Owner account.
+Keep the application or `/setup` isolated from untrusted networks until a trusted administrator completes setup. In particular, a restored or preloaded database whose site has no active Owner enters `owner` mode. Public registration remains blocked, but any visitor who can reach `/setup` during that window can recover the Owner role.
+
+For the supplied Compose file, also set a unique raw `POSTGRES_PASSWORD` and set the required
+`DATABASE_URL` to a complete URL whose host is `db`. Compose does not interpolate the password into
+the URL. Percent-encode any reserved characters in the URL credentials while keeping
+`POSTGRES_PASSWORD` raw. PostgreSQL is reachable only on the private Compose network; do not
+publish its port in an internet-facing deployment.
 
 ## Database Migrations
 
@@ -88,7 +97,14 @@ The migration command is:
 pnpm db:migrate
 ```
 
-It uses a PostgreSQL advisory lock, so concurrent invocations serialize. For every release:
+The host command is for environments where `DATABASE_URL` is reachable from the host. The supplied Compose database is private; run the release migration through the app image instead:
+
+```bash
+docker compose up -d db
+docker compose run --rm --no-deps app node scripts/migrate.mjs
+```
+
+The supplied image also runs this migration runner before starting the server. It uses a PostgreSQL advisory lock, so concurrent container starts serialize migration work and already-applied releases are a no-op. For every release:
 
 1. Back up PostgreSQL and media first.
 2. Review the target release's SQL in `drizzle/`.
@@ -97,7 +113,7 @@ It uses a PostgreSQL advisory lock, so concurrent invocations serialize. For eve
 5. Run the migration once as a controlled release step and retain its output.
 6. Keep the previous application image and the pre-migration backup until post-deploy validation passes.
 
-The current Docker image also runs `scripts/migrate.ts` automatically in its `CMD` before starting the standalone server. This means every container start attempts the idempotent migration path under the advisory lock. A platform that uses a dedicated migration job should customize the startup process so migration ownership is unambiguous; do not describe the stock image as migration-free.
+A platform that uses a dedicated migration job should customize the startup process so migration ownership is unambiguous; do not describe the stock image as migration-free.
 
 Do not start old application code against a schema known to be incompatible with it.
 
@@ -113,33 +129,26 @@ docker compose up -d
 
 Always use `--quiet` for human validation. Plain `docker compose config` renders resolved environment values and its output must not be copied into logs or review artifacts.
 
-The stock image's startup script resolves the secret as follows:
+Keep `NOVIQWIKI_SECRET` stable across restarts and replicas. On a fresh installation, remove the
+one-time `NOVIQWIKI_SETUP_TOKEN` after the first Owner has completed setup and restart the service.
 
-1. When a non-empty explicit `NOVIQWIKI_SECRET` environment value exists, use it and proactively delete `${NOVIQWIKI_SECRET_DIR:-/app/secrets}/noviqwiki-secret` if that fallback file exists.
-2. Otherwise, read a non-empty fallback file at that path.
-3. If no non-empty fallback exists, generate a 32-byte random value, write its hexadecimal representation to that file with restrictive permissions, and export it to the application.
-
-An explicit `NOVIQWIKI_SECRET` is never written to the fallback file. The stock Compose file mounts `noviqwiki-secrets` at `/app/secrets`, so a fallback survives container replacement and `docker compose down` while no explicit value is used. Starting with an explicit value removes that persisted fallback. If the explicit value is later removed, no old fallback remains to recover: startup generates a new one, invalidating existing HMAC-derived sessions, email-verification tokens, password-reset tokens, rate-limit hashes, and IP hashes. Operators may inject the explicit value through the shell, an untracked `.env`, or an override. Production must use one stable, explicitly managed value rather than switch between an explicit secret and automatic fallback generation.
-
-Inspect status and logs:
+Inspect runtime status:
 
 ```bash
 docker compose ps
 docker compose logs --tail=200 app
 ```
 
-The committed service names are `app` and `db`. The named volumes are `noviqwiki-db`, `noviqwiki-media`, `noviqwiki-backups`, and `noviqwiki-secrets` under the Compose project name. `docker compose down` preserves them. `docker compose down -v` deletes the database, local media, backup output, and persisted fallback secret; it must not be used on retained data without an explicit destructive-operation plan. If no explicit managed secret is supplied after deleting the secret volume, startup generates a new value and invalidates existing HMAC-derived sessions and tokens, as does removing an explicit value after it has deleted the old fallback.
-
-`pnpm backup` does not include `noviqwiki-secrets`. A production deployment should keep `NOVIQWIKI_SECRET` in its secret manager. A platform that deliberately uses the file fallback must protect and recover that file separately and keep it consistent across instances.
+The committed service names are `app` and `db`. The named volumes are `noviqwiki-db`, `noviqwiki-media`, and `noviqwiki-backups` under the Compose project name. `docker compose down` preserves them. `docker compose down -v` deletes the database, local media, and backup output; it must not be used on retained data without an explicit destructive-operation plan. Keep `NOVIQWIKI_SECRET` in an approved secret manager.
 
 ## Hardening Compose for Production
 
 A production-specific Compose or platform definition should, at minimum:
 
-- Replace the example PostgreSQL credentials, or use a managed database.
-- Stop publishing PostgreSQL to the public host unless an explicitly secured administration path requires it.
+- Use unique PostgreSQL credentials, or use a managed database.
+- Keep PostgreSQL private; host development should use only the loopback mapping in `compose.dev.yaml`.
 - Inject `DATABASE_URL`, `NOVIQWIKI_BASE_URL`, `NOVIQWIKI_SECRET`, media, SMTP, pool, and log settings from the deployment environment or secret manager.
-- Fail deployment when the managed `NOVIQWIKI_SECRET` is missing instead of relying on the image's evaluation-friendly automatic generation and secret volume.
+- Continue failing deployment when the managed `NOVIQWIKI_SECRET` is missing.
 - Mount local media and backup output on independently backed-up persistent storage, or configure the complete S3 backend.
 - Pin the application image to a release tag and preferably an immutable digest.
 - Add resource limits, log retention, update policy, and platform-specific health checks.
@@ -156,15 +165,17 @@ Terminate TLS before traffic reaches the Next.js server and forward or overwrite
 - `X-Forwarded-Proto`
 - `X-Forwarded-For`
 
-The proxy must remove untrusted client-supplied forwarding headers and write its own values. NoviqWiki uses forwarded host/protocol information for same-origin redirects and uses the forwarded client address in security metadata. Incorrect trust boundaries can produce bad redirects or spoofed IP attribution.
+The proxy must remove untrusted client-supplied forwarding headers and write its own values. Set `NOVIQWIKI_BASE_URL` to the externally visible HTTPS URL. It is the production-authoritative origin for request validation, redirects, email links, and citations even if the database contains an older Base URL from setup. Production cookies must be secure.
 
-Set `NODE_ENV=production`, serve only through HTTPS, and set both the environment and stored site base URLs to the external HTTPS origin. The environment `NOVIQWIKI_BASE_URL` alone controls the `Secure` attribute on session and CSRF cookies: its scheme must be `https:`. Neither `NODE_ENV` nor the base URL stored in PostgreSQL changes that cookie decision. The stored URL remains authoritative for generated application and recovery links.
+The supplied Compose port binds to `127.0.0.1:3000` so a host reverse proxy can reach it without publishing the application directly. If the proxy is another Compose service, remove the host port mapping and route to `app:3000` over the private service network.
+
+`X-Forwarded-For` is ignored for source-based authentication rate limits unless `NOVIQWIKI_TRUSTED_PROXY_HOPS` is configured. Set it only to the fixed number of trusted proxies between the client and NoviqWiki, and only when network policy prevents direct access to the application port and every trusted proxy overwrites or appends its immediate peer address. Invalid or incomplete IP chains do not enable a source bucket; account and global limits remain active.
 
 Apply request-size, timeout, and rate controls at the proxy in addition to application validation. Preserve Web and API response headers such as CSP, `X-Content-Type-Options`, and `X-Frame-Options`.
 
 ## Health Checks
 
-The endpoints are always present in the current application:
+At minimum, verify the application can serve `GET /` and connect to the database after deployment. Use liveness for process monitoring and readiness for load-balancer routing. Readiness returns HTTP 503 when PostgreSQL or the configured media backend cannot be used:
 
 ```text
 GET /api/health
@@ -173,7 +184,7 @@ GET /api/ready
 
 - `/api/health` is a process liveness response and does not query PostgreSQL.
 - `/api/ready` queries PostgreSQL and calls the active storage adapter's readiness check.
-- Local-storage readiness creates/checks the configured directory. The current S3 readiness check confirms only that a bucket name is configured; it does not make a remote S3 request. Use a separate provider probe or a real upload/read smoke test when S3 availability matters.
+- Local and S3 readiness perform bounded write/read/delete probes. Local storage rejects unsafe or linked roots before probing; S3 uses `.noviqwiki-readiness/` and deletes the exact probe object/version.
 
 Manual checks:
 
@@ -188,19 +199,21 @@ Route load-balancer liveness and readiness according to platform behavior. Do no
 
 Next.js static assets are included in the standalone image. Local user media must live on the persistent path configured by `NOVIQWIKI_MEDIA_ROOT`; the committed Compose file mounts `/app/media`.
 
-The current authorized local-media route sends `Cache-Control: public, max-age=31536000, immutable`. Private wikis must configure the reverse proxy/CDN to prevent shared caching. Deployments that require immediate revocation after logout, permission removal, a private-mode change, or deletion must change the application route to `Cache-Control: private, no-store` and purge already cached objects or rotate previously distributed URLs.
+Local and S3 media are authorized and streamed through the same-origin `/media/{key}` route. Public-site responses use `Cache-Control: public, max-age=0, must-revalidate`; private-site responses use `Cache-Control: private, no-store`. Non-inline-safe types are served as attachments, and S3 signatures are never persisted or exposed.
 
 For S3-compatible storage:
 
 - Use a private, versioned, encrypted bucket.
-- Scope credentials to the required object operations and bucket prefix.
-- Confirm the endpoint works with path-style requests and one-hour signed GET URLs.
-- Verify representative images and files in a real browser under the deployed CSP, not only through a direct bucket request.
+- Grant object read, write, and delete permissions for media keys and the `.noviqwiki-readiness/` probe prefix.
+- When versioning is enabled, allow deletion of the exact probe version so readiness checks do not accumulate versions or delete markers.
 - Back up the bucket independently; `pnpm backup` does not copy S3 objects.
 
 Changing storage drivers does not migrate existing objects. Plan and verify an explicit object migration before changing `NOVIQWIKI_MEDIA_DRIVER`.
 
-`pnpm backup` always creates a PostgreSQL dump and creates a media `.tar.gz` archive only for the `local` driver. It does not include S3 objects or `noviqwiki-secrets`. The backup and restore scripts load `.env`, but each reads only its relevant database, media, and backup or restore variables; they do not run full web-application configuration validation and do not require `NOVIQWIKI_SECRET`.
+`pnpm backup` always creates a PostgreSQL dump and creates a media `.tar.gz` archive only for the `local` driver. It does not include S3 objects or deployment secrets. Read [BACKUP_RESTORE.md](./BACKUP_RESTORE.md) before operating it.
+
+Successful S3 capability probes are cached for five minutes and failures for 30 seconds. Concurrent
+readiness requests share one in-flight probe.
 
 ## Observability
 
@@ -222,7 +235,7 @@ Logs, traces, metrics labels, and support bundles must not contain passwords, ra
 
 After health checks pass, validate with appropriate test accounts:
 
-1. Setup mode is correct: no site opens full setup, a site with zero total users opens only first-Owner bootstrap, and any existing user closes setup.
+1. Setup mode is correct: no site opens full setup, a site with no active Owner opens only Owner recovery/bootstrap, and an active Owner closes setup.
 2. Login and logout work over HTTPS.
 3. Public and restricted-page access matches policy.
 4. A page edit creates a new immutable revision; history, diff, and search update.
@@ -260,9 +273,9 @@ The repository currently has forward Drizzle migrations and no general automatic
 - 通过反向代理、负载均衡器或平台入口终止 HTTPS。
 - 由部署系统管理的密钥和环境变量。
 - 数据库与媒体备份、监控、告警以及经过测试的恢复流程。
-- 与 NoviqWiki 站点设置中基础 URL 一致的单一公共源。
+- 与部署管理的 `NOVIQWIKI_BASE_URL` 一致的单一公共源。
 
-仓库中的 `compose.yaml` 是本地或评估基线，不是经过强化的生产定义。当前文件将 PostgreSQL 发布到主机 `5432` 端口，使用示例数据库密码 `noviqwiki`，通过 `3000` 端口提供 HTTP，固定使用本地媒体，并挂载 `noviqwiki-secrets`，以便镜像在未提供显式值时持久化自动生成的密钥。面向互联网部署前，必须创建部署专用覆盖文件或平台定义。
+仓库中的 `compose.yaml` 是安全的本地基线：它要求显式数据库与应用密钥，将 PostgreSQL 保持在私有网络，并只把 HTTP 应用绑定到 `127.0.0.1:3000`。面向互联网部署仍须配置 HTTPS、受管密钥、备份、可观测性、资源限制和部署专用镜像策略；主机开发仅可通过 `compose.dev.yaml` 的回环映射访问数据库。
 
 ### 验证候选版本
 
@@ -285,6 +298,8 @@ docker compose build
 
 `pnpm test:ui` 是独立的在线服务器审计。如果它属于发布决策，请按照 [TESTING.md](./TESTING.md#ui-发布审计) 中的前置条件和已登录覆盖方式运行。不要把未经准备的裸 `pnpm test:ui` 塞入批处理命令，因为它要求服务器已经运行。
 
+CI 会为集成测试提供 PostgreSQL 17，并运行真实 PostgreSQL 迁移与并发覆盖；本地复现时应提供文档规定的测试数据库 URL。
+
 只有在当前检出上实际执行后才能记录结果。固定部署的源代码提交或容器摘要，以便将制品与验证结果关联。
 
 ### 生产环境变量
@@ -296,6 +311,7 @@ NODE_ENV=production
 DATABASE_URL=postgres://noviqwiki:secret@postgres.example.com:5432/noviqwiki
 NOVIQWIKI_BASE_URL=https://wiki.example.com
 NOVIQWIKI_SECRET=replace-with-generated-secret-of-at-least-32-characters
+NOVIQWIKI_SETUP_TOKEN=replace-with-separate-one-time-token
 NOVIQWIKI_MEDIA_DRIVER=local
 NOVIQWIKI_MEDIA_ROOT=/app/media
 NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
@@ -314,19 +330,19 @@ NOVIQWIKI_S3_SECRET_ACCESS_KEY=replace-with-secret-key
 
 当前 S3 适配器要求端点、存储桶、访问密钥和密钥，并使用路径样式请求。上线前应验证所选提供商和浏览器交付路径。需要邮箱验证或密码重置邮件时，应同时配置两个 SMTP 变量。
 
-设置向导会把基础 URL 写入 PostgreSQL。完成设置后，仅修改 `NOVIQWIKI_BASE_URL` 不会更新该存储值；还必须在 `/admin/settings` 中更新。存储的 URL 是生成应用与恢复链接的权威值，但不控制 Cookie 安全性。只有环境变量 `NOVIQWIKI_BASE_URL` 使用 `https:` 协议时，会话与 CSRF Cookie 才带有 `Secure`，与 `NODE_ENV` 无关。环境加载规则和完整变量说明见 [CONFIGURATION.md](./CONFIGURATION.md)。
+生产环境中，部署管理的 `NOVIQWIKI_BASE_URL` 是请求校验、重定向、引用和邮件链接的权威源，即使 PostgreSQL 中仍保存旧设置值。生产必须使用 HTTPS。初始 Owner 设置时输入 `NOVIQWIKI_SETUP_TOKEN`，完成后从环境中移除并重启。环境加载规则和完整变量说明见 [CONFIGURATION.md](./CONFIGURATION.md)。
 
 ### 设置模式与暴露范围
 
 `/setup` 路由具有以下三种由数据库得出的模式：
 
-| 模式       | 数据库状态               | 结果                                                              |
-| ---------- | ------------------------ | ----------------------------------------------------------------- |
-| `initial`  | 不存在站点               | 可进行完整站点配置和首位 Owner 设置。                             |
-| `owner`    | 已存在站点且用户总数为零 | 仅可进行首位 Owner 引导；保留现有站点设置、页面、修订和媒体引用。 |
-| `complete` | 至少存在一个用户         | 设置已关闭，访问 `/setup` 会被重定向。                            |
+| 模式       | 数据库状态                 | 结果                                                                     |
+| ---------- | -------------------------- | ------------------------------------------------------------------------ |
+| `initial`  | 不存在站点                 | 可进行完整站点配置和首位 Owner 设置。                                    |
+| `owner`    | 已存在站点但没有活跃 Owner | 仅可进行 Owner 恢复/引导；保留现有站点设置、页面、修订、用户和媒体引用。 |
+| `complete` | 站点存在活跃 Owner         | 设置已关闭，访问 `/setup` 会被重定向。                                   |
 
-在可信管理员完成设置前，应将应用或 `/setup` 与不可信网络隔离。尤其是，已恢复或预加载且包含站点但没有用户的数据库会进入 `owner` 模式；公开注册会保持阻断，但在此期间，任何能够访问 `/setup` 的访客仍能取得首位 Owner 账户。
+在可信管理员完成设置前，应将应用或 `/setup` 与不可信网络隔离。尤其是，已恢复或预加载且没有活跃 Owner 的站点会进入 `owner` 模式；公开注册会保持阻断，但在此期间，任何能够访问 `/setup` 的访客仍能恢复 Owner 角色。
 
 ### 数据库迁移
 
@@ -345,7 +361,7 @@ pnpm db:migrate
 5. 将迁移作为受控发布步骤运行一次并保留输出。
 6. 在部署后验证通过前，保留旧应用镜像和迁移前备份。
 
-当前 Docker 镜像还会在 `CMD` 中、启动独立服务器前自动执行 `scripts/migrate.ts`。这意味着每次容器启动都会在 advisory lock 保护下尝试幂等迁移。使用专用迁移任务的平台应自定义启动流程，使迁移责任清晰；不要把原始镜像描述成“不执行迁移”。
+当前 Docker 镜像还会在 `CMD` 中、启动独立服务器前自动执行 `scripts/migrate.mjs`。这意味着每次容器启动都会在 advisory lock 保护下尝试幂等迁移。使用专用迁移任务的平台应自定义启动流程，使迁移责任清晰；不要把原始镜像描述成“不执行迁移”。
 
 不要让旧应用代码连接到已知不兼容的架构。
 
@@ -361,13 +377,7 @@ docker compose up -d
 
 人工验证始终应使用 `--quiet`。普通的 `docker compose config` 会渲染解析后的环境变量值，其输出不得复制到日志或审查材料中。
 
-原始镜像的启动脚本按以下方式解析密钥：
-
-1. 若存在非空的显式 `NOVIQWIKI_SECRET` 环境变量值，则使用该值，并主动删除 `${NOVIQWIKI_SECRET_DIR:-/app/secrets}/noviqwiki-secret` 回退文件（若存在）。
-2. 否则，读取该路径下的非空回退文件。
-3. 若不存在非空回退文件，则生成 32 字节随机值，以受限权限将其十六进制表示写入该文件，并导出给应用。
-
-显式 `NOVIQWIKI_SECRET` 绝不会写入回退文件。原始 Compose 文件将 `noviqwiki-secrets` 挂载到 `/app/secrets`，因此在未使用显式值期间，回退密钥会在替换容器和执行 `docker compose down` 后保留。使用显式值启动会删除该持久化回退；日后若移除显式值，就没有旧回退可供恢复，启动流程会生成新值，并使现有 HMAC 派生的会话、邮箱验证令牌、密码重置令牌、限流哈希和 IP 哈希失效。运维人员可通过 shell、未跟踪的 `.env` 或覆盖文件注入显式值。生产环境必须使用单一、稳定且由部署系统明确管理的值，不应在显式密钥和自动回退之间切换。
+Compose 在缺少或清空 `DATABASE_URL`、`POSTGRES_PASSWORD`、`NOVIQWIKI_BASE_URL` 或 `NOVIQWIKI_SECRET` 时立即失败，不会生成密钥或使用密钥卷。所有副本与重启都必须使用部署密钥管理器中的同一稳定 `NOVIQWIKI_SECRET`。首次安装完成后，应移除一次性 `NOVIQWIKI_SETUP_TOKEN` 并重启。
 
 检查状态和日志：
 
@@ -376,18 +386,16 @@ docker compose ps
 docker compose logs --tail=200 app
 ```
 
-提交的服务名为 `app` 和 `db`。Compose 项目名下的命名卷分别为 `noviqwiki-db`、`noviqwiki-media`、`noviqwiki-backups` 和 `noviqwiki-secrets`。`docker compose down` 会保留它们。`docker compose down -v` 会删除数据库、本地媒体、备份输出和持久化回退密钥；在没有明确破坏性操作方案时，不得对保留数据使用。删除密钥卷后若未提供显式托管密钥，启动时会生成新值并使现有 HMAC 派生的会话和令牌失效；显式值删除旧回退后再被移除，也会产生相同结果。
-
-`pnpm backup` 不包含 `noviqwiki-secrets`。生产部署应将 `NOVIQWIKI_SECRET` 保存在密钥管理器中。若平台有意使用文件回退，则必须单独保护和恢复该文件，并保持跨实例一致。
+提交的服务名为 `app` 和 `db`。Compose 项目名下的命名卷为 `noviqwiki-db`、`noviqwiki-media` 和 `noviqwiki-backups`。`docker compose down` 会保留它们；`docker compose down -v` 会删除数据库、本地媒体和备份输出，在没有明确破坏性操作方案时不得对保留数据使用。生产部署应将 `NOVIQWIKI_SECRET` 保存在密钥管理器中。
 
 ### 强化生产 Compose
 
 生产专用 Compose 或平台定义至少应：
 
-- 替换示例 PostgreSQL 凭据，或使用托管数据库。
-- 除非明确需要且已加固管理路径，否则不要把 PostgreSQL 发布到公共主机。
+- 使用唯一 PostgreSQL 凭据，或使用托管数据库。
+- 保持 PostgreSQL 私有；主机开发仅使用 `compose.dev.yaml` 的回环映射。
 - 从部署环境或密钥管理器注入 `DATABASE_URL`、`NOVIQWIKI_BASE_URL`、`NOVIQWIKI_SECRET`、媒体、SMTP、连接池和日志设置。
-- 在缺少托管的 `NOVIQWIKI_SECRET` 时让部署失败，而不是依赖镜像为评估提供的自动生成机制和密钥卷。
+- 继续在缺少托管 `NOVIQWIKI_SECRET` 时让部署失败。
 - 将本地媒体和备份输出挂载到独立备份的持久存储，或配置完整 S3 后端。
 - 将应用镜像固定到发布标签，最好再固定不可变摘要。
 - 增加资源限制、日志保留、更新策略和平台健康检查。
@@ -406,7 +414,7 @@ docker compose logs --tail=200 app
 
 代理必须删除客户端提供的不可信转发头，并写入自己的值。NoviqWiki 使用转发的主机和协议生成同源重定向，并在安全元数据中使用转发的客户端地址。信任边界配置错误会造成错误重定向或伪造 IP 归因。
 
-设置 `NODE_ENV=production`，只通过 HTTPS 提供服务，并将环境变量和站点存储的基础 URL 都设为外部 HTTPS 源。只有环境变量 `NOVIQWIKI_BASE_URL` 决定会话与 CSRF Cookie 是否带有 `Secure`：其协议必须为 `https:`。`NODE_ENV` 和 PostgreSQL 中存储的基础 URL 都不会改变这项 Cookie 决策。存储的 URL 仍是生成应用与恢复链接的权威值。
+只通过 HTTPS 提供服务，并将 `NOVIQWIKI_BASE_URL` 设为外部 HTTPS 源。生产环境把它作为请求校验、重定向、邮件链接和引用的权威值，即使 PostgreSQL 中仍存在旧设置值。提交的应用端口只绑定到 `127.0.0.1:3000`；Compose 内的代理应通过私有网络访问 `app:3000`。
 
 除应用校验外，还应在代理层设置请求大小、超时和限流。保留 CSP、`X-Content-Type-Options` 和 `X-Frame-Options` 等 Web 与 API 响应头。
 
@@ -421,7 +429,7 @@ GET /api/ready
 
 - `/api/health` 是进程存活响应，不查询 PostgreSQL。
 - `/api/ready` 查询 PostgreSQL，并调用当前存储适配器的就绪检查。
-- 本地存储就绪检查会创建或检查配置目录。当前 S3 就绪检查只确认已配置存储桶名称，不会发起远程 S3 请求。S3 可用性很重要时，应另设提供商探针或执行真实上传与读取冒烟测试。
+- 本地与 S3 就绪检查都会执行有界写入/读取/删除探针。本地存储会先拒绝不安全或含链接的根目录；S3 使用 `.noviqwiki-readiness/` 前缀并删除精确探针对象/版本。
 
 手动检查：
 
@@ -436,19 +444,19 @@ curl -fsS https://wiki.example.com/api/ready
 
 Next.js 静态资源已包含在独立镜像中。本地用户媒体必须位于 `NOVIQWIKI_MEDIA_ROOT` 指定的持久路径；提交的 Compose 文件将其挂载到 `/app/media`。
 
-当前已授权的本地媒体路由发送 `Cache-Control: public, max-age=31536000, immutable`。私有 Wiki 必须配置反向代理/CDN 禁止共享缓存。若部署要求在退出登录、移除权限、切换私有模式或删除后立即撤销访问，则必须把应用路由改为 `Cache-Control: private, no-store`，并清除已缓存对象或轮换此前分发的 URL。
+本地与 S3 媒体都通过同源 `/media/{key}` 路由授权并流式传输。公开站点响应使用 `Cache-Control: public, max-age=0, must-revalidate`，私有站点使用 `Cache-Control: private, no-store`。非内联安全类型作为附件返回，S3 签名不会被持久化或暴露。
 
 对于兼容 S3 的存储：
 
 - 使用私有、已启用版本控制且加密的存储桶。
 - 将凭据权限限制到所需对象操作和存储桶前缀。
-- 确认端点兼容路径样式请求和一小时签名 GET URL。
+- 为媒体键和 `.noviqwiki-readiness/` 探针前缀授予对象读、写、删除权限；启用版本控制时还要允许删除精确探针版本。
 - 在部署 CSP 下用真实浏览器验证代表性图片和文件，而不仅是直接请求存储桶。
 - 独立备份存储桶；`pnpm backup` 不复制 S3 对象。
 
 更改存储驱动不会迁移现有对象。修改 `NOVIQWIKI_MEDIA_DRIVER` 前必须规划并验证明确的对象迁移。
 
-`pnpm backup` 始终创建 PostgreSQL 转储，并且仅对 `local` 驱动创建媒体 `.tar.gz` 归档。它不包含 S3 对象或 `noviqwiki-secrets`。备份与恢复脚本会加载 `.env`，但各自只读取本操作所需的数据库、媒体以及备份或恢复变量；它们不会运行 Web 应用的完整配置校验，也不要求 `NOVIQWIKI_SECRET`。
+`pnpm backup` 始终创建 PostgreSQL 转储，并且仅对 `local` 驱动创建媒体 `.tar.gz` 归档。它不包含 S3 对象或部署密钥。操作前请阅读 [BACKUP_RESTORE.md](./BACKUP_RESTORE.md)。
 
 ### 可观测性
 
@@ -470,7 +478,7 @@ Next.js 静态资源已包含在独立镜像中。本地用户媒体必须位于
 
 健康检查通过后，使用适当测试账户验证：
 
-1. 设置模式正确：没有站点时开放完整设置；站点用户总数为零时仅开放首位 Owner 引导；存在任何用户后关闭设置。
+1. 设置模式正确：没有站点时开放完整设置；站点没有活跃 Owner 时仅开放 Owner 恢复/引导；存在活跃 Owner 后关闭设置。
 2. 通过 HTTPS 登录和退出正常。
 3. 公共和受限页面访问符合策略。
 4. 编辑页面会创建新的不可变修订；历史、差异和搜索同步更新。

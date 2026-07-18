@@ -3,6 +3,7 @@ import { updateSettingsAction } from "@/app/actions";
 import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
+import { MAX_MEDIA_UPLOAD_BYTES } from "@/modules/settings/service";
 
 export default async function AdminSettingsPage() {
   const site = await getPrimarySiteWithSettings();
@@ -192,6 +193,8 @@ export default async function AdminSettingsPage() {
               className="field"
               name="uploadMaxBytes"
               type="number"
+              min={1}
+              max={MAX_MEDIA_UPLOAD_BYTES}
               defaultValue={settings.uploadMaxBytes}
             />
           </label>

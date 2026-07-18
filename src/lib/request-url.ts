@@ -1,10 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getEnv, type AppEnv } from "@/lib/env";
+
+export type RequestUrlEnvironment = Pick<AppEnv, "NOVIQWIKI_BASE_URL" | "NODE_ENV">;
 
 export function redirectWithinRequestHost(request: Request | NextRequest, pathname: string) {
   return NextResponse.redirect(urlWithinRequestHost(request, pathname));
 }
 
-export function urlWithinRequestHost(request: Request | NextRequest, pathname: string) {
+export function urlWithinRequestHost(
+  request: Request | NextRequest,
+  pathname: string,
+  environment: RequestUrlEnvironment = getEnv()
+) {
+  if (environment.NODE_ENV === "production") {
+    const url = new URL(environment.NOVIQWIKI_BASE_URL);
+    url.pathname = pathname;
+    url.search = "";
+    url.hash = "";
+    return url;
+  }
   const nextUrl = "nextUrl" in request ? request.nextUrl : null;
   const url = nextUrl ? nextUrl.clone() : new URL(request.url);
   url.pathname = pathname;

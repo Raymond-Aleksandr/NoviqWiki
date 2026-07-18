@@ -202,6 +202,9 @@ export const en = {
   email: "Email",
   displayName: "Display name",
   password: "Password",
+  setupToken: "Deployment setup token",
+  setupTokenDescription:
+    "Enter the one-time token configured in NOVIQWIKI_SETUP_TOKEN for this deployment.",
   registrationClosed: "Closed",
   registrationClosedDescription: "Only administrators can create accounts.",
   registrationInvite: "Invite or administrator-created",
@@ -209,6 +212,8 @@ export const en = {
   registrationOpen: "Open",
   registrationOpenDescription: "Anyone can register and receive default permissions.",
   registrationEmailVerification: "Email verification required",
+  emailDeliveryRequired:
+    "Configure NOVIQWIKI_SMTP_URL and NOVIQWIKI_EMAIL_FROM before enabling email verification.",
   registrationEmailVerificationDescription:
     "New accounts must verify email when SMTP is configured.",
   localFilesystem: "Local persistent filesystem",
@@ -230,6 +235,7 @@ export const en = {
   enterOwnerUsername: "Enter an Owner username.",
   usernameCharacters: "Username can use letters, numbers, underscore, dot, and hyphen.",
   enterOwnerEmail: "Enter a valid Owner email.",
+  enterSetupToken: "Enter the deployment setup token.",
   passwordLength: "Password must be at least 12 characters.",
   passwordComplexity: "Password must include lowercase, uppercase, and a number.",
   modernSelfHostedWiki: "A modern self-hosted wiki",
@@ -372,8 +378,11 @@ export const en = {
   verifyEmailDescription: "Confirm the email address associated with this NoviqWiki account.",
   verifyEmailAddress: "Verify email address",
   verificationTokenMissing: "Verification token is missing.",
-  verificationExpiredHint:
-    "If this link has expired, request a new verification email from an administrator.",
+  verificationExpiredHint: "If this link has expired, request a new verification email.",
+  resendVerificationEmail: "Resend verification email",
+  resendVerificationDescription:
+    "Enter your username or email address. If a pending account matches and SMTP is configured, NoviqWiki sends a new verification link.",
+  requestVerificationLink: "Request verification link",
   createPageDescription: "Draft first or publish immediately if your role allows publication.",
   unsavedChanges: "Unsaved changes",
   pageTitle: "Page title",
@@ -572,6 +581,8 @@ export const en = {
   nextPage: "Next",
   passwordResetSentGeneric:
     "If an account matches that identifier and email is configured, a reset link has been sent.",
+  emailVerificationSentGeneric:
+    "If a pending account matches that identifier and email is configured, a verification link has been sent.",
   pageNotCreated: "Page was not created.",
   draftSaved: "Draft saved.",
   publishedRevisionPrefix: "Published revision",
@@ -637,5 +648,5 @@ export const en = {
   allowedMediaTypeInvalid: "Allowed media types must be valid safe MIME types.",
   unsafeFilename: "Unsafe filename.",
   mediaNotFound: "Media asset not found.",
-  mediaStillReferenced: "Media is still referenced by published pages."
+  mediaStillReferenced: "Media is still referenced by stored page revisions or drafts."
 };

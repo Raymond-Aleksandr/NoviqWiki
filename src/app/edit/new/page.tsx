@@ -7,7 +7,7 @@ import { ActionForm } from "@/components/ui/action-form";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { getCurrentSession } from "@/modules/auth/session";
-import { requirePermission } from "@/modules/authorization/permissions";
+import { hasPermission, requirePermission } from "@/modules/authorization/permissions";
 import { listMedia } from "@/modules/media/service";
 import { renderEditorPreview } from "@/modules/rendering/preview";
 
@@ -25,8 +25,9 @@ export default async function NewPage({ searchParams }: Props) {
     redirect("/login");
   }
   await requirePermission(session.user.id, site.site.id, "page.create");
+  const canReadMedia = await hasPermission(session.user.id, site.site.id, "media.read");
   const [mediaItems, i18n] = await Promise.all([
-    listMedia({ siteId: site.site.id, limit: 40 }),
+    canReadMedia ? listMedia({ siteId: site.site.id, limit: 40 }) : Promise.resolve([]),
     getRequestI18n(site.settings?.defaultLocale)
   ]);
   const { messages } = i18n;

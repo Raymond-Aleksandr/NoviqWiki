@@ -2,7 +2,7 @@
 
 > [English](TESTING.md) | [简体中文](TESTING.md#简体中文)
 
-NoviqWiki uses layered verification: formatting, linting, TypeScript checks, unit tests, PGlite-backed integration tests, production builds, real-PostgreSQL Playwright tests, a non-reset live UI audit, and Docker Compose validation. Each layer proves a different scope.
+NoviqWiki uses layered verification: formatting, linting, TypeScript checks, mostly PGlite-backed integration tests with selected real-PostgreSQL migration/concurrency cases, production builds, real-PostgreSQL Playwright tests, a non-reset live UI audit, and Docker Compose validation. Each layer proves a different scope.
 
 Never report a command as passing unless it ran in the current checkout. A skipped prerequisite or partially authenticated UI audit must be reported as such.
 
@@ -49,7 +49,7 @@ Do not place a bare `pnpm test:ui` into an unattended full-suite batch unless a 
 
 ## Test Environment Safety
 
-- Unit and integration tests do not need a running PostgreSQL service. Integration tests create an in-process PGlite database and apply the SQL files from `drizzle/`.
+- Unit tests and most integration tests do not need a running PostgreSQL service. Those integration tests create in-process PGlite databases and apply the SQL files from `drizzle/`. Supplying `NOVIQWIKI_TEST_POSTGRES_URL` enables PostgreSQL-specific migration and concurrency cases; use only a dedicated test database. The CI quality job supplies PostgreSQL 17.
 - End-to-end tests use real PostgreSQL and destructively reset only a database whose name contains a separate `test`, `e2e`, or `ci` token.
 - The UI audit does not reset its target database. It navigates a live site and opens supported dialogs without submitting destructive confirmations.
 - Never point e2e, seed, restore, or manual cleanup commands at production or shared staging data.
@@ -77,7 +77,7 @@ The script executes `vitest run tests/unit`. Current unit coverage includes smal
 - Session/CSRF cookie `Secure` selection from the `NOVIQWIKI_BASE_URL` `http:` or `https:` scheme, independently of `NODE_ENV`.
 - Optional registration and Owner-setup display-name normalization, including blank values becoming absent.
 - Repository branding enforcement that rejects the provisional identifier in any Git-tracked content.
-- Container fallback-secret publication across concurrent contenders that share both a secret directory and the same shell PID identity.
+- Compose fail-closed requirements for explicit database, canonical URL, and `NOVIQWIKI_SECRET` values, including explicit CI-only Docker settings.
 
 Unit tests should remain deterministic and avoid a real network or production service. When a change introduces pure domain behavior, test edge cases and failure paths here before relying on a browser test.
 
@@ -89,7 +89,7 @@ Run:
 pnpm test:integration
 ```
 
-The script executes `vitest run tests/integration`. Each current integration test creates an in-process PGlite database and applies repository migration SQL through `tests/helpers/test-db.ts`. A standalone PostgreSQL server is therefore **not** a prerequisite for this suite.
+The script executes `vitest run tests/integration`. Most integration files create an in-process PGlite database and apply repository migration SQL through `tests/helpers/test-db.ts`. When `NOVIQWIKI_TEST_POSTGRES_URL` is set, the PostgreSQL-specific suite applies the migrations to that dedicated database and runs locking and concurrency cases. Without the variable, those cases are skipped; the PGlite portion does not require a standalone PostgreSQL server. The CI quality job starts PostgreSQL 17 and runs both portions.
 
 Current integration coverage includes:
 
@@ -100,8 +100,9 @@ Current integration coverage includes:
 - Public page index, random page, wanted, orphaned, dead-end, short, protected, uncategorized, and redirect-maintenance queries.
 - Watchlist, recent-change, and audit-log filtering/pagination.
 - Media MIME allowlist behavior.
+- Real-PostgreSQL registration-policy, authorization-snapshot, page-graph, search-index, and media-deletion concurrency behavior when `NOVIQWIKI_TEST_POSTGRES_URL` is supplied.
 
-These tests exercise services and migration SQL, not the complete Next.js route-handler stack and not PostgreSQL server behavior. PGlite passing is not proof of PostgreSQL locking, connection, extension, query-plan, or production-volume behavior. Use the e2e suite and a representative PostgreSQL staging database for those risks.
+The PGlite cases exercise services and migration SQL, not the complete Next.js route-handler stack or PostgreSQL server behavior. The conditional PostgreSQL cases cover selected locking and concurrency risks, but do not prove every extension, query plan, connection mode, or production-volume behavior. Use the e2e suite and a representative PostgreSQL staging database for the remaining risks.
 
 ## End-to-End Tests
 
@@ -249,7 +250,7 @@ docker compose logs --tail=200 app
 
 `docker compose config --quiet` and `docker compose build` do not prove that the stack starts, migrations succeed, setup loads, persistent volumes work, or backup/restore succeeds. Record a separate clean-deployment smoke test when those properties are release requirements.
 
-The committed stack mounts `noviqwiki-secrets` at `/app/secrets`. A relevant smoke test should verify that an automatically generated secret survives container recreation and `docker compose down`, that activating an explicit `NOVIQWIKI_SECRET` removes the old fallback file without writing the explicit value there, that later removing the explicit value generates a new fallback, and that `docker compose down -v` deletes the secrets volume along with the database, media, and backup volumes. `pnpm backup` does not include the secrets volume.
+The committed stack requires explicit `POSTGRES_PASSWORD`, `DATABASE_URL`, `NOVIQWIKI_BASE_URL`, and `NOVIQWIKI_SECRET` values. It does not generate a fallback signing secret or mount a secrets volume. A relevant smoke test should verify that missing required values fail closed, PostgreSQL is private in `compose.yaml`, the application binds to loopback, and the opt-in `compose.dev.yaml` override exposes PostgreSQL only on loopback for host development.
 
 ## Current CI Scope
 
@@ -259,7 +260,7 @@ The tracked GitHub Actions workflows currently run:
 - The Chromium e2e suite against PostgreSQL.
 - Docker Compose configuration and image build.
 
-The quality job uses the in-process PGlite integration suite and therefore does not start an unused PostgreSQL service. After its production build, it prepares the standalone output, archives it with symlinks intact, and retains the artifact for one day. The Playwright job downloads that exact build instead of compiling the application again. The Docker job uses the GitHub Actions BuildKit cache while still validating the committed Compose configuration and Dockerfile on every run.
+The quality job starts PostgreSQL 17, supplies `NOVIQWIKI_TEST_POSTGRES_URL`, and runs both the main PGlite integration coverage and the PostgreSQL-specific migration/concurrency cases. After its production build, it prepares the standalone output, archives it with symlinks intact, and retains the artifact for one day. The Playwright job downloads that exact build instead of compiling the application again. The Docker job uses the GitHub Actions BuildKit cache while still validating the committed Compose configuration and Dockerfile on every run.
 
 They do not currently run the live `pnpm test:ui` audit, a clean `docker compose up` setup flow, `pnpm backup`, `pnpm restore`, or a restore drill. Those results must come from separately recorded execution rather than being inferred from green CI.
 
@@ -311,7 +312,7 @@ UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui passed for public routes; a
 
 > [English](TESTING.md) | [简体中文](TESTING.md#简体中文)
 
-NoviqWiki 采用分层验证：格式化、代码检查、TypeScript 检查、单元测试、PGlite 集成测试、生产构建、真实 PostgreSQL Playwright 测试、非重置在线 UI 审计，以及 Docker Compose 验证。每一层证明的范围不同。
+NoviqWiki 采用分层验证：格式化、代码检查、TypeScript 检查、单元测试、主要基于 PGlite 且包含部分真实 PostgreSQL 迁移/并发用例的集成测试、生产构建、真实 PostgreSQL Playwright 测试、非重置在线 UI 审计，以及 Docker Compose 验证。每一层证明的范围不同。
 
 只有在当前检出中实际运行过的命令才能报告为通过。缺少前置条件或只完成部分已登录 UI 审计时，必须明确报告跳过范围。
 
@@ -358,7 +359,7 @@ UI_AUDIT_BASE_URL=http://localhost:3000 pnpm test:ui
 
 ### 测试环境安全
 
-- 单元测试和集成测试不需要运行中的 PostgreSQL 服务。集成测试会创建进程内 PGlite 数据库并应用 `drizzle/` 中的 SQL 文件。
+- 单元测试和大多数集成测试不需要运行中的 PostgreSQL 服务。这些集成测试会创建进程内 PGlite 数据库并应用 `drizzle/` 中的 SQL 文件。设置 `NOVIQWIKI_TEST_POSTGRES_URL` 后会启用 PostgreSQL 专属的迁移与并发用例；只能使用专用测试数据库。CI 质量作业会提供 PostgreSQL 17。
 - 端到端测试使用真实 PostgreSQL，只会破坏性重置数据库名中包含独立 `test`、`e2e` 或 `ci` 标记的数据库。
 - UI 审计不会重置目标数据库。它浏览在线站点并打开支持的对话框，但不会提交破坏性确认。
 - 绝不能把 e2e、种子、恢复或手动清理命令指向生产或共享预发布数据。
@@ -386,7 +387,7 @@ pnpm test
 - 根据 `NOVIQWIKI_BASE_URL` 的 `http:` 或 `https:` 协议选择会话/CSRF Cookie 的 `Secure` 属性，且不依赖 `NODE_ENV`。
 - 可选注册与 Owner 设置显示名称的规范化，包括把空白值视为未提供。
 - 仓库品牌标识约束：任何 Git 跟踪内容重新引入临时标识都会失败。
-- 共享密钥目录及相同 Shell PID 标识的并发发布者只能获得同一个容器回退密钥。
+- Compose 对显式数据库、规范 URL 和 `NOVIQWIKI_SECRET` 值的失败关闭要求，以及显式的 CI 专用 Docker 配置。
 
 单元测试应保持确定性，不依赖真实网络或生产服务。变更新增纯领域行为时，应先在此覆盖边界情况和失败路径，而不是只依赖浏览器测试。
 
@@ -398,7 +399,7 @@ pnpm test
 pnpm test:integration
 ```
 
-该脚本执行 `vitest run tests/integration`。每个当前集成测试都创建进程内 PGlite 数据库，并通过 `tests/helpers/test-db.ts` 应用仓库迁移 SQL。因此该套件**不要求**独立 PostgreSQL 服务器。
+该脚本执行 `vitest run tests/integration`。大多数集成文件会创建进程内 PGlite 数据库，并通过 `tests/helpers/test-db.ts` 应用仓库迁移 SQL。设置 `NOVIQWIKI_TEST_POSTGRES_URL` 后，PostgreSQL 专属套件会把迁移应用到该专用数据库，并运行锁与并发用例。未设置该变量时会跳过这些用例；PGlite 部分不要求独立 PostgreSQL 服务器。CI 质量作业会启动 PostgreSQL 17 并运行两个部分。
 
 当前集成覆盖包括：
 
@@ -409,8 +410,9 @@ pnpm test:integration
 - 公共页面索引、随机页面、需要页面、孤立页面、无出链页面、短页面、受保护页面、未分类页面和重定向维护查询。
 - 关注列表、最近更改和审计日志筛选与分页。
 - 媒体 MIME 允许列表行为。
+- 设置 `NOVIQWIKI_TEST_POSTGRES_URL` 后，验证真实 PostgreSQL 上的注册策略、授权快照、页面图、搜索索引和媒体删除并发行为。
 
-这些测试验证服务和迁移 SQL，不覆盖完整 Next.js 路由处理栈，也不覆盖 PostgreSQL 服务器行为。PGlite 通过不能证明 PostgreSQL 锁、连接、扩展、查询计划或生产数据量行为。相关风险应使用 e2e 套件和有代表性的 PostgreSQL 预发布数据库验证。
+PGlite 用例验证服务和迁移 SQL，不覆盖完整 Next.js 路由处理栈或 PostgreSQL 服务器行为。条件式 PostgreSQL 用例覆盖部分锁与并发风险，但不能证明所有扩展、查询计划、连接模式或生产数据量行为。其余风险应使用 e2e 套件和有代表性的 PostgreSQL 预发布数据库验证。
 
 ### 端到端测试
 
@@ -558,7 +560,7 @@ docker compose logs --tail=200 app
 
 `docker compose config --quiet` 和 `docker compose build` 不能证明栈能够启动、迁移成功、设置页加载、持久卷工作或备份恢复成功。如果这些属性属于发布要求，应单独记录干净部署冒烟测试。
 
-提交的栈把 `noviqwiki-secrets` 挂载到 `/app/secrets`。相关冒烟测试应验证自动生成的密钥在容器重建和 `docker compose down` 后仍然存在；启用显式 `NOVIQWIKI_SECRET` 会删除旧回退文件，且不会把显式值写入该文件；日后移除显式值会生成新的回退密钥；并验证 `docker compose down -v` 会将密钥卷与数据库、媒体和备份卷一并删除。`pnpm backup` 不包含密钥卷。
+提交的栈要求显式设置 `POSTGRES_PASSWORD`、`DATABASE_URL`、`NOVIQWIKI_BASE_URL` 和 `NOVIQWIKI_SECRET`。它不会生成回退签名密钥或挂载密钥卷。相关冒烟测试应验证缺少必填值时会失败关闭、`compose.yaml` 保持 PostgreSQL 私有、应用绑定到回环地址，以及显式启用的 `compose.dev.yaml` 覆盖只在回环地址暴露 PostgreSQL 供主机开发使用。
 
 ### 当前 CI 范围
 
@@ -568,7 +570,7 @@ docker compose logs --tail=200 app
 - 针对 PostgreSQL 的 Chromium e2e 套件。
 - Docker Compose 配置和镜像构建。
 
-质量作业使用进程内 PGlite 集成套件，因此不再启动未使用的 PostgreSQL 服务。生产构建完成后，它会准备独立输出、保留其中的符号链接并打包，产物保留一天。Playwright 作业下载同一份构建，不再重新编译应用。Docker 作业使用 GitHub Actions BuildKit 缓存，同时仍在每次运行中验证提交的 Compose 配置和 Dockerfile。
+质量作业会启动 PostgreSQL 17，提供 `NOVIQWIKI_TEST_POSTGRES_URL`，并同时运行主要 PGlite 集成覆盖及 PostgreSQL 专属的迁移/并发用例。生产构建完成后，它会准备独立输出、保留其中的符号链接并打包，产物保留一天。Playwright 作业下载同一份构建，不再重新编译应用。Docker 作业使用 GitHub Actions BuildKit 缓存，同时仍在每次运行中验证提交的 Compose 配置和 Dockerfile。
 
 当前 CI 不运行在线 `pnpm test:ui`、干净 `docker compose up` 设置流程、`pnpm backup`、`pnpm restore` 或恢复演练。这些结果必须来自单独记录的实际执行，不能从绿色 CI 推断。
 

@@ -45,12 +45,14 @@ NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 Generate a secret with `openssl rand -base64 32`, then prepare and start the app:
 
 ```bash
-docker compose up -d db
+docker compose -f compose.yaml -f compose.dev.yaml up -d db
 pnpm db:migrate
 pnpm dev
 ```
 
-Open <http://localhost:3000> and complete the full setup wizard on a fresh database. If the database already contains a site but has no users, complete the Owner-only bootstrap on a trusted network. See [Quickstart](docs/QUICKSTART.md) and [Development](docs/DEVELOPMENT.md) for detailed setup and troubleshooting.
+Compose and production launches require an explicit `NOVIQWIKI_SECRET`; no fallback secret or secrets volume is generated. The default Compose file keeps PostgreSQL private, while `compose.dev.yaml` exposes it only on loopback for host development.
+
+Open <http://localhost:3000> and complete the full setup wizard on a fresh database. If the database already contains a site but has no active Owner, complete the Owner-only bootstrap on a trusted network; existing non-Owner users do not disable this recovery mode. See [Quickstart](docs/QUICKSTART.md) and [Development](docs/DEVELOPMENT.md) for detailed setup and troubleshooting.
 
 ## Architecture Rules
 
@@ -104,7 +106,7 @@ docker compose build
 Important test conditions:
 
 - `pnpm format` rewrites files; `pnpm format:check` verifies the final tree without rewriting it.
-- Integration tests use isolated in-memory PGlite databases created by the test helpers. Do not change test configuration to point at production or shared staging data.
+- Most integration tests use isolated in-memory PGlite databases. PostgreSQL-specific migration and concurrency cases run when `NOVIQWIKI_TEST_POSTGRES_URL` points to a dedicated test database; the CI quality job supplies PostgreSQL 17. Never point this variable at production or shared staging data.
 - `pnpm test:ui` audits an already-running local review app and does not reset it. Without `UI_AUDIT_USERNAME` and `UI_AUDIT_PASSWORD`, authenticated editor and admin routes are skipped.
 - `pnpm test:e2e` resets only a database whose name is recognized as disposable and starts its own production-mode test server. Review [Testing](docs/TESTING.md) before running it.
 - Use `docker compose config --quiet` when `.env` or the shell contains a real secret. Plain `docker compose config` expands environment values and its output must not be copied into logs or pull requests.
@@ -198,12 +200,14 @@ NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 使用 `openssl rand -base64 32` 生成密钥，然后准备并启动应用：
 
 ```bash
-docker compose up -d db
+docker compose -f compose.yaml -f compose.dev.yaml up -d db
 pnpm db:migrate
 pnpm dev
 ```
 
-打开 <http://localhost:3000>，并在全新数据库上完成完整初始化向导。如果数据库已有站点但没有用户，请先在受信网络完成仅 Owner 引导。详细设置和故障排查请参阅[快速开始](docs/QUICKSTART.md)和[开发指南](docs/DEVELOPMENT.md)。
+Compose 和生产启动都要求显式设置 `NOVIQWIKI_SECRET`；系统不会生成回退密钥或密钥卷。默认 Compose 文件保持 PostgreSQL 私有，`compose.dev.yaml` 则只在回环地址上暴露数据库供主机开发使用。
+
+打开 <http://localhost:3000>，并在全新数据库上完成完整初始化向导。如果数据库已有站点但没有 active Owner，请先在受信网络完成仅 Owner 引导；即使仍有非 Owner 用户，也会进入此恢复模式。详细设置和故障排查请参阅[快速开始](docs/QUICKSTART.md)和[开发指南](docs/DEVELOPMENT.md)。
 
 ### 架构规则
 
@@ -257,7 +261,7 @@ docker compose build
 重要测试条件：
 
 - `pnpm format` 会重写文件；`pnpm format:check` 用于在不重写文件的情况下验证最终工作树。
-- 集成测试使用测试辅助工具创建的隔离内存 PGlite 数据库。不要更改测试配置，使其指向生产或共享预发布数据。
+- 大多数集成测试使用隔离的内存 PGlite 数据库。当 `NOVIQWIKI_TEST_POSTGRES_URL` 指向专用测试数据库时，会运行 PostgreSQL 专属的迁移与并发用例；CI 质量作业会提供 PostgreSQL 17。绝不能让该变量指向生产或共享预发布数据。
 - `pnpm test:ui` 审核一个已经运行的本地预览应用，不会重置该应用。如果未提供 `UI_AUDIT_USERNAME` 和 `UI_AUDIT_PASSWORD`，会跳过需要身份验证的编辑和管理路由。
 - `pnpm test:e2e` 只会重置名称被识别为一次性用途的数据库，并启动自己的生产模式测试服务器。运行前请阅读[测试指南](docs/TESTING.md)。
 - 当 `.env` 或 shell 含真实密钥时使用 `docker compose config --quiet`。普通 `docker compose config` 会展开环境变量值，其输出不得复制到日志或 pull request。

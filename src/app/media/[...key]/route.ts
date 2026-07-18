@@ -2,10 +2,10 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { db } from "@/db/client";
 import { mediaAssets } from "@/db/schema";
-import { getEnv } from "@/lib/env";
 import { getCurrentSession } from "@/modules/auth/session";
 import { hasPermission } from "@/modules/authorization/permissions";
-import { LocalStorageAdapter, getStorageAdapter } from "@/modules/media/storage";
+import { getMediaCacheControl, getMediaContentDisposition } from "@/modules/media/response";
+import { getStorageAdapter } from "@/modules/media/storage";
 
 type Props = {
   params: Promise<unknown>;
@@ -36,15 +36,14 @@ export async function GET(_request: Request, { params }: Props) {
   if (!(await hasPermission(session?.user.id, asset.siteId, "media.read"))) {
     return new NextResponse("Not found", { status: 404 });
   }
-  if (getEnv().NOVIQWIKI_MEDIA_DRIVER === "s3") {
-    const url = await getStorageAdapter().getPublicUrl(storageKey);
-    return NextResponse.redirect(url);
-  }
-  const bytes = await new LocalStorageAdapter().read(storageKey);
-  return new NextResponse(bytes, {
+  const publiclyReadable = await hasPermission(null, asset.siteId, "media.read");
+  const body = await getStorageAdapter().read(storageKey);
+  const responseBody = body instanceof ReadableStream ? body : Uint8Array.from(body).buffer;
+  return new NextResponse(responseBody, {
     headers: {
       "content-type": asset.mimeType,
-      "cache-control": "public, max-age=31536000, immutable",
+      "content-disposition": getMediaContentDisposition(asset.mimeType, asset.safeFilename),
+      "cache-control": getMediaCacheControl(publiclyReadable),
       "x-content-type-options": "nosniff"
     }
   });

@@ -7,10 +7,11 @@ NoviqWiki stores authoritative application data in PostgreSQL. Uploaded media is
 ## Safety and Prerequisites
 
 - Run backup and restore commands from the repository host with the target environment variables exported. The TypeScript scripts load `.env` through `dotenv/config`; they do not automatically load `.env.local`. See [CONFIGURATION.md](./CONFIGURATION.md#environment-files).
-- The scripts strictly parse the resolved `DATABASE_URL` before invoking database tools: it must use `postgres://` or `postgresql://`, include one host, and identify exactly one database. Target- or credential-overriding query parameters are rejected, an omitted port is normalized to `5432`, and ambient libpq host/address/port/database/service variables are removed from the child process. A URL password is removed from process arguments and supplied through a temporary `0600` passfile. The scripts first try the host's `pg_dump` or `psql`. Only when that executable is unavailable (`ENOENT`) **and** `NOVIQWIKI_COMPOSE_FALLBACK=1` is set do they use Docker context `default`, Compose project `noviqwiki`, service `db`, database `noviqwiki`, and user `noviqwiki`, anchored to this repository's absolute `compose.yaml`. Credential, connectivity, SQL, and other non-zero failures stop immediately. The opt-in Compose path ignores `DATABASE_URL`; enable it only after verifying that fixed target. Local-media backup and restore also require `tar`.
+- The scripts strictly parse the resolved `DATABASE_URL` before invoking database tools: it must use `postgres://` or `postgresql://`, include one host, and identify exactly one database. Target- or credential-overriding query parameters are rejected, an omitted port is normalized to `5432`, and ambient libpq routing variables are removed from child processes. Database passwords are never put in process arguments.
+- Database tooling is selected by the validated target. The exact Compose `noviqwiki@db:5432/noviqwiki` target uses container tools; every other target requires local PostgreSQL client tools. A failing local command is never retried against a different database.
 - The runtime image does not install PostgreSQL client tools or the Docker CLI. Do not assume that `docker compose exec app pnpm backup` or `docker compose exec app pnpm restore` will work.
 - A restore is destructive. Resolve and verify the exact database URL, SQL file, media archive, bucket, and application version before starting.
-- Stop application writes, or place the site in a maintenance window, while taking a consistency-sensitive backup or performing a restore.
+- The supplied Compose workflow automatically stops and restarts a running application for a database-plus-local-media snapshot or restore. For every other local-media deployment, stop application writes and provide the explicit quiescence acknowledgement described below.
 
 ## Backup Scope
 
@@ -18,7 +19,7 @@ Back up all of the following:
 
 - PostgreSQL, including the Drizzle migration journal.
 - Uploaded media from the configured local directory or S3-compatible bucket.
-- The deployment environment and secret references needed to recreate the service. Store secret values only in an approved encrypted secret system. If Compose generated `NOVIQWIKI_SECRET` in the `noviqwiki-secrets` volume, migrate it into that system or protect it separately; `pnpm backup` does not include this volume.
+- The deployment environment and secret references needed to recreate the service. Store secret values only in an approved encrypted secret system; `pnpm backup` does not copy deployment secrets.
 - The application release tag, commit, or immutable container image digest.
 - The `drizzle/` migration files from that application version.
 - Provider-specific configuration such as bucket versioning, lifecycle, encryption, and database point-in-time-recovery settings.
@@ -44,14 +45,36 @@ Run the project command from the repository host:
 NOVIQWIKI_BACKUP_DIR=backups pnpm backup
 ```
 
-`NOVIQWIKI_BACKUP_DIR` defaults to `backups`. The command uses a restrictive process umask: a newly created backup directory has mode `0700`, and generated backup files have mode `0600`. An existing custom output directory keeps its current mode, so protect it with `0700` or stricter permissions before use. The command creates:
+For the supplied Compose deployment, the command recognizes the exact `db` target, streams
+`pg_dump` from the database container, and streams local media from the `noviqwiki-media` volume
+through a one-off application container. If the application service is running, it is stopped for
+the database-plus-local-media snapshot and restarted afterward so writes cannot split the pair.
+Both conditions are required: a configured `/app/media` path alone does not select Compose tools
+when the database is external. Bare-metal, Kubernetes, and external-database deployments therefore
+use the configured path directly and require the explicit quiescence acknowledgement below.
+
+For a non-Compose local-media deployment, stop all application writers first and acknowledge that
+state explicitly:
+
+```bash
+NOVIQWIKI_BACKUP_QUIESCED=true pnpm backup
+```
+
+New backup directories are created with mode `0700`; an existing directory must already be mode
+`0700` or stricter and is never chmodded by the command. SQL and media files are created exclusively
+with mode `0600`. The backup and local-media directories must not overlap, which prevents an archive
+from including itself or earlier backups. A failed database or media step removes both partial
+outputs. Keep raw database and object-storage procedures documented as a fallback.
+
+For the exact Compose database target, the containerized `pg_dump` output is streamed directly to
+disk, so dump size is not constrained by a child-process memory buffer.
 
 - `backups/noviqwiki-<timestamp>-<run-id>.sql`: a plain-text SQL dump produced by `pg_dump`.
 - `backups/noviqwiki-<timestamp>-<run-id>-media.tar.gz`: a local-media archive, only when `NOVIQWIKI_MEDIA_DRIVER=local`.
 
-`pnpm backup` accepts only `local` or `s3` as `NOVIQWIKI_MEDIA_DRIVER`. With the local driver, `NOVIQWIKI_MEDIA_ROOT` must already be a readable and searchable dedicated media directory. The script does not create a missing source, and it rejects unsafe broad locations such as the filesystem root, repository root, user home, or another shallow top-level path. It resolves `NOVIQWIKI_BACKUP_DIR` to its real path and rejects an output directory equal to or inside the media root, preventing the archive from including its own backup output. It does **not** create a custom-format PostgreSQL dump, copy S3 objects, export environment variables, include the Compose `noviqwiki-secrets` volume, or encrypt its output.
+`pnpm backup` accepts only `local` or `s3` as `NOVIQWIKI_MEDIA_DRIVER`. With the local driver, `NOVIQWIKI_MEDIA_ROOT` must already be a readable and searchable dedicated media directory. The script rejects filesystem roots, home/workspace ancestors, linked trees, and overlapping media/backup paths. It does **not** create a custom-format PostgreSQL dump, copy S3 objects, export environment variables, copy deployment secrets, or encrypt its output.
 
-The command first runs the host's `pg_dump`. Each run receives a UUID suffix so concurrent invocations do not share output names. If the executable is unavailable, the command stops unless `NOVIQWIKI_COMPOSE_FALLBACK=1` explicitly authorizes the fixed default Compose target described above. The opt-in path ignores `DATABASE_URL`; a customized target still requires a working host client or the manual procedure. The generated SQL is then checked for the NoviqWiki plain-dump markers used by restore, and a local-media archive is relisted through the same safe-member checks used by restore. A failed or unrecognized database dump removes the current partial `.sql` file. If local-media archiving or validation fails, the script removes both outputs so the run cannot leave an apparently complete recovery point. For production or a customized deployment, verify the source identity, output modes, sizes, and representative row counts.
+Each run receives a UUID suffix so concurrent invocations do not share output names. The generated SQL is checked for the NoviqWiki plain-dump markers used by restore, and a local-media archive is relisted through the same safe-member checks used by restore. Any failed or unrecognized database or media step removes both outputs so the run cannot leave an apparently complete recovery point. Verify the source identity, output modes, sizes, and representative row counts.
 
 Record both generated filenames together. A database backup without its matching media backup is not a complete recovery point.
 
@@ -60,18 +83,18 @@ Record both generated filenames together. A database backup without its matching
 For a portable compressed custom-format dump:
 
 ```bash
-mkdir -p backups
-pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --file="backups/noviqwiki-$(date +%Y%m%d%H%M%S).dump"
+PGHOST=database.example.com \
+PGPORT=5432 \
+PGUSER=noviqwiki \
+PGDATABASE=noviqwiki \
+PGSSLMODE=require \
+pg_dump --format=custom --no-owner --no-acl --file=backups/noviqwiki-$(date +%Y%m%d%H%M%S).dump
 ```
 
-For a database reachable only through the default Compose service:
-
-```bash
-mkdir -p backups
-docker compose exec -T db pg_dump -U noviqwiki -d noviqwiki --format=custom --no-owner --no-acl > backups/noviqwiki.dump
-```
-
-For large databases, run the dump close to PostgreSQL, monitor its duration and size, and use the database provider's snapshot or point-in-time-recovery features as an additional layer.
+Put the password in a mode-`0600` libpq `.pgpass` file, a `PGPASSFILE` supplied by the deployment
+secret store, or an equivalently protected service definition. Do not pass a password-bearing
+`DATABASE_URL` as a command argument: command lines may be visible to other local processes. For
+large databases, run backups from infrastructure close to the database and monitor duration.
 
 ## Media Backup
 
@@ -98,63 +121,72 @@ For a non-AWS provider, include its required `--endpoint-url` and profile or cre
 
 Prefer a new recovery database over overwriting the only copy of a damaged database. Preserve the original until the recovery has been accepted.
 
-## Project Restore Command: Plain SQL
-
-The bare command `pnpm restore` is not sufficient. The script requires the SQL path and a confirmation bound to the resolved database target. For the default host URL, the value is `restore:localhost:5432/noviqwiki`:
-
-```bash
-NOVIQWIKI_RESTORE_SQL=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038.sql \
-NOVIQWIKI_RESTORE_CONFIRM=restore:localhost:5432/noviqwiki \
-pnpm restore
-```
-
-To restore the paired local-media archive as well:
-
-```bash
-NOVIQWIKI_RESTORE_SQL=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038.sql \
-NOVIQWIKI_RESTORE_MEDIA=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038-media.tar.gz \
-NOVIQWIKI_RESTORE_CONFIRM=restore:localhost:5432/noviqwiki \
-pnpm restore
-```
-
-Before accepting the confirmation or resetting any schema, the script performs all of these checks:
-
-- `DATABASE_URL` must pass the strict PostgreSQL target parsing described above, and `NOVIQWIKI_MEDIA_DRIVER` must be `local` or `s3`.
-- `NOVIQWIKI_RESTORE_SQL` must be a readable, non-empty regular file recognized as a complete NoviqWiki plain-text `pg_dump`. The check requires the PostgreSQL dump header, the expected `sites` and `users` table definitions, and the dump-completion marker; a truncated dump, custom `.dump` file, or arbitrary SQL is rejected.
-- If `NOVIQWIKI_RESTORE_MEDIA` is set, the media driver must be `local` and the archive must be a readable regular file with at least one member. The tar preflight rejects absolute paths, parent-directory traversal, backslash or control-character paths, and every member type other than regular files and directories, including symbolic and hard links.
-- A successful host `psql --version` probe selects the parsed `DATABASE_URL` target. Only an unavailable executable plus the explicit Compose opt-in selects the anchored `compose:default/noviqwiki/db/noviqwiki` target; any other probe failure stops. The selected target determines the confirmation label.
-
-Only after the complete preflight passes must `NOVIQWIKI_RESTORE_CONFIRM` equal `restore:<host>:<port>/<database>` derived from `DATABASE_URL`; an omitted URL port is represented as `5432`. When the opted-in Compose path is selected, the required value is exactly `restore:compose:default/noviqwiki/db/noviqwiki`; a host-target confirmation does not authorize the Compose target. A missing or mismatched value exits before the reset and import.
-
-After confirmation but still before the database reset, the script creates or resolves `NOVIQWIKI_MEDIA_ROOT` only when a media archive was supplied, rejecting the same unsafe broad destinations used by the backup check. It opens the SQL file and verifies that its device, inode, size, and timestamps still match the preflight result. It then runs:
-
-```sql
-drop schema if exists public cascade;
-drop schema if exists drizzle cascade;
-create schema public;
-```
-
-This erases the target database's application schema. The script passes the reset SQL and plain-dump input to the same host or Compose `psql` invocation with `-X`, `ON_ERROR_STOP=1`, and `--single-transaction`. Credential, connectivity, reset, and SQL failures stop without switching targets, and an import failure rolls back the schema reset instead of leaving an empty database.
-
-The Compose path is never automatic: an unavailable host `psql` and `NOVIQWIKI_COMPOSE_FALLBACK=1` are both required, and its target-bound confirmation must still match `restore:compose:default/noviqwiki/db/noviqwiki`. The command clears Compose project/file and Docker host/context environment overrides, then explicitly selects the identities encoded in that label. Install `psql` for every customized target. For a separately provisioned empty production target, an explicit fail-fast import is:
-
-```bash
-psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 --single-transaction -f backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038.sql
-```
-
-After a successful database import, the script rechecks the media archive's file identity and repeats the tar safety preflight before extracting it into the preflighted writable `NOVIQWIKI_MEDIA_ROOT`. Extraction does not first remove unrelated existing files. PostgreSQL and filesystem media cannot share one transaction: a later permission, capacity, or extraction failure can leave the database restored while media is missing or partially merged. Keep writes stopped, preserve the archive, correct the storage failure, and rerun or complete media recovery before accepting the restore.
-
-The structural dump markers prevent an accidental wrong-format or truncated input; they do not authenticate or sandbox SQL. A modified file can still contain arbitrary SQL or `psql` meta-commands. Restore only a dump from a trusted recovery source after verifying its recorded checksum or signature and expected provenance.
-
 ## Manual Restore: Custom Format
 
-Restore a custom `.dump` file with `pg_restore`, not with `pnpm restore`:
+Create the target database, then restore:
 
 ```bash
-pg_restore --dbname "$DATABASE_URL" --clean --if-exists --no-owner --no-acl backups/noviqwiki.dump
+PGHOST=database.example.com \
+PGPORT=5432 \
+PGUSER=noviqwiki \
+PGDATABASE=noviqwiki \
+PGSSLMODE=require \
+pg_restore --clean --if-exists --no-owner --no-acl backup/noviqwiki.dump
 ```
 
-Use `--clean --if-exists` only for a disposable target or one that is intentionally being replaced. For a clean empty database, omitting `--clean` reduces accidental deletion risk. Review `pg_restore` output and treat any SQL error as a failed restore.
+Use the same protected `.pgpass`/`PGPASSFILE` approach as backup, and verify every non-secret
+target variable before starting. Use `--clean --if-exists` only when the target database is
+disposable or intentionally being replaced. For production recovery, confirm the target before
+running the command.
+
+## Project Restore Command: Plain SQL
+
+Use the project restore command when available:
+
+```bash
+NOVIQWIKI_RESTORE_SQL=backups/noviqwiki.sql \
+NOVIQWIKI_RESTORE_MEDIA=backups/noviqwiki-media.tar.gz \
+NOVIQWIKI_RESTORE_CONFIRM='restore:noviqwiki@db:5432/noviqwiki:media=%2Fapp%2Fmedia' \
+pnpm restore
+```
+
+The confirmation is derived from the parsed database username, host, port, and database name; the
+command prints the exact required value when it is absent or wrong. When
+`NOVIQWIKI_RESTORE_MEDIA` is set, confirmation also includes the percent-encoded canonical absolute
+local-media root (the fixed `/app/media` volume path for Compose). A database-only confirmation
+cannot therefore authorize recursive replacement of a media tree, and confirmation for one media
+root cannot authorize replacement of another. A generic `restore` value is intentionally rejected,
+so confirmation for one target cannot authorize dropping another target.
+
+The command copies SQL into a private staging directory, then verifies that the staged file is
+readable, has the `pg_dump` header, and ends with the `pg_dump` completion marker before touching the
+database. Schema reset and restore run in one explicit transaction with `ON_ERROR_STOP`; `COMMIT` is
+sent only after the entire staged dump has been read successfully. An SQL or source-read failure
+therefore rolls the reset back instead of leaving an empty or partially restored database.
+Local media archives are validated before the database restore begins. Absolute/traversal paths,
+symbolic links, hard links, devices, and other non-regular entries are rejected. Media is extracted
+to a private staging directory and promoted with the previous tree retained; if SQL restoration
+fails, the previous media tree is put back. The Compose path performs the same staged promotion in
+the named media volume and automatically stops/restarts a running application service. Compose
+media-volume operations are selected only when the validated database target is also the exact
+Compose `db` service; `/app/media` by itself never redirects an external-database restore into the
+current checkout's Compose volume.
+
+For a non-Compose database or any local-media path that is not the database-bound Compose volume,
+stop application writes and add `NOVIQWIKI_RESTORE_QUIESCED=true`. `NOVIQWIKI_MEDIA_ROOT` must resolve
+to a dedicated directory; filesystem roots, home/workspace ancestors, linked trees, and non-regular
+files are rejected.
+The exact canonical absolute root is bound into `NOVIQWIKI_RESTORE_CONFIRM` and is checked again
+immediately before promotion. This explicit binding is the destructive-operation boundary; broad
+but otherwise valid paths such as a directory below the home or workspace are never authorized by
+the database-only confirmation. Confirm the target environment before running restore commands; a
+successful restore intentionally replaces existing data.
+
+Database tooling is selected by the validated target, not by whether a host binary happens to be
+installed. The exact Compose `db` target always uses container tools; every other target requires
+local PostgreSQL client tools. A failing local command is never silently replaced with a dump from
+another database. Target-changing URL query parameters are rejected, and non-Compose client
+commands remove the database password from their process arguments. Structural dump checks prevent accidental wrong-format or truncated input, but do not authenticate SQL; restore only trusted, integrity-verified backups.
 
 ## Media Restore
 
@@ -179,7 +211,7 @@ curl -fsS https://wiki.example.com/api/ready
 
 Then validate all of the following in the application:
 
-If the restored database contains a site but zero users, NoviqWiki intentionally exposes `/setup` in Owner-only bootstrap mode. Public registration remains blocked, but the first setup visitor can still claim Owner. Keep the recovered service on a trusted or access-restricted network until an authorized operator creates that account. This step preserves existing pages, media, and site settings; confirm that `/setup` closes after bootstrap before exposing normal traffic.
+If the restored database contains a site but no active Owner, NoviqWiki intentionally exposes `/setup` in Owner recovery/bootstrap mode. Public registration remains blocked, but the first setup visitor can recover the Owner role. Keep the service on a trusted or access-restricted network until an authorized operator completes recovery. Existing users, pages, media, and settings are preserved; confirm that `/setup` closes afterward before exposing normal traffic.
 
 - An administrator can sign in and sign out.
 - Public pages render, and restricted pages remain inaccessible to unauthorized users.
@@ -217,10 +249,10 @@ NoviqWiki 将权威业务数据存储在 PostgreSQL 中。上传的媒体文件�
 ### 安全要求与前置条件
 
 - 请在仓库所在主机上执行备份和恢复命令，并先导出目标环境所需的环境变量。TypeScript 脚本通过 `dotenv/config` 加载 `.env`，不会自动加载 `.env.local`。详见 [CONFIGURATION.md](./CONFIGURATION.md#环境文件)。
-- 脚本会在调用数据库工具前严格解析最终的 `DATABASE_URL`：它必须使用 `postgres://` 或 `postgresql://`，包含单一主机，并且只标识一个数据库。会拒绝覆盖目标或凭据的查询参数，把省略的端口规范为 `5432`，并从子进程环境中移除 libpq 的主机、地址、端口、数据库和服务变量。URL 密码不会出现在进程参数中，而是通过临时 `0600` passfile 提供。脚本会先尝试主机上的 `pg_dump` 或 `psql`。只有相应的可执行文件不可用（`ENOENT`）**且**设置了 `NOVIQWIKI_COMPOSE_FALLBACK=1` 时，才会使用绑定到本仓库绝对 `compose.yaml` 的 Docker `default` context、Compose `noviqwiki` 项目、`db` 服务、`noviqwiki` 数据库和 `noviqwiki` 用户。凭据、连接、SQL 及其他非零失败会立即停止。显式启用的 Compose 路径会忽略 `DATABASE_URL`；只有在确认该固定目标后才能启用。本地媒体备份和恢复还需要 `tar`。
+- 脚本会严格解析最终的 `DATABASE_URL`，拒绝覆盖目标或凭据的查询参数，规范省略的端口，移除 libpq 路由覆盖，并防止密码进入进程参数。数据库工具由已验证目标决定：精确的 Compose `noviqwiki@db:5432/noviqwiki` 目标使用容器工具，其他目标必须安装本地 PostgreSQL 客户端；本地命令失败后绝不会切换到另一数据库。
 - 运行时镜像没有安装 PostgreSQL 客户端工具或 Docker CLI。不要假定 `docker compose exec app pnpm backup` 或 `docker compose exec app pnpm restore` 可以正常工作。
 - 恢复属于破坏性操作。开始前必须确认准确的数据库 URL、SQL 文件、媒体归档、存储桶和应用版本。
-- 对一致性有要求的备份或任何恢复操作期间，应停止应用写入或进入维护窗口。
+- Compose 流程会在数据库与本地媒体联合备份或恢复期间自动停止并重启运行中的应用。其他本地媒体部署必须停止应用写入，并提供下文所述的显式静默确认。
 
 ### 备份范围
 
@@ -228,7 +260,7 @@ NoviqWiki 将权威业务数据存储在 PostgreSQL 中。上传的媒体文件�
 
 - PostgreSQL 数据库，包括 Drizzle 迁移日志。
 - 配置的本地目录或兼容 S3 的存储桶中的上传媒体。
-- 重建服务所需的部署环境和密钥引用。密钥值只能保存在获批的加密密钥系统中。若 Compose 已在 `noviqwiki-secrets` 卷中生成 `NOVIQWIKI_SECRET`，应将其迁移到该系统或单独保护；`pnpm backup` 不包含此卷。
+- 重建服务所需的部署环境和密钥引用。密钥值只能保存在获批的加密密钥系统中；`pnpm backup` 不复制部署密钥。
 - 应用发布标签、提交版本或不可变容器镜像摘要。
 - 对应应用版本的 `drizzle/` 迁移文件。
 - 提供商相关配置，例如存储桶版本控制、生命周期、加密和数据库时间点恢复设置。
@@ -254,14 +286,20 @@ NoviqWiki 将权威业务数据存储在 PostgreSQL 中。上传的媒体文件�
 NOVIQWIKI_BACKUP_DIR=backups pnpm backup
 ```
 
-`NOVIQWIKI_BACKUP_DIR` 默认为 `backups`。该命令会使用受限的进程 umask：新建备份目录的权限为 `0700`，生成的备份文件权限为 `0600`。已存在的自定义输出目录会保留当前权限，因此使用前应将其保护为 `0700` 或更严格。该命令会创建：
+精确 Compose 数据库目标会从数据库容器流式执行 `pg_dump`，并通过一次性应用容器从 `noviqwiki-media` 卷流式读取本地媒体；若应用正在运行，会在联合快照期间停止并在结束后重启。非 Compose 本地媒体部署必须先停止所有写入并显式确认：
+
+```bash
+NOVIQWIKI_BACKUP_QUIESCED=true pnpm backup
+```
+
+新备份目录权限为 `0700`；已存在目录必须已经是 `0700` 或更严格。SQL 与媒体文件独占创建为 `0600`。备份目录与媒体目录不得重叠；任一步骤失败都会删除两个不完整产物。该命令会创建：
 
 - `backups/noviqwiki-<timestamp>-<run-id>.sql`：由 `pg_dump` 生成的纯文本 SQL 转储。
 - `backups/noviqwiki-<timestamp>-<run-id>-media.tar.gz`：仅在 `NOVIQWIKI_MEDIA_DRIVER=local` 时生成的本地媒体归档。
 
-`pnpm backup` 只接受 `local` 或 `s3` 作为 `NOVIQWIKI_MEDIA_DRIVER`。使用本地驱动时，`NOVIQWIKI_MEDIA_ROOT` 必须已经是可读、可遍历的专用媒体目录。脚本不会创建缺失的来源，并会拒绝文件系统根目录、仓库根目录、用户主目录或其他浅层顶级路径等不安全的宽泛位置。脚本会将 `NOVIQWIKI_BACKUP_DIR` 解析为真实路径，并拒绝等于媒体根目录或位于其内部的输出目录，以防归档把自身备份产物包含进去。它**不会**生成 PostgreSQL 自定义格式转储，不会复制 S3 对象，不会导出环境变量，不会包含 Compose 的 `noviqwiki-secrets` 卷，也不会加密输出。
+`pnpm backup` 只接受 `local` 或 `s3`。使用本地驱动时，媒体根目录必须是专用、可读、可遍历、无链接的目录，不能是文件系统根、主目录/工作区祖先或与备份目录重叠。它**不会**生成 PostgreSQL 自定义格式转储，不会复制 S3 对象、导出环境变量、复制部署密钥或加密输出。
 
-该命令会先运行主机上的 `pg_dump`。每次运行都有 UUID 后缀，因此并发调用不会共享输出文件名。若该可执行文件不可用，命令会直接停止，除非通过 `NOVIQWIKI_COMPOSE_FALLBACK=1` 明确授权上文所述的固定默认 Compose 目标。显式启用的路径会忽略 `DATABASE_URL`；自定义目标仍需要可用的主机客户端或手动流程。生成的 SQL 随后会按恢复流程使用的 NoviqWiki 纯转储标记进行检查，本地媒体归档也会按恢复流程的安全成员规则重新列出。数据库转储失败或无法识别时，会删除本次不完整的 `.sql` 文件。若本地媒体归档或校验失败，脚本会同时删除本次两个产物，避免留下看似完整的恢复点。生产或自定义部署还应验证来源标识、输出权限、大小和代表性行数。
+每次运行都有 UUID 后缀。生成的 SQL 会检查 NoviqWiki 纯转储标记，本地媒体归档也会重新执行安全成员校验。数据库或媒体步骤失败时会同时删除两个产物，避免留下看似完整的恢复点。生产部署还应核对来源、权限、大小和代表性行数。
 
 应将两个生成文件名作为同一个恢复点记录。只有数据库而没有对应媒体的备份并不完整。
 
@@ -270,18 +308,15 @@ NOVIQWIKI_BACKUP_DIR=backups pnpm backup
 若需可移植的压缩自定义格式转储：
 
 ```bash
-mkdir -p backups
-pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --file="backups/noviqwiki-$(date +%Y%m%d%H%M%S).dump"
+PGHOST=database.example.com \
+PGPORT=5432 \
+PGUSER=noviqwiki \
+PGDATABASE=noviqwiki \
+PGSSLMODE=require \
+pg_dump --format=custom --no-owner --no-acl --file=backups/noviqwiki-$(date +%Y%m%d%H%M%S).dump
 ```
 
-若数据库只能通过默认 Compose 服务访问：
-
-```bash
-mkdir -p backups
-docker compose exec -T db pg_dump -U noviqwiki -d noviqwiki --format=custom --no-owner --no-acl > backups/noviqwiki.dump
-```
-
-大型数据库应尽量在靠近 PostgreSQL 的基础设施中执行转储，并监控耗时和文件大小；同时使用数据库提供商的快照或时间点恢复能力作为额外保障。
+密码应放在权限为 `0600` 的 `.pgpass`、部署密钥系统提供的 `PGPASSFILE` 或等效受保护服务定义中。不要把含密码的 `DATABASE_URL` 放到命令参数中。大型数据库应在靠近 PostgreSQL 的基础设施中执行转储并监控耗时。
 
 ### 媒体备份
 
@@ -310,20 +345,12 @@ aws s3 sync s3://noviqwiki-assets backups/media/noviqwiki-assets
 
 ### 项目恢复命令：纯 SQL
 
-仅运行 `pnpm restore` 不足以完成恢复。脚本必须获得 SQL 路径，以及与最终数据库目标绑定的确认值。默认主机 URL 对应的值为 `restore:localhost:5432/noviqwiki`：
+仅运行 `pnpm restore` 不足以完成恢复。脚本要求 SQL 路径和与最终目标绑定的确认值；缺少或错误时会打印所需精确值。例如恢复精确 Compose 目标及本地媒体：
 
 ```bash
-NOVIQWIKI_RESTORE_SQL=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038.sql \
-NOVIQWIKI_RESTORE_CONFIRM=restore:localhost:5432/noviqwiki \
-pnpm restore
-```
-
-如需同时恢复配套的本地媒体归档：
-
-```bash
-NOVIQWIKI_RESTORE_SQL=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038.sql \
-NOVIQWIKI_RESTORE_MEDIA=backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038-media.tar.gz \
-NOVIQWIKI_RESTORE_CONFIRM=restore:localhost:5432/noviqwiki \
+NOVIQWIKI_RESTORE_SQL=backups/noviqwiki.sql \
+NOVIQWIKI_RESTORE_MEDIA=backups/noviqwiki-media.tar.gz \
+NOVIQWIKI_RESTORE_CONFIRM='restore:noviqwiki@db:5432/noviqwiki:media=%2Fapp%2Fmedia' \
 pnpm restore
 ```
 
@@ -332,9 +359,9 @@ pnpm restore
 - `DATABASE_URL` 必须通过上文所述的严格 PostgreSQL 目标解析，且 `NOVIQWIKI_MEDIA_DRIVER` 必须为 `local` 或 `s3`。
 - `NOVIQWIKI_RESTORE_SQL` 必须是可读、非空的普通文件，并被识别为完整的 NoviqWiki 纯文本 `pg_dump`。检查要求存在 PostgreSQL 转储头、预期的 `sites` 和 `users` 表定义以及转储完成标记；截断转储、自定义 `.dump` 文件和任意 SQL 都会被拒绝。
 - 若设置了 `NOVIQWIKI_RESTORE_MEDIA`，媒体驱动必须为 `local`，归档必须是至少包含一个成员的可读普通文件。tar 预检会拒绝绝对路径、父目录穿越、反斜杠或控制字符路径，以及除普通文件和目录之外的所有成员类型，包括符号链接和硬链接。
-- 主机 `psql --version` 探测成功时会选择解析后的 `DATABASE_URL` 目标。只有可执行文件不可用且已显式启用 Compose 时，才会选择锚定的 `compose:default/noviqwiki/db/noviqwiki` 目标；任何其他探测失败都会停止。所选目标决定确认标签。
+- 已验证目标精确匹配 Compose `db` 服务时使用容器工具；其他目标必须使用本地 PostgreSQL 客户端。任何失败都会停止，不会切换目标。
 
-只有完整预检通过后，`NOVIQWIKI_RESTORE_CONFIRM` 才必须等于根据 `DATABASE_URL` 得出的 `restore:<host>:<port>/<database>`；URL 省略端口时会显示 `5432`。选择显式启用的 Compose 路径时，所需值严格为 `restore:compose:default/noviqwiki/db/noviqwiki`；主机目标确认不能授权 Compose 目标。缺少确认值或值不匹配时，脚本会在重置和导入前退出。
+完整预检通过后，`NOVIQWIKI_RESTORE_CONFIRM` 必须精确绑定解析后的数据库用户、主机、端口和数据库；提供媒体归档时还必须包含经百分号编码的规范媒体根目录。数据库专用确认不能授权递归替换媒体树，另一个媒体根目录的确认也不能复用。
 
 完成确认后但仍在重置数据库前，脚本只会在已提供媒体归档时创建或解析 `NOVIQWIKI_MEDIA_ROOT`，并拒绝与备份检查相同的不安全宽泛目的地。脚本会打开 SQL 文件，确认其设备、inode、大小和时间戳仍与预检结果一致。然后执行：
 
@@ -346,13 +373,18 @@ create schema public;
 
 这会清除目标数据库中的应用架构。脚本会把重置 SQL 和纯转储输入传给同一个主机或 Compose `psql` 调用，并使用 `-X`、`ON_ERROR_STOP=1` 和 `--single-transaction`。凭据、连接、重置和 SQL 失败都会停止，且不会切换目标；导入失败会回滚 Schema 重置，而不会留下空数据库。
 
-Compose 路径绝不会自动启用：必须同时满足主机 `psql` 不可用和 `NOVIQWIKI_COMPOSE_FALLBACK=1`，并且目标绑定确认仍须匹配 `restore:compose:default/noviqwiki/db/noviqwiki`。命令会清除 Compose 项目/文件以及 Docker 主机/context 环境覆盖，然后显式选择该标签编码的身份。所有自定义目标都应安装 `psql`。对于单独创建的空生产目标，可按以下方式显式快速失败导入：
+数据库工具由已验证目标选择；非 Compose 目标必须安装 `psql`，本地命令失败后不会改用另一个数据库。对于单独创建的空生产目标，可按以下方式显式快速失败导入：
 
 ```bash
-psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 --single-transaction -f backups/noviqwiki-2026-07-17T12-00-00-000Z-87bdf3d0-6c8b-4a09-ae26-e2d2b28b8038.sql
+PGHOST=database.example.com \
+PGPORT=5432 \
+PGUSER=noviqwiki \
+PGDATABASE=noviqwiki \
+PGSSLMODE=require \
+psql -X -v ON_ERROR_STOP=1 --single-transaction -f backups/noviqwiki.sql
 ```
 
-数据库导入成功后，脚本会重新检查媒体归档的文件身份并再次执行 tar 安全预检，然后才将其解压到已预检为可写的 `NOVIQWIKI_MEDIA_ROOT`。解压前不会删除目录中其他无关文件。PostgreSQL 与文件系统媒体无法共享一个事务：后续权限、容量或解压失败可能使数据库已经恢复，而媒体缺失或只合并了一部分。此时应继续停止写入、保留归档、修复存储问题，并在接受恢复结果前重跑或完成媒体恢复。
+媒体归档会在数据库恢复前验证，并解压到私有暂存目录。旧媒体树会保留到提升完成；SQL 恢复失败时会恢复旧媒体。Compose 在命名卷中执行相同的暂存提升，并自动停止/重启应用。非 Compose 本地媒体恢复必须设置 `NOVIQWIKI_RESTORE_QUIESCED=true`，且媒体根目录会在提升前再次与确认值核对。
 
 结构标记只能防止意外使用错误格式或截断输入，不能验证 SQL 真伪，也不会把 SQL 沙箱化。被修改的文件仍可包含任意 SQL 或 `psql` 元命令。只能恢复来自可信恢复源、且已核对记录的校验和或签名与来源信息的转储。
 
@@ -361,7 +393,12 @@ psql -X "$DATABASE_URL" -v ON_ERROR_STOP=1 --single-transaction -f backups/noviq
 自定义 `.dump` 文件应使用 `pg_restore`，而不是 `pnpm restore`：
 
 ```bash
-pg_restore --dbname "$DATABASE_URL" --clean --if-exists --no-owner --no-acl backups/noviqwiki.dump
+PGHOST=database.example.com \
+PGPORT=5432 \
+PGUSER=noviqwiki \
+PGDATABASE=noviqwiki \
+PGSSLMODE=require \
+pg_restore --clean --if-exists --no-owner --no-acl backups/noviqwiki.dump
 ```
 
 仅在目标可丢弃或确定要被替换时使用 `--clean --if-exists`。对于全新的空数据库，省略 `--clean` 可以降低误删风险。检查 `pg_restore` 的输出，任何 SQL 错误都应视为恢复失败。
@@ -389,7 +426,7 @@ curl -fsS https://wiki.example.com/api/ready
 
 然后在应用中验证以下全部项目：
 
-若恢复后的数据库包含站点但用户数为零，NoviqWiki 会有意开放 `/setup` 的仅所有者 bootstrap 模式。公开注册会保持阻断，但第一个设置访客仍可取得 Owner。在获授权操作人员创建该账户前，应将恢复服务置于可信或受访问限制的网络中。该步骤会保留现有页面、媒体和站点设置；开放正常流量前，应确认 bootstrap 完成后 `/setup` 已关闭。
+若恢复后的数据库包含站点但没有活跃 Owner，NoviqWiki 会有意开放 `/setup` 的 Owner 恢复/引导模式。公开注册仍被阻断，但首个设置访客可以恢复 Owner 角色。在获授权操作人员完成恢复前，应将服务置于可信或受访问限制的网络中。现有用户、页面、媒体和站点设置都会保留；开放正常流量前应确认 `/setup` 已关闭。
 
 - 管理员可以登录和退出。
 - 公共页面可以渲染，受限页面仍无法被未授权用户访问。

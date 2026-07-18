@@ -1,8 +1,12 @@
 import { eq, sql } from "drizzle-orm";
 import { db, type Database, type RootDatabase } from "@/db/client";
 import { siteSettings, sites } from "@/db/schema";
+import { sha256, safeEqual } from "@/lib/crypto";
+import { getEnv } from "@/lib/env";
+import { AppError, ForbiddenError } from "@/lib/errors";
 import { slugifyTitle } from "@/lib/normalize";
 import { writeAuditLog } from "@/modules/audit/service";
+import { requireSystemEmailConfigured } from "@/modules/auth/email";
 import {
   assignUserToGroup,
   ensureDefaultAuthorization,
@@ -29,12 +33,31 @@ export async function getSetupMode(database: Database = db): Promise<SetupMode> 
   return (await getSetupState(database)).mode;
 }
 
+export function assertSetupAuthorized(providedToken?: string) {
+  const env = getEnv();
+  const configuredToken = env.NOVIQWIKI_SETUP_TOKEN?.trim();
+  if (env.NODE_ENV !== "production" && !configuredToken) {
+    return;
+  }
+  if (!configuredToken || configuredToken.length < 32) {
+    throw new AppError(
+      "Initial setup is disabled until NOVIQWIKI_SETUP_TOKEN is configured with at least 32 characters.",
+      "setup_token_required",
+      503
+    );
+  }
+  if (!providedToken || !safeEqual(sha256(providedToken), sha256(configuredToken))) {
+    throw new ForbiddenError("The setup token is invalid.");
+  }
+}
+
 export async function isSetupRequired(database: Database = db) {
   return (await getSetupMode(database)) !== "complete";
 }
 
 export async function completeSetup(
   input: {
+    setupToken?: string;
     siteName: string;
     tagline: string;
     baseUrl: string;
@@ -48,6 +71,18 @@ export async function completeSetup(
   },
   database: RootDatabase = db
 ) {
+  assertSetupAuthorized(input.setupToken);
+  const configuredMediaDriver = getEnv().NOVIQWIKI_MEDIA_DRIVER;
+  if (input.mediaDriver !== configuredMediaDriver) {
+    throw new AppError(
+      `Media storage is configured as ${configuredMediaDriver}; setup cannot select ${input.mediaDriver}.`,
+      "validation_error",
+      422
+    );
+  }
+  if (input.registrationMode === "email_verification") {
+    requireSystemEmailConfigured();
+  }
   return database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('noviqwiki.initial_setup'))`);
     const existing = await tx.select({ id: sites.id }).from(sites).limit(1);
@@ -103,6 +138,7 @@ export async function completeSetup(
 
 export async function bootstrapOwner(
   input: {
+    setupToken?: string;
     ownerUsername: string;
     ownerEmail: string;
     ownerDisplayName?: string;
@@ -110,6 +146,7 @@ export async function bootstrapOwner(
   },
   database: RootDatabase = db
 ) {
+  assertSetupAuthorized(input.setupToken);
   return database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('noviqwiki.initial_setup'))`);
     const [site] = await tx.select().from(sites).limit(1);

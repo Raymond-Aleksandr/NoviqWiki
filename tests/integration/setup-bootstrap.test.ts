@@ -49,10 +49,7 @@ describe("setup owner bootstrap", () => {
     });
     expect(await isSetupRequired(test.executor)).toBe(true);
     await expect(
-      login(
-        { identifier: existingReader.username, password: "ExistingReaderPassword123" },
-        test.executor
-      )
+      login({ identifier: existingReader.username, password: "ExistingReaderPassword123" }, test.db)
     ).resolves.toMatchObject({ user: { id: existingReader.id } });
     await expect(
       registerUser(
@@ -94,7 +91,7 @@ describe("setup owner bootstrap", () => {
     expect(await getSetupMode(test.executor)).toBe("complete");
     expect(await isSetupRequired(test.executor)).toBe(false);
     await expect(
-      login({ identifier: "portable-owner", password: "PortablePassword123" }, test.executor)
+      login({ identifier: "portable-owner", password: "PortablePassword123" }, test.db)
     ).resolves.toMatchObject({ user: { id: owner.id } });
     await expect(hasPermission(owner.id, site.id, "site.configure", test.executor)).resolves.toBe(
       true

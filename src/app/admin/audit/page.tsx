@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ChevronDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
+import { requireAuthenticatedPermission } from "@/app/access";
 import { getPrimarySiteWithSettings } from "@/db/site";
 import { auditActionLabel } from "@/i18n/audit-actions";
 import { getRequestI18n } from "@/i18n/server";
@@ -13,6 +14,7 @@ const pageSize = 50;
 
 export default async function AdminAuditPage({ searchParams }: Props) {
   const site = await getPrimarySiteWithSettings();
+  await requireAuthenticatedPermission(site!.site.id, "audit.read");
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
   const action = auditActionValue(params.action);
