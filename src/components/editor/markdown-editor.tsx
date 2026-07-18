@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
@@ -12,6 +12,8 @@ import {
   Italic,
   Link,
   List,
+  Maximize2,
+  Minimize2,
   Quote,
   Search,
   Upload,
@@ -30,6 +32,8 @@ export type EditorMediaItem = {
 type Props = {
   name?: string;
   initialValue?: string;
+  initialPreviewHtml: string;
+  previewMode: "create" | "edit";
   footer?: ReactNode;
   messages: Messages;
   mediaItems?: EditorMediaItem[];
@@ -38,6 +42,8 @@ type Props = {
 export function MarkdownEditor({
   name = "markdown",
   initialValue = "",
+  initialPreviewHtml,
+  previewMode,
   footer,
   messages,
   mediaItems = []
@@ -48,8 +54,14 @@ export function MarkdownEditor({
   const [selectedMediaId, setSelectedMediaId] = useState(mediaItems[0]?.id ?? "");
   const [manualUrl, setManualUrl] = useState("");
   const [manualAlt, setManualAlt] = useState("");
+  const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [preview, setPreview] = useState<{
+    html: string;
+    status: "ready" | "loading" | "error";
+  }>({ html: initialPreviewHtml, status: "ready" });
+  const lastRenderedMarkdown = useRef(initialValue);
+  const previewRequestId = useRef(0);
   const extensions = useMemo(() => [markdown()], []);
-  const preview = useMemo(() => renderPreview(value, messages), [messages, value]);
   const filteredMedia = useMemo(() => {
     const needle = mediaQuery.trim().toLowerCase();
     if (!needle) return mediaItems;
@@ -60,6 +72,50 @@ export function MarkdownEditor({
   const activeMediaUrl = selectedMedia?.publicUrl ?? manualUrl.trim();
   const activeMediaAlt =
     selectedMedia?.altText || selectedMedia?.safeFilename || manualAlt.trim() || messages.altText;
+
+  useEffect(() => {
+    const requestId = ++previewRequestId.current;
+    if (value === lastRenderedMarkdown.current) {
+      setPreview((current) =>
+        current.status === "ready" ? current : { ...current, status: "ready" }
+      );
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setPreview((current) => ({ ...current, status: "loading" }));
+      try {
+        const response = await fetch("/api/editor/preview", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ markdown: value, mode: previewMode }),
+          signal: controller.signal
+        });
+        const payload = (await response.json()) as {
+          data?: { html?: string };
+        };
+        if (!response.ok || typeof payload.data?.html !== "string") {
+          throw new Error("Preview request failed.");
+        }
+        if (requestId !== previewRequestId.current) {
+          return;
+        }
+        lastRenderedMarkdown.current = value;
+        setPreview({ html: payload.data.html, status: "ready" });
+      } catch {
+        if (controller.signal.aborted || requestId !== previewRequestId.current) {
+          return;
+        }
+        setPreview((current) => ({ ...current, status: "error" }));
+      }
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [previewMode, value]);
 
   function insert(before: string, after = "", sample = "") {
     setValue(
@@ -75,7 +131,7 @@ export function MarkdownEditor({
   }
 
   return (
-    <div className="editor-shell">
+    <div className={`editor-shell ${previewExpanded ? "preview-expanded" : ""}`}>
       <div className="editor-toolbar" role="toolbar" aria-label={messages.markdownFormatting}>
         <button
           className="editor-tool-button"
@@ -141,6 +197,23 @@ export function MarkdownEditor({
           <Image size={16} aria-hidden="true" />
           <span className="sr-only">{messages.image}</span>
         </button>
+        <span className="editor-toolbar-spacer" />
+        <button
+          className="editor-tool-button"
+          type="button"
+          title={previewExpanded ? messages.collapsePreview : messages.expandPreview}
+          aria-pressed={previewExpanded}
+          onClick={() => setPreviewExpanded((current) => !current)}
+        >
+          {previewExpanded ? (
+            <Minimize2 size={16} aria-hidden="true" />
+          ) : (
+            <Maximize2 size={16} aria-hidden="true" />
+          )}
+          <span className="sr-only">
+            {previewExpanded ? messages.collapsePreview : messages.expandPreview}
+          </span>
+        </button>
       </div>
       <div className="editor-columns">
         <div className="editor-code-pane">
@@ -153,9 +226,29 @@ export function MarkdownEditor({
             aria-label={messages.markdownEditor}
           />
         </div>
-        <div className="editor-preview" aria-label={messages.markdownPreview}>
-          <div className="editor-preview-kicker">{messages.livePreview}</div>
-          {preview}
+        <div
+          className="editor-preview"
+          aria-label={messages.markdownPreview}
+          aria-busy={preview.status === "loading"}
+        >
+          <div className="editor-preview-header">
+            <div className="editor-preview-kicker">{messages.livePreview}</div>
+            <div className={`editor-preview-status ${preview.status}`} aria-live="polite">
+              {preview.status === "loading"
+                ? messages.previewUpdating
+                : preview.status === "error"
+                  ? messages.previewFailed
+                  : null}
+            </div>
+          </div>
+          {preview.html ? (
+            <div
+              className="article-body editor-preview-body"
+              dangerouslySetInnerHTML={{ __html: preview.html }}
+            />
+          ) : (
+            <p className="muted">{messages.previewEmpty}</p>
+          )}
         </div>
       </div>
       {footer ? <div className="editor-footer">{footer}</div> : null}
@@ -260,85 +353,4 @@ export function MarkdownEditor({
       ) : null}
     </div>
   );
-}
-
-function renderPreview(value: string, messages: Messages): ReactNode[] | ReactNode {
-  const nodes: ReactNode[] = [];
-  let listItems: ReactNode[] = [];
-
-  function flushList() {
-    if (listItems.length > 0) {
-      nodes.push(<ul key={`list-${nodes.length}`}>{listItems}</ul>);
-      listItems = [];
-    }
-  }
-
-  value.split(/\r?\n/).forEach((line, index) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      flushList();
-      return;
-    }
-    if (trimmed.startsWith("# ")) {
-      flushList();
-      nodes.push(<h2 key={index}>{renderInline(trimmed.slice(2))}</h2>);
-      return;
-    }
-    if (trimmed.startsWith("## ")) {
-      flushList();
-      nodes.push(<h3 key={index}>{renderInline(trimmed.slice(3))}</h3>);
-      return;
-    }
-    if (trimmed.startsWith("- ")) {
-      listItems.push(<li key={index}>{renderInline(trimmed.slice(2))}</li>);
-      return;
-    }
-    if (trimmed.startsWith("> ")) {
-      flushList();
-      nodes.push(<blockquote key={index}>{renderInline(trimmed.slice(2))}</blockquote>);
-      return;
-    }
-    if (trimmed.startsWith("[[Category:")) {
-      flushList();
-      nodes.push(
-        <p key={index}>
-          <span className="badge">
-            {trimmed.replace(/^\[\[Category:/, "").replace(/\]\]$/, "")}
-          </span>
-        </p>
-      );
-      return;
-    }
-    flushList();
-    nodes.push(<p key={index}>{renderInline(trimmed)}</p>);
-  });
-
-  flushList();
-  return nodes.length > 0 ? nodes : <p className="muted">{messages.previewEmpty}</p>;
-}
-
-function renderInline(text: string): ReactNode[] {
-  return text
-    .split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`|\[\[[^\]]+\]\])/g)
-    .filter(Boolean)
-    .map((part, index) => {
-      if (part.startsWith("**") && part.endsWith("**")) {
-        return <strong key={index}>{part.slice(2, -2)}</strong>;
-      }
-      if (part.startsWith("*") && part.endsWith("*")) {
-        return <em key={index}>{part.slice(1, -1)}</em>;
-      }
-      if (part.startsWith("`") && part.endsWith("`")) {
-        return <code key={index}>{part.slice(1, -1)}</code>;
-      }
-      if (part.startsWith("[[") && part.endsWith("]]")) {
-        const [target, label] = part.slice(2, -2).split("|");
-        return (
-          <span className="badge danger" key={index}>
-            {label ?? target}
-          </span>
-        );
-      }
-      return part;
-    });
 }

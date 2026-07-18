@@ -1,11 +1,16 @@
 import "dotenv/config";
 
 import { spawn } from "node:child_process";
-import { access, cp, mkdir, rm } from "node:fs/promises";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { resetE2eDatabase } from "./e2e-support";
+import { assertPreparedStandaloneAssets, prepareStandaloneAssets } from "./standalone-assets";
 
 async function main() {
+  const skipBuild = process.env.NOVIQWIKI_E2E_SKIP_BUILD === "1";
+  if (skipBuild) {
+    await assertPreparedStandaloneAssets();
+  }
   const reset = await resetE2eDatabase();
   const playwrightPort = process.env.PLAYWRIGHT_PORT ?? "3101";
   const playwrightBaseUrl = process.env.PLAYWRIGHT_BASE_URL ?? `http://127.0.0.1:${playwrightPort}`;
@@ -34,10 +39,10 @@ async function main() {
   );
   console.log(`Running Playwright against ${playwrightBaseUrl}.`);
 
-  if (process.env.NOVIQWIKI_E2E_SKIP_BUILD !== "1") {
+  if (!skipBuild) {
     await run(command, ["exec", "next", "build"], childEnv);
+    await prepareStandaloneAssets();
   }
-  await prepareStandaloneAssets();
   await run(command, ["exec", "playwright", "test", ...process.argv.slice(2)], childEnv);
 }
 
@@ -56,29 +61,6 @@ async function run(command: string, args: string[], env: NodeJS.ProcessEnv) {
       }
     });
   });
-}
-
-async function prepareStandaloneAssets() {
-  const standaloneRoot = path.resolve(".next/standalone");
-  const standaloneStatic = path.join(standaloneRoot, ".next/static");
-  const standalonePublic = path.join(standaloneRoot, "public");
-  const publicRoot = path.resolve("public");
-
-  await rm(standaloneStatic, { recursive: true, force: true });
-  await cp(path.resolve(".next/static"), standaloneStatic, { recursive: true });
-  await rm(standalonePublic, { recursive: true, force: true });
-  if (await pathExists(publicRoot)) {
-    await cp(publicRoot, standalonePublic, { recursive: true });
-  }
-}
-
-async function pathExists(targetPath: string) {
-  try {
-    await access(targetPath);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 main().catch((error) => {

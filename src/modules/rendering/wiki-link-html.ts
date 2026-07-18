@@ -1,12 +1,19 @@
 import { normalizeTitle } from "@/lib/normalize";
-import type { PageOutboundLink } from "@/modules/pages/service";
+
+export type ResolvedWikiLink = {
+  targetTitle: string;
+  label: string | null;
+  targetPageId: string | null;
+  targetSlug: string | null;
+  exists: boolean;
+};
 
 const anchorPattern = /<a\b([^>]*)>([\s\S]*?)<\/a>/g;
 const wikiTitlePattern = /\stitle="wiki-link:([^"]*)"/;
 
 export function decorateWikiLinkHtml(
   html: string,
-  outboundLinks: PageOutboundLink[],
+  outboundLinks: ResolvedWikiLink[],
   canCreatePage: boolean
 ) {
   if (!html.includes("wiki-link:")) {

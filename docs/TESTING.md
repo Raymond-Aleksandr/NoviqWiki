@@ -122,8 +122,8 @@ The wrapper performs these steps:
 1. Selects a reset-safe real PostgreSQL URL.
 2. Creates the database when possible, drops its `public` and `drizzle` schemas, recreates `public`, and applies migrations.
 3. Uses `test-results/e2e-media` as the default local media root.
-4. Runs a production `next build` unless explicitly skipped.
-5. Copies static/public assets into the standalone output and starts it on port `3101` by default.
+4. Validates an already prepared standalone artifact when the build is explicitly skipped; otherwise runs a production `next build` and copies static/public assets into the standalone output.
+5. Starts the standalone output on port `3101` by default.
 6. Runs the configured Chromium Playwright project.
 
 The default database URL is:
@@ -157,6 +157,14 @@ Useful overrides:
 | `NOVIQWIKI_E2E_SKIP_BUILD`   | Unset                     | Set to `1` only with a compatible existing build.            |
 | `NOVIQWIKI_E2E_REUSE_SERVER` | Unset                     | Set to `1` to reuse an existing server.                      |
 | `NOVIQWIKI_E2E_SERVER_MODE`  | `start`                   | Set to `dev` only for an intentional development-server run. |
+
+To reuse a local production build, prepare its standalone assets before setting the skip flag:
+
+```bash
+pnpm build
+pnpm e2e:prepare
+NOVIQWIKI_E2E_SKIP_BUILD=1 pnpm test:e2e
+```
 
 Create the disposable database manually if the configured PostgreSQL user cannot create databases. The wrapper resets the database schema but does not promise to delete arbitrary files from a custom e2e media path.
 
@@ -250,6 +258,8 @@ The tracked GitHub Actions workflows currently run:
 - Formatting check, lint, typecheck, unit tests, integration tests, and build.
 - The Chromium e2e suite against PostgreSQL.
 - Docker Compose configuration and image build.
+
+The quality job uses the in-process PGlite integration suite and therefore does not start an unused PostgreSQL service. After its production build, it prepares the standalone output, archives it with symlinks intact, and retains the artifact for one day. The Playwright job downloads that exact build instead of compiling the application again. The Docker job uses the GitHub Actions BuildKit cache while still validating the committed Compose configuration and Dockerfile on every run.
 
 They do not currently run the live `pnpm test:ui` audit, a clean `docker compose up` setup flow, `pnpm backup`, `pnpm restore`, or a restore drill. Those results must come from separately recorded execution rather than being inferred from green CI.
 
@@ -421,8 +431,8 @@ pnpm test:e2e
 1. 选择可安全重置的真实 PostgreSQL URL。
 2. 尽可能创建数据库，删除其 `public` 和 `drizzle` 架构，重新创建 `public` 并应用迁移。
 3. 默认使用 `test-results/e2e-media` 作为本地媒体根目录。
-4. 除非明确跳过，否则执行生产 `next build`。
-5. 将静态和公共资源复制到独立输出，并默认在 `3101` 端口启动。
+4. 明确跳过构建时验证已经准备好的独立产物；否则执行生产 `next build`，并把静态和公共资源复制到独立输出。
+5. 默认在 `3101` 端口启动独立输出。
 6. 运行配置的 Chromium Playwright 项目。
 
 默认数据库 URL：
@@ -456,6 +466,14 @@ NOVIQWIKI_E2E_DATABASE_URL=postgres://user:pass@localhost:5432/noviqwiki_test pn
 | `NOVIQWIKI_E2E_SKIP_BUILD`   | 未设置                    | 仅在已有兼容构建时设置为 `1`。             |
 | `NOVIQWIKI_E2E_REUSE_SERVER` | 未设置                    | 设置为 `1` 复用现有服务器。                |
 | `NOVIQWIKI_E2E_SERVER_MODE`  | `start`                   | 仅在明确进行开发服务器运行时设置为 `dev`。 |
+
+若要复用本地生产构建，应先准备其独立资源，再设置跳过标志：
+
+```bash
+pnpm build
+pnpm e2e:prepare
+NOVIQWIKI_E2E_SKIP_BUILD=1 pnpm test:e2e
+```
 
 若配置的 PostgreSQL 用户无法创建数据库，请手动创建可丢弃数据库。包装脚本会重置数据库架构，但不保证删除自定义 e2e 媒体路径中的任意文件。
 
@@ -549,6 +567,8 @@ docker compose logs --tail=200 app
 - 格式检查、lint、类型检查、单元测试、集成测试和构建。
 - 针对 PostgreSQL 的 Chromium e2e 套件。
 - Docker Compose 配置和镜像构建。
+
+质量作业使用进程内 PGlite 集成套件，因此不再启动未使用的 PostgreSQL 服务。生产构建完成后，它会准备独立输出、保留其中的符号链接并打包，产物保留一天。Playwright 作业下载同一份构建，不再重新编译应用。Docker 作业使用 GitHub Actions BuildKit 缓存，同时仍在每次运行中验证提交的 Compose 配置和 Dockerfile。
 
 当前 CI 不运行在线 `pnpm test:ui`、干净 `docker compose up` 设置流程、`pnpm backup`、`pnpm restore` 或恢复演练。这些结果必须来自单独记录的实际执行，不能从绿色 CI 推断。
 

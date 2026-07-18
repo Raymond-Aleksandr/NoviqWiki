@@ -8,10 +8,11 @@ import { getPrimarySiteWithSettings } from "@/db/site";
 import { getRequestI18n } from "@/i18n/server";
 import { decodeRouteParam } from "@/lib/route-params";
 import { getCurrentSession } from "@/modules/auth/session";
-import { requirePermission } from "@/modules/authorization/permissions";
+import { hasPermission, requirePermission } from "@/modules/authorization/permissions";
 import { listMedia } from "@/modules/media/service";
 import { getDraftForEditor, getRevisionById } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
+import { renderEditorPreview } from "@/modules/rendering/preview";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -40,14 +41,20 @@ export default async function EditPage({ params }: Props) {
   const revision = resolved.page.currentRevisionId
     ? await getRevisionById(resolved.page.currentRevisionId)
     : null;
-  const [draft, mediaItems, i18n] = await Promise.all([
+  const [draft, mediaItems, i18n, canCreatePage] = await Promise.all([
     getDraftForEditor({ pageId: resolved.page.id, editorId: session.user.id }),
     listMedia({ siteId: site.site.id, limit: 40 }),
-    getRequestI18n(site.settings?.defaultLocale)
+    getRequestI18n(site.settings?.defaultLocale),
+    hasPermission(session.user.id, site.site.id, "page.create")
   ]);
   const { messages } = i18n;
   const editorMarkdown = draft?.markdown ?? revision?.markdown ?? "";
   const baseRevisionId = draft?.baseRevisionId ?? resolved.page.currentRevisionId ?? "";
+  const initialPreview = await renderEditorPreview({
+    siteId: site.site.id,
+    markdown: editorMarkdown,
+    canCreatePage
+  });
   return (
     <section className="page-frame editor-page">
       <header className="editor-header">
@@ -76,6 +83,8 @@ export default async function EditPage({ params }: Props) {
         <input type="hidden" name="baseRevisionId" value={baseRevisionId} />
         <MarkdownEditor
           initialValue={editorMarkdown}
+          initialPreviewHtml={initialPreview.html}
+          previewMode="edit"
           messages={messages}
           mediaItems={serializeEditorMedia(mediaItems)}
           footer={
