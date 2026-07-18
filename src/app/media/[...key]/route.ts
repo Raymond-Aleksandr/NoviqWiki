@@ -36,7 +36,7 @@ export async function GET(_request: Request, { params }: Props) {
   if (!(await hasPermission(session?.user.id, asset.siteId, "media.read"))) {
     return new NextResponse("Not found", { status: 404 });
   }
-  if (getEnv().NEXTWIKI_MEDIA_DRIVER === "s3") {
+  if (getEnv().NOVIQWIKI_MEDIA_DRIVER === "s3") {
     const url = await getStorageAdapter().getPublicUrl(storageKey);
     return NextResponse.redirect(url);
   }

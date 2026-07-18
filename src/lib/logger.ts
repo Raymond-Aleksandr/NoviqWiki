@@ -1,7 +1,7 @@
 import pino from "pino";
 
 export const logger = pino({
-  level: process.env.NEXTWIKI_LOG_LEVEL ?? "info",
+  level: process.env.NOVIQWIKI_LOG_LEVEL ?? "info",
   redact: {
     paths: [
       "password",

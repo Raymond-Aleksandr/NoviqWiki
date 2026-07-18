@@ -29,7 +29,7 @@ export async function sendEmailVerification(
 ) {
   const token = await issueEmailVerification(input.userId, database);
   const site = await getPrimarySiteWithSettings(database);
-  const baseUrl = site?.settings?.baseUrl ?? getEnv().NEXTWIKI_BASE_URL;
+  const baseUrl = site?.settings?.baseUrl ?? getEnv().NOVIQWIKI_BASE_URL;
   const url = new URL("/verify-email", baseUrl);
   url.searchParams.set("token", token);
   return sendSystemEmail({
@@ -83,7 +83,7 @@ export async function requestPasswordReset(identifier: string, database: Databas
   }
   const token = await issuePasswordReset(user.id, database);
   const site = await getPrimarySiteWithSettings(database);
-  const baseUrl = site?.settings?.baseUrl ?? getEnv().NEXTWIKI_BASE_URL;
+  const baseUrl = site?.settings?.baseUrl ?? getEnv().NOVIQWIKI_BASE_URL;
   const url = new URL("/reset-password", baseUrl);
   url.searchParams.set("token", token);
   const sent = await sendSystemEmail({

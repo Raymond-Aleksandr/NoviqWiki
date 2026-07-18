@@ -282,7 +282,7 @@ curl --cookie cookies.txt \
   https://wiki.example.com/api/v1/media
 ```
 
-Uploads are checked against the site size and MIME allowlists and stored through the runtime adapter selected by `NEXTWIKI_MEDIA_DRIVER`. The detector currently falls back to the client-declared MIME type when `file-type` cannot identify the bytes; deployers should keep a narrow allowlist and should not treat v0.1.0 upload inspection as complete content validation.
+Uploads are checked against the site size and MIME allowlists and stored through the runtime adapter selected by `NOVIQWIKI_MEDIA_DRIVER`. The detector currently falls back to the client-declared MIME type when `file-type` cannot identify the bytes; deployers should keep a narrow allowlist and should not treat v0.1.0 upload inspection as complete content validation.
 
 `GET /media/{id}` returns `{ "references": [...] }`, not the binary file. Local storage persists a durable application URL.
 
@@ -611,7 +611,7 @@ curl --cookie cookies.txt \
   https://wiki.example.com/api/v1/media
 ```
 
-上传会根据站点大小限制和 MIME 允许列表检查，并通过 `NEXTWIKI_MEDIA_DRIVER` 选择的运行时适配器存储。当 `file-type` 无法识别字节内容时，当前检测器会回退到客户端声明的 MIME 类型；部署者应维持严格的允许列表，不应把 v0.1.0 的上传检查视为完整内容验证。
+上传会根据站点大小限制和 MIME 允许列表检查，并通过 `NOVIQWIKI_MEDIA_DRIVER` 选择的运行时适配器存储。当 `file-type` 无法识别字节内容时，当前检测器会回退到客户端声明的 MIME 类型；部署者应维持严格的允许列表，不应把 v0.1.0 的上传检查视为完整内容验证。
 
 `GET /media/{id}` 返回 `{ "references": [...] }`，而不是文件二进制。本地存储会保存持久的应用地址。
 

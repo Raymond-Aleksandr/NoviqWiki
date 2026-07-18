@@ -15,8 +15,8 @@ export default async function SetupPage() {
   return (
     <SetupWizard
       action={setupAction}
-      defaultBaseUrl={env.NEXTWIKI_BASE_URL}
-      defaultMediaDriver={env.NEXTWIKI_MEDIA_DRIVER}
+      defaultBaseUrl={env.NOVIQWIKI_BASE_URL}
+      defaultMediaDriver={env.NOVIQWIKI_MEDIA_DRIVER}
       defaultSiteName={setup.site?.name ?? "NoviqWiki"}
       initialLocale={locale}
       messages={messages}

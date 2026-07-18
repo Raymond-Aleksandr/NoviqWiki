@@ -14,7 +14,7 @@ This guide describes the current NoviqWiki `0.1.0` deployment model: a Next.js s
 - Database and media backup, monitoring, alerting, and a tested restore procedure.
 - A single public origin matching the base URL stored in the NoviqWiki site settings.
 
-The repository's `compose.yaml` is a local/evaluation baseline, not a hardened production definition. As committed, it publishes PostgreSQL on host port `5432`, uses the example database password `nextwiki`, serves HTTP on port `3000`, hard-codes local media, and mounts `nextwiki-secrets` so the image can persist an automatically generated secret when no explicit value is supplied. Create a deployment-specific override or platform definition before internet-facing use.
+The repository's `compose.yaml` is a local/evaluation baseline, not a hardened production definition. As committed, it publishes PostgreSQL on host port `5432`, uses the example database password `noviqwiki`, serves HTTP on port `3000`, hard-codes local media, and mounts `noviqwiki-secrets` so the image can persist an automatically generated secret when no explicit value is supplied. Create a deployment-specific override or platform definition before internet-facing use.
 
 ## Verify a Release Candidate
 
@@ -45,28 +45,28 @@ At minimum, a local-media production deployment needs explicit values equivalent
 
 ```bash
 NODE_ENV=production
-DATABASE_URL=postgres://nextwiki:secret@postgres.example.com:5432/nextwiki
-NEXTWIKI_BASE_URL=https://wiki.example.com
-NEXTWIKI_SECRET=replace-with-generated-secret-of-at-least-32-characters
-NEXTWIKI_MEDIA_DRIVER=local
-NEXTWIKI_MEDIA_ROOT=/app/media
-NEXTWIKI_STORAGE_PUBLIC_PATH=/media
+DATABASE_URL=postgres://noviqwiki:secret@postgres.example.com:5432/noviqwiki
+NOVIQWIKI_BASE_URL=https://wiki.example.com
+NOVIQWIKI_SECRET=replace-with-generated-secret-of-at-least-32-characters
+NOVIQWIKI_MEDIA_DRIVER=local
+NOVIQWIKI_MEDIA_ROOT=/app/media
+NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 ```
 
 For S3-compatible media, replace the local-media values and provide the complete current S3 set:
 
 ```bash
-NEXTWIKI_MEDIA_DRIVER=s3
-NEXTWIKI_S3_ENDPOINT=https://s3.us-east-1.amazonaws.com
-NEXTWIKI_S3_REGION=us-east-1
-NEXTWIKI_S3_BUCKET=noviqwiki-assets
-NEXTWIKI_S3_ACCESS_KEY_ID=replace-with-access-key
-NEXTWIKI_S3_SECRET_ACCESS_KEY=replace-with-secret-key
+NOVIQWIKI_MEDIA_DRIVER=s3
+NOVIQWIKI_S3_ENDPOINT=https://s3.us-east-1.amazonaws.com
+NOVIQWIKI_S3_REGION=us-east-1
+NOVIQWIKI_S3_BUCKET=noviqwiki-assets
+NOVIQWIKI_S3_ACCESS_KEY_ID=replace-with-access-key
+NOVIQWIKI_S3_SECRET_ACCESS_KEY=replace-with-secret-key
 ```
 
 The current S3 adapter requires the endpoint, bucket, access key, and secret key and uses path-style requests. Validate the chosen provider and browser delivery path before rollout. Configure both SMTP variables when email verification or password-reset delivery is required.
 
-The setup wizard writes a base URL into PostgreSQL. After setup, changing only `NEXTWIKI_BASE_URL` does not update that stored value; update `/admin/settings` as well. The stored URL is authoritative for generated application and recovery links, but it does not control cookie security. Session and CSRF cookies receive `Secure` only when the environment `NEXTWIKI_BASE_URL` has the `https:` scheme, regardless of `NODE_ENV`. See [CONFIGURATION.md](./CONFIGURATION.md) for environment-loading rules and the full variable reference.
+The setup wizard writes a base URL into PostgreSQL. After setup, changing only `NOVIQWIKI_BASE_URL` does not update that stored value; update `/admin/settings` as well. The stored URL is authoritative for generated application and recovery links, but it does not control cookie security. Session and CSRF cookies receive `Secure` only when the environment `NOVIQWIKI_BASE_URL` has the `https:` scheme, regardless of `NODE_ENV`. See [CONFIGURATION.md](./CONFIGURATION.md) for environment-loading rules and the full variable reference.
 
 ## Setup Modes and Exposure
 
@@ -115,11 +115,11 @@ Always use `--quiet` for human validation. Plain `docker compose config` renders
 
 The stock image's startup script resolves the secret as follows:
 
-1. When a non-empty explicit `NEXTWIKI_SECRET` environment value exists, use it and proactively delete `${NEXTWIKI_SECRET_DIR:-/app/secrets}/nextwiki-secret` if that fallback file exists.
+1. When a non-empty explicit `NOVIQWIKI_SECRET` environment value exists, use it and proactively delete `${NOVIQWIKI_SECRET_DIR:-/app/secrets}/noviqwiki-secret` if that fallback file exists.
 2. Otherwise, read a non-empty fallback file at that path.
 3. If no non-empty fallback exists, generate a 32-byte random value, write its hexadecimal representation to that file with restrictive permissions, and export it to the application.
 
-An explicit `NEXTWIKI_SECRET` is never written to the fallback file. The stock Compose file mounts `nextwiki-secrets` at `/app/secrets`, so a fallback survives container replacement and `docker compose down` while no explicit value is used. Starting with an explicit value removes that persisted fallback. If the explicit value is later removed, no old fallback remains to recover: startup generates a new one, invalidating existing HMAC-derived sessions, email-verification tokens, password-reset tokens, rate-limit hashes, and IP hashes. Operators may inject the explicit value through the shell, an untracked `.env`, or an override. Production must use one stable, explicitly managed value rather than switch between an explicit secret and automatic fallback generation.
+An explicit `NOVIQWIKI_SECRET` is never written to the fallback file. The stock Compose file mounts `noviqwiki-secrets` at `/app/secrets`, so a fallback survives container replacement and `docker compose down` while no explicit value is used. Starting with an explicit value removes that persisted fallback. If the explicit value is later removed, no old fallback remains to recover: startup generates a new one, invalidating existing HMAC-derived sessions, email-verification tokens, password-reset tokens, rate-limit hashes, and IP hashes. Operators may inject the explicit value through the shell, an untracked `.env`, or an override. Production must use one stable, explicitly managed value rather than switch between an explicit secret and automatic fallback generation.
 
 Inspect status and logs:
 
@@ -128,9 +128,9 @@ docker compose ps
 docker compose logs --tail=200 app
 ```
 
-The committed service names are `app` and `db`. The named volumes are `nextwiki-db`, `nextwiki-media`, `nextwiki-backups`, and `nextwiki-secrets` under the Compose project name. `docker compose down` preserves them. `docker compose down -v` deletes the database, local media, backup output, and persisted fallback secret; it must not be used on retained data without an explicit destructive-operation plan. If no explicit managed secret is supplied after deleting the secret volume, startup generates a new value and invalidates existing HMAC-derived sessions and tokens, as does removing an explicit value after it has deleted the old fallback.
+The committed service names are `app` and `db`. The named volumes are `noviqwiki-db`, `noviqwiki-media`, `noviqwiki-backups`, and `noviqwiki-secrets` under the Compose project name. `docker compose down` preserves them. `docker compose down -v` deletes the database, local media, backup output, and persisted fallback secret; it must not be used on retained data without an explicit destructive-operation plan. If no explicit managed secret is supplied after deleting the secret volume, startup generates a new value and invalidates existing HMAC-derived sessions and tokens, as does removing an explicit value after it has deleted the old fallback.
 
-`pnpm backup` does not include `nextwiki-secrets`. A production deployment should keep `NEXTWIKI_SECRET` in its secret manager. A platform that deliberately uses the file fallback must protect and recover that file separately and keep it consistent across instances.
+`pnpm backup` does not include `noviqwiki-secrets`. A production deployment should keep `NOVIQWIKI_SECRET` in its secret manager. A platform that deliberately uses the file fallback must protect and recover that file separately and keep it consistent across instances.
 
 ## Hardening Compose for Production
 
@@ -138,8 +138,8 @@ A production-specific Compose or platform definition should, at minimum:
 
 - Replace the example PostgreSQL credentials, or use a managed database.
 - Stop publishing PostgreSQL to the public host unless an explicitly secured administration path requires it.
-- Inject `DATABASE_URL`, `NEXTWIKI_BASE_URL`, `NEXTWIKI_SECRET`, media, SMTP, pool, and log settings from the deployment environment or secret manager.
-- Fail deployment when the managed `NEXTWIKI_SECRET` is missing instead of relying on the image's evaluation-friendly automatic generation and secret volume.
+- Inject `DATABASE_URL`, `NOVIQWIKI_BASE_URL`, `NOVIQWIKI_SECRET`, media, SMTP, pool, and log settings from the deployment environment or secret manager.
+- Fail deployment when the managed `NOVIQWIKI_SECRET` is missing instead of relying on the image's evaluation-friendly automatic generation and secret volume.
 - Mount local media and backup output on independently backed-up persistent storage, or configure the complete S3 backend.
 - Pin the application image to a release tag and preferably an immutable digest.
 - Add resource limits, log retention, update policy, and platform-specific health checks.
@@ -158,7 +158,7 @@ Terminate TLS before traffic reaches the Next.js server and forward or overwrite
 
 The proxy must remove untrusted client-supplied forwarding headers and write its own values. NoviqWiki uses forwarded host/protocol information for same-origin redirects and uses the forwarded client address in security metadata. Incorrect trust boundaries can produce bad redirects or spoofed IP attribution.
 
-Set `NODE_ENV=production`, serve only through HTTPS, and set both the environment and stored site base URLs to the external HTTPS origin. The environment `NEXTWIKI_BASE_URL` alone controls the `Secure` attribute on session and CSRF cookies: its scheme must be `https:`. Neither `NODE_ENV` nor the base URL stored in PostgreSQL changes that cookie decision. The stored URL remains authoritative for generated application and recovery links.
+Set `NODE_ENV=production`, serve only through HTTPS, and set both the environment and stored site base URLs to the external HTTPS origin. The environment `NOVIQWIKI_BASE_URL` alone controls the `Secure` attribute on session and CSRF cookies: its scheme must be `https:`. Neither `NODE_ENV` nor the base URL stored in PostgreSQL changes that cookie decision. The stored URL remains authoritative for generated application and recovery links.
 
 Apply request-size, timeout, and rate controls at the proxy in addition to application validation. Preserve Web and API response headers such as CSP, `X-Content-Type-Options`, and `X-Frame-Options`.
 
@@ -186,7 +186,7 @@ Route load-balancer liveness and readiness according to platform behavior. Do no
 
 ## Static Assets and Media
 
-Next.js static assets are included in the standalone image. Local user media must live on the persistent path configured by `NEXTWIKI_MEDIA_ROOT`; the committed Compose file mounts `/app/media`.
+Next.js static assets are included in the standalone image. Local user media must live on the persistent path configured by `NOVIQWIKI_MEDIA_ROOT`; the committed Compose file mounts `/app/media`.
 
 The current authorized local-media route sends `Cache-Control: public, max-age=31536000, immutable`. Private wikis must configure the reverse proxy/CDN to prevent shared caching. Deployments that require immediate revocation after logout, permission removal, a private-mode change, or deletion must change the application route to `Cache-Control: private, no-store` and purge already cached objects or rotate previously distributed URLs.
 
@@ -198,9 +198,9 @@ For S3-compatible storage:
 - Verify representative images and files in a real browser under the deployed CSP, not only through a direct bucket request.
 - Back up the bucket independently; `pnpm backup` does not copy S3 objects.
 
-Changing storage drivers does not migrate existing objects. Plan and verify an explicit object migration before changing `NEXTWIKI_MEDIA_DRIVER`.
+Changing storage drivers does not migrate existing objects. Plan and verify an explicit object migration before changing `NOVIQWIKI_MEDIA_DRIVER`.
 
-`pnpm backup` always creates a PostgreSQL dump and creates a media `.tar.gz` archive only for the `local` driver. It does not include S3 objects or `nextwiki-secrets`. The backup and restore scripts load `.env`, but each reads only its relevant database, media, and backup or restore variables; they do not run full web-application configuration validation and do not require `NEXTWIKI_SECRET`.
+`pnpm backup` always creates a PostgreSQL dump and creates a media `.tar.gz` archive only for the `local` driver. It does not include S3 objects or `noviqwiki-secrets`. The backup and restore scripts load `.env`, but each reads only its relevant database, media, and backup or restore variables; they do not run full web-application configuration validation and do not require `NOVIQWIKI_SECRET`.
 
 ## Observability
 
@@ -262,7 +262,7 @@ The repository currently has forward Drizzle migrations and no general automatic
 - 数据库与媒体备份、监控、告警以及经过测试的恢复流程。
 - 与 NoviqWiki 站点设置中基础 URL 一致的单一公共源。
 
-仓库中的 `compose.yaml` 是本地或评估基线，不是经过强化的生产定义。当前文件将 PostgreSQL 发布到主机 `5432` 端口，使用示例数据库密码 `nextwiki`，通过 `3000` 端口提供 HTTP，固定使用本地媒体，并挂载 `nextwiki-secrets`，以便镜像在未提供显式值时持久化自动生成的密钥。面向互联网部署前，必须创建部署专用覆盖文件或平台定义。
+仓库中的 `compose.yaml` 是本地或评估基线，不是经过强化的生产定义。当前文件将 PostgreSQL 发布到主机 `5432` 端口，使用示例数据库密码 `noviqwiki`，通过 `3000` 端口提供 HTTP，固定使用本地媒体，并挂载 `noviqwiki-secrets`，以便镜像在未提供显式值时持久化自动生成的密钥。面向互联网部署前，必须创建部署专用覆盖文件或平台定义。
 
 ### 验证候选版本
 
@@ -293,28 +293,28 @@ docker compose build
 
 ```bash
 NODE_ENV=production
-DATABASE_URL=postgres://nextwiki:secret@postgres.example.com:5432/nextwiki
-NEXTWIKI_BASE_URL=https://wiki.example.com
-NEXTWIKI_SECRET=replace-with-generated-secret-of-at-least-32-characters
-NEXTWIKI_MEDIA_DRIVER=local
-NEXTWIKI_MEDIA_ROOT=/app/media
-NEXTWIKI_STORAGE_PUBLIC_PATH=/media
+DATABASE_URL=postgres://noviqwiki:secret@postgres.example.com:5432/noviqwiki
+NOVIQWIKI_BASE_URL=https://wiki.example.com
+NOVIQWIKI_SECRET=replace-with-generated-secret-of-at-least-32-characters
+NOVIQWIKI_MEDIA_DRIVER=local
+NOVIQWIKI_MEDIA_ROOT=/app/media
+NOVIQWIKI_STORAGE_PUBLIC_PATH=/media
 ```
 
 使用兼容 S3 的媒体时，请替换本地媒体值，并提供当前所需的完整 S3 变量：
 
 ```bash
-NEXTWIKI_MEDIA_DRIVER=s3
-NEXTWIKI_S3_ENDPOINT=https://s3.us-east-1.amazonaws.com
-NEXTWIKI_S3_REGION=us-east-1
-NEXTWIKI_S3_BUCKET=noviqwiki-assets
-NEXTWIKI_S3_ACCESS_KEY_ID=replace-with-access-key
-NEXTWIKI_S3_SECRET_ACCESS_KEY=replace-with-secret-key
+NOVIQWIKI_MEDIA_DRIVER=s3
+NOVIQWIKI_S3_ENDPOINT=https://s3.us-east-1.amazonaws.com
+NOVIQWIKI_S3_REGION=us-east-1
+NOVIQWIKI_S3_BUCKET=noviqwiki-assets
+NOVIQWIKI_S3_ACCESS_KEY_ID=replace-with-access-key
+NOVIQWIKI_S3_SECRET_ACCESS_KEY=replace-with-secret-key
 ```
 
 当前 S3 适配器要求端点、存储桶、访问密钥和密钥，并使用路径样式请求。上线前应验证所选提供商和浏览器交付路径。需要邮箱验证或密码重置邮件时，应同时配置两个 SMTP 变量。
 
-设置向导会把基础 URL 写入 PostgreSQL。完成设置后，仅修改 `NEXTWIKI_BASE_URL` 不会更新该存储值；还必须在 `/admin/settings` 中更新。存储的 URL 是生成应用与恢复链接的权威值，但不控制 Cookie 安全性。只有环境变量 `NEXTWIKI_BASE_URL` 使用 `https:` 协议时，会话与 CSRF Cookie 才带有 `Secure`，与 `NODE_ENV` 无关。环境加载规则和完整变量说明见 [CONFIGURATION.md](./CONFIGURATION.md)。
+设置向导会把基础 URL 写入 PostgreSQL。完成设置后，仅修改 `NOVIQWIKI_BASE_URL` 不会更新该存储值；还必须在 `/admin/settings` 中更新。存储的 URL 是生成应用与恢复链接的权威值，但不控制 Cookie 安全性。只有环境变量 `NOVIQWIKI_BASE_URL` 使用 `https:` 协议时，会话与 CSRF Cookie 才带有 `Secure`，与 `NODE_ENV` 无关。环境加载规则和完整变量说明见 [CONFIGURATION.md](./CONFIGURATION.md)。
 
 ### 设置模式与暴露范围
 
@@ -363,11 +363,11 @@ docker compose up -d
 
 原始镜像的启动脚本按以下方式解析密钥：
 
-1. 若存在非空的显式 `NEXTWIKI_SECRET` 环境变量值，则使用该值，并主动删除 `${NEXTWIKI_SECRET_DIR:-/app/secrets}/nextwiki-secret` 回退文件（若存在）。
+1. 若存在非空的显式 `NOVIQWIKI_SECRET` 环境变量值，则使用该值，并主动删除 `${NOVIQWIKI_SECRET_DIR:-/app/secrets}/noviqwiki-secret` 回退文件（若存在）。
 2. 否则，读取该路径下的非空回退文件。
 3. 若不存在非空回退文件，则生成 32 字节随机值，以受限权限将其十六进制表示写入该文件，并导出给应用。
 
-显式 `NEXTWIKI_SECRET` 绝不会写入回退文件。原始 Compose 文件将 `nextwiki-secrets` 挂载到 `/app/secrets`，因此在未使用显式值期间，回退密钥会在替换容器和执行 `docker compose down` 后保留。使用显式值启动会删除该持久化回退；日后若移除显式值，就没有旧回退可供恢复，启动流程会生成新值，并使现有 HMAC 派生的会话、邮箱验证令牌、密码重置令牌、限流哈希和 IP 哈希失效。运维人员可通过 shell、未跟踪的 `.env` 或覆盖文件注入显式值。生产环境必须使用单一、稳定且由部署系统明确管理的值，不应在显式密钥和自动回退之间切换。
+显式 `NOVIQWIKI_SECRET` 绝不会写入回退文件。原始 Compose 文件将 `noviqwiki-secrets` 挂载到 `/app/secrets`，因此在未使用显式值期间，回退密钥会在替换容器和执行 `docker compose down` 后保留。使用显式值启动会删除该持久化回退；日后若移除显式值，就没有旧回退可供恢复，启动流程会生成新值，并使现有 HMAC 派生的会话、邮箱验证令牌、密码重置令牌、限流哈希和 IP 哈希失效。运维人员可通过 shell、未跟踪的 `.env` 或覆盖文件注入显式值。生产环境必须使用单一、稳定且由部署系统明确管理的值，不应在显式密钥和自动回退之间切换。
 
 检查状态和日志：
 
@@ -376,9 +376,9 @@ docker compose ps
 docker compose logs --tail=200 app
 ```
 
-提交的服务名为 `app` 和 `db`。Compose 项目名下的命名卷分别为 `nextwiki-db`、`nextwiki-media`、`nextwiki-backups` 和 `nextwiki-secrets`。`docker compose down` 会保留它们。`docker compose down -v` 会删除数据库、本地媒体、备份输出和持久化回退密钥；在没有明确破坏性操作方案时，不得对保留数据使用。删除密钥卷后若未提供显式托管密钥，启动时会生成新值并使现有 HMAC 派生的会话和令牌失效；显式值删除旧回退后再被移除，也会产生相同结果。
+提交的服务名为 `app` 和 `db`。Compose 项目名下的命名卷分别为 `noviqwiki-db`、`noviqwiki-media`、`noviqwiki-backups` 和 `noviqwiki-secrets`。`docker compose down` 会保留它们。`docker compose down -v` 会删除数据库、本地媒体、备份输出和持久化回退密钥；在没有明确破坏性操作方案时，不得对保留数据使用。删除密钥卷后若未提供显式托管密钥，启动时会生成新值并使现有 HMAC 派生的会话和令牌失效；显式值删除旧回退后再被移除，也会产生相同结果。
 
-`pnpm backup` 不包含 `nextwiki-secrets`。生产部署应将 `NEXTWIKI_SECRET` 保存在密钥管理器中。若平台有意使用文件回退，则必须单独保护和恢复该文件，并保持跨实例一致。
+`pnpm backup` 不包含 `noviqwiki-secrets`。生产部署应将 `NOVIQWIKI_SECRET` 保存在密钥管理器中。若平台有意使用文件回退，则必须单独保护和恢复该文件，并保持跨实例一致。
 
 ### 强化生产 Compose
 
@@ -386,8 +386,8 @@ docker compose logs --tail=200 app
 
 - 替换示例 PostgreSQL 凭据，或使用托管数据库。
 - 除非明确需要且已加固管理路径，否则不要把 PostgreSQL 发布到公共主机。
-- 从部署环境或密钥管理器注入 `DATABASE_URL`、`NEXTWIKI_BASE_URL`、`NEXTWIKI_SECRET`、媒体、SMTP、连接池和日志设置。
-- 在缺少托管的 `NEXTWIKI_SECRET` 时让部署失败，而不是依赖镜像为评估提供的自动生成机制和密钥卷。
+- 从部署环境或密钥管理器注入 `DATABASE_URL`、`NOVIQWIKI_BASE_URL`、`NOVIQWIKI_SECRET`、媒体、SMTP、连接池和日志设置。
+- 在缺少托管的 `NOVIQWIKI_SECRET` 时让部署失败，而不是依赖镜像为评估提供的自动生成机制和密钥卷。
 - 将本地媒体和备份输出挂载到独立备份的持久存储，或配置完整 S3 后端。
 - 将应用镜像固定到发布标签，最好再固定不可变摘要。
 - 增加资源限制、日志保留、更新策略和平台健康检查。
@@ -406,7 +406,7 @@ docker compose logs --tail=200 app
 
 代理必须删除客户端提供的不可信转发头，并写入自己的值。NoviqWiki 使用转发的主机和协议生成同源重定向，并在安全元数据中使用转发的客户端地址。信任边界配置错误会造成错误重定向或伪造 IP 归因。
 
-设置 `NODE_ENV=production`，只通过 HTTPS 提供服务，并将环境变量和站点存储的基础 URL 都设为外部 HTTPS 源。只有环境变量 `NEXTWIKI_BASE_URL` 决定会话与 CSRF Cookie 是否带有 `Secure`：其协议必须为 `https:`。`NODE_ENV` 和 PostgreSQL 中存储的基础 URL 都不会改变这项 Cookie 决策。存储的 URL 仍是生成应用与恢复链接的权威值。
+设置 `NODE_ENV=production`，只通过 HTTPS 提供服务，并将环境变量和站点存储的基础 URL 都设为外部 HTTPS 源。只有环境变量 `NOVIQWIKI_BASE_URL` 决定会话与 CSRF Cookie 是否带有 `Secure`：其协议必须为 `https:`。`NODE_ENV` 和 PostgreSQL 中存储的基础 URL 都不会改变这项 Cookie 决策。存储的 URL 仍是生成应用与恢复链接的权威值。
 
 除应用校验外，还应在代理层设置请求大小、超时和限流。保留 CSP、`X-Content-Type-Options` 和 `X-Frame-Options` 等 Web 与 API 响应头。
 
@@ -434,7 +434,7 @@ curl -fsS https://wiki.example.com/api/ready
 
 ### 静态资源与媒体
 
-Next.js 静态资源已包含在独立镜像中。本地用户媒体必须位于 `NEXTWIKI_MEDIA_ROOT` 指定的持久路径；提交的 Compose 文件将其挂载到 `/app/media`。
+Next.js 静态资源已包含在独立镜像中。本地用户媒体必须位于 `NOVIQWIKI_MEDIA_ROOT` 指定的持久路径；提交的 Compose 文件将其挂载到 `/app/media`。
 
 当前已授权的本地媒体路由发送 `Cache-Control: public, max-age=31536000, immutable`。私有 Wiki 必须配置反向代理/CDN 禁止共享缓存。若部署要求在退出登录、移除权限、切换私有模式或删除后立即撤销访问，则必须把应用路由改为 `Cache-Control: private, no-store`，并清除已缓存对象或轮换此前分发的 URL。
 
@@ -446,9 +446,9 @@ Next.js 静态资源已包含在独立镜像中。本地用户媒体必须位于
 - 在部署 CSP 下用真实浏览器验证代表性图片和文件，而不仅是直接请求存储桶。
 - 独立备份存储桶；`pnpm backup` 不复制 S3 对象。
 
-更改存储驱动不会迁移现有对象。修改 `NEXTWIKI_MEDIA_DRIVER` 前必须规划并验证明确的对象迁移。
+更改存储驱动不会迁移现有对象。修改 `NOVIQWIKI_MEDIA_DRIVER` 前必须规划并验证明确的对象迁移。
 
-`pnpm backup` 始终创建 PostgreSQL 转储，并且仅对 `local` 驱动创建媒体 `.tar.gz` 归档。它不包含 S3 对象或 `nextwiki-secrets`。备份与恢复脚本会加载 `.env`，但各自只读取本操作所需的数据库、媒体以及备份或恢复变量；它们不会运行 Web 应用的完整配置校验，也不要求 `NEXTWIKI_SECRET`。
+`pnpm backup` 始终创建 PostgreSQL 转储，并且仅对 `local` 驱动创建媒体 `.tar.gz` 归档。它不包含 S3 对象或 `noviqwiki-secrets`。备份与恢复脚本会加载 `.env`，但各自只读取本操作所需的数据库、媒体以及备份或恢复变量；它们不会运行 Web 应用的完整配置校验，也不要求 `NOVIQWIKI_SECRET`。
 
 ### 可观测性
 

@@ -1,19 +1,19 @@
 import { z } from "zod";
 
 const envSchema = z.object({
-  DATABASE_URL: z.string().url().default("postgres://nextwiki:nextwiki@localhost:5432/nextwiki"),
-  NEXTWIKI_BASE_URL: z.string().url().default("http://localhost:3000"),
-  NEXTWIKI_SECRET: z.string().optional(),
-  NEXTWIKI_MEDIA_DRIVER: z.enum(["local", "s3"]).default("local"),
-  NEXTWIKI_MEDIA_ROOT: z.string().default("./media"),
-  NEXTWIKI_STORAGE_PUBLIC_PATH: z.string().default("/media"),
-  NEXTWIKI_SMTP_URL: z.string().optional(),
-  NEXTWIKI_EMAIL_FROM: z.string().optional(),
-  NEXTWIKI_S3_ENDPOINT: z.string().optional(),
-  NEXTWIKI_S3_REGION: z.string().default("us-east-1"),
-  NEXTWIKI_S3_BUCKET: z.string().optional(),
-  NEXTWIKI_S3_ACCESS_KEY_ID: z.string().optional(),
-  NEXTWIKI_S3_SECRET_ACCESS_KEY: z.string().optional(),
+  DATABASE_URL: z.string().url().default("postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki"),
+  NOVIQWIKI_BASE_URL: z.string().url().default("http://localhost:3000"),
+  NOVIQWIKI_SECRET: z.string().optional(),
+  NOVIQWIKI_MEDIA_DRIVER: z.enum(["local", "s3"]).default("local"),
+  NOVIQWIKI_MEDIA_ROOT: z.string().default("./media"),
+  NOVIQWIKI_STORAGE_PUBLIC_PATH: z.string().default("/media"),
+  NOVIQWIKI_SMTP_URL: z.string().optional(),
+  NOVIQWIKI_EMAIL_FROM: z.string().optional(),
+  NOVIQWIKI_S3_ENDPOINT: z.string().optional(),
+  NOVIQWIKI_S3_REGION: z.string().default("us-east-1"),
+  NOVIQWIKI_S3_BUCKET: z.string().optional(),
+  NOVIQWIKI_S3_ACCESS_KEY_ID: z.string().optional(),
+  NOVIQWIKI_S3_SECRET_ACCESS_KEY: z.string().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development")
 });
 
@@ -30,16 +30,16 @@ export function getEnv() {
   if (
     parsed.NODE_ENV === "production" &&
     !isProductionBuild &&
-    (!parsed.NEXTWIKI_SECRET || parsed.NEXTWIKI_SECRET.length < 32)
+    (!parsed.NOVIQWIKI_SECRET || parsed.NOVIQWIKI_SECRET.length < 32)
   ) {
-    throw new Error("NEXTWIKI_SECRET must be at least 32 characters in production.");
+    throw new Error("NOVIQWIKI_SECRET must be at least 32 characters in production.");
   }
-  if (parsed.NEXTWIKI_MEDIA_DRIVER === "s3") {
+  if (parsed.NOVIQWIKI_MEDIA_DRIVER === "s3") {
     const missing = [
-      ["NEXTWIKI_S3_ENDPOINT", parsed.NEXTWIKI_S3_ENDPOINT],
-      ["NEXTWIKI_S3_BUCKET", parsed.NEXTWIKI_S3_BUCKET],
-      ["NEXTWIKI_S3_ACCESS_KEY_ID", parsed.NEXTWIKI_S3_ACCESS_KEY_ID],
-      ["NEXTWIKI_S3_SECRET_ACCESS_KEY", parsed.NEXTWIKI_S3_SECRET_ACCESS_KEY]
+      ["NOVIQWIKI_S3_ENDPOINT", parsed.NOVIQWIKI_S3_ENDPOINT],
+      ["NOVIQWIKI_S3_BUCKET", parsed.NOVIQWIKI_S3_BUCKET],
+      ["NOVIQWIKI_S3_ACCESS_KEY_ID", parsed.NOVIQWIKI_S3_ACCESS_KEY_ID],
+      ["NOVIQWIKI_S3_SECRET_ACCESS_KEY", parsed.NOVIQWIKI_S3_SECRET_ACCESS_KEY]
     ].filter(([, value]) => !value);
     if (missing.length > 0) {
       throw new Error(
@@ -57,11 +57,11 @@ export function getDatabaseUrl() {
 
 export function getAppSecret() {
   const env = getEnv();
-  if (env.NEXTWIKI_SECRET) {
-    return env.NEXTWIKI_SECRET;
+  if (env.NOVIQWIKI_SECRET) {
+    return env.NOVIQWIKI_SECRET;
   }
   if (env.NODE_ENV === "production") {
-    throw new Error("NEXTWIKI_SECRET is required in production.");
+    throw new Error("NOVIQWIKI_SECRET is required in production.");
   }
   return "development-only-secret-change-before-production-000000";
 }

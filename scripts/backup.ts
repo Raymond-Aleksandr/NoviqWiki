@@ -18,14 +18,14 @@ import {
 async function main() {
   process.umask(0o077);
   const databaseTarget = parsePostgresTarget(
-    process.env.DATABASE_URL ?? "postgres://nextwiki:nextwiki@localhost:5432/nextwiki"
+    process.env.DATABASE_URL ?? "postgres://noviqwiki:noviqwiki@localhost:5432/noviqwiki"
   );
-  const mediaDriver = process.env.NEXTWIKI_MEDIA_DRIVER ?? "local";
-  const mediaRoot = process.env.NEXTWIKI_MEDIA_ROOT ?? "./media";
+  const mediaDriver = process.env.NOVIQWIKI_MEDIA_DRIVER ?? "local";
+  const mediaRoot = process.env.NOVIQWIKI_MEDIA_ROOT ?? "./media";
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const backupDir = process.env.NEXTWIKI_BACKUP_DIR ?? "backups";
+  const backupDir = process.env.NOVIQWIKI_BACKUP_DIR ?? "backups";
   if (mediaDriver !== "local" && mediaDriver !== "s3") {
-    throw new Error("NEXTWIKI_MEDIA_DRIVER must be local or s3.");
+    throw new Error("NOVIQWIKI_MEDIA_DRIVER must be local or s3.");
   }
   const safeMediaRoot = mediaDriver === "local" ? await requireSafeMediaSource(mediaRoot) : null;
   await mkdir(backupDir, { recursive: true, mode: 0o700 });
@@ -38,7 +38,7 @@ async function main() {
         relativeBackupDir !== ".." &&
         !path.isAbsolute(relativeBackupDir))
     ) {
-      throw new Error("NEXTWIKI_BACKUP_DIR must not be inside NEXTWIKI_MEDIA_ROOT.");
+      throw new Error("NOVIQWIKI_BACKUP_DIR must not be inside NOVIQWIKI_MEDIA_ROOT.");
     }
   }
   const prefix = path.join(safeBackupDir, `noviqwiki-${timestamp}-${randomUUID()}`);
@@ -71,9 +71,9 @@ async function main() {
             "db",
             "pg_dump",
             "-U",
-            "nextwiki",
+            "noviqwiki",
             "-d",
-            "nextwiki",
+            "noviqwiki",
             "-f",
             "-"
           ]),
@@ -126,9 +126,9 @@ async function main() {
 void main();
 
 function requireComposeFallbackConfirmation(tool: string) {
-  if (process.env.NEXTWIKI_COMPOSE_FALLBACK !== "1") {
+  if (process.env.NOVIQWIKI_COMPOSE_FALLBACK !== "1") {
     throw new Error(
-      `${tool} is unavailable. Install PostgreSQL client tools, or set NEXTWIKI_COMPOSE_FALLBACK=1 only after verifying the fixed ${composeTargetLabel} target.`
+      `${tool} is unavailable. Install PostgreSQL client tools, or set NOVIQWIKI_COMPOSE_FALLBACK=1 only after verifying the fixed ${composeTargetLabel} target.`
     );
   }
 }

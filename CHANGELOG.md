@@ -22,10 +22,11 @@ Snapshot date: 2026-07-17
 
 #### Changed
 
+- Completed the provisional internal-identifier migration: every project-owned environment variable now uses the `NOVIQWIKI_*` prefix, while the default PostgreSQL identity, Compose volumes, runtime account, fallback-secret path, E2E database, and operational confirmation labels consistently use `noviqwiki`. Deployments based on an earlier draft must update their environment keys and deliberately migrate retained database, media, backup, and secret state before starting this checkout.
 - Added a guarded Owner-only setup mode for databases that contain a site but no users, preserving existing site settings and content while creating the first Owner. Public registration remains blocked until that Owner exists: complete sites keep an unlocked registration fast path, while an incomplete site/user preflight enters the same advisory lock as setup and rechecks state so it cannot race first-Owner creation.
-- Persisted the Compose-generated fallback application secret in a dedicated named volume instead of rotating it on every container recreation; activating an explicit `NEXTWIKI_SECRET` now removes any old fallback file so later removal intentionally rotates the secret instead of reviving a stale value.
-- Derived the session and CSRF Cookie `Secure` attribute from the `NEXTWIKI_BASE_URL` protocol so local HTTP evaluation and production HTTPS use explicit canonical-origin behavior.
-- Made backup and restore independent of unrelated web-runtime secret validation. Local database tools now use a normalized target without ambient libpq routing overrides or passwords in argv; concurrent backups receive unique names. The fixed, repository-anchored Compose fallback requires both a missing local PostgreSQL client and explicit `NEXTWIKI_COMPOSE_FALLBACK=1`. Restore validates complete recognized SQL and safe local-media inputs, binds confirmation to the exact host or Compose identity, and runs the schema reset plus import fail-fast in one transaction.
+- Persisted the Compose-generated fallback application secret in a dedicated named volume instead of rotating it on every container recreation; activating an explicit `NOVIQWIKI_SECRET` now removes any old fallback file so later removal intentionally rotates the secret instead of reviving a stale value.
+- Derived the session and CSRF Cookie `Secure` attribute from the `NOVIQWIKI_BASE_URL` protocol so local HTTP evaluation and production HTTPS use explicit canonical-origin behavior.
+- Made backup and restore independent of unrelated web-runtime secret validation. Local database tools now use a normalized target without ambient libpq routing overrides or passwords in argv; concurrent backups receive unique names. The fixed, repository-anchored Compose fallback requires both a missing local PostgreSQL client and explicit `NOVIQWIKI_COMPOSE_FALLBACK=1`. Restore validates complete recognized SQL and safe local-media inputs, binds confirmation to the exact host or Compose identity, and runs the schema reset plus import fail-fast in one transaction.
 
 ---
 
@@ -51,7 +52,8 @@ Snapshot date: 2026-07-17
 
 #### 变更
 
+- 完成临时内部标识迁移：所有项目专属环境变量统一使用 `NOVIQWIKI_*` 前缀；默认 PostgreSQL 身份、Compose 卷、运行时账户、回退密钥路径、E2E 数据库及运维确认标签统一使用 `noviqwiki`。基于更早草稿部署的实例必须先更新环境变量键，并有计划地迁移保留的数据库、媒体、备份和密钥状态，再启动此检出。
 - 为已有站点但没有用户的数据库增加受保护的仅 Owner 设置模式，在创建首个 Owner 时保留现有站点设置与内容。首个 Owner 创建前，公开注册会保持阻断：已完整初始化的站点保留无锁注册快速路径；站点/用户预检不完整时则会进入与设置流程相同的 advisory lock 并重新检查状态，因此无法与首个 Owner 创建竞争。
-- 将 Compose 自动生成的回退应用密钥保存在专用命名卷中，不再随每次容器重建而轮换；启用显式 `NEXTWIKI_SECRET` 时现在会删除任何旧回退文件，因此日后移除显式值会有意轮换密钥，而不会恢复过时值。
-- 根据 `NEXTWIKI_BASE_URL` 协议决定会话和 CSRF Cookie 的 `Secure` 属性，使本地 HTTP 评估与生产 HTTPS 明确遵循规范源配置。
-- 让备份与恢复不再依赖无关的 Web 运行时密钥校验。本地数据库工具现在使用规范化目标，不继承环境中的 libpq 路由覆盖，密码也不会出现在 argv 中；并发备份会获得唯一名称。只有在本机缺少 PostgreSQL 客户端且显式设置 `NEXTWIKI_COMPOSE_FALLBACK=1` 时，才会使用固定且锚定到本仓库的 Compose 数据库回退。恢复会验证完整、可识别的 SQL 与安全本地媒体输入，将确认值绑定到准确的主机或 Compose 身份，并在同一个事务中以快速失败方式执行 Schema 重置和导入。
+- 将 Compose 自动生成的回退应用密钥保存在专用命名卷中，不再随每次容器重建而轮换；启用显式 `NOVIQWIKI_SECRET` 时现在会删除任何旧回退文件，因此日后移除显式值会有意轮换密钥，而不会恢复过时值。
+- 根据 `NOVIQWIKI_BASE_URL` 协议决定会话和 CSRF Cookie 的 `Secure` 属性，使本地 HTTP 评估与生产 HTTPS 明确遵循规范源配置。
+- 让备份与恢复不再依赖无关的 Web 运行时密钥校验。本地数据库工具现在使用规范化目标，不继承环境中的 libpq 路由覆盖，密码也不会出现在 argv 中；并发备份会获得唯一名称。只有在本机缺少 PostgreSQL 客户端且显式设置 `NOVIQWIKI_COMPOSE_FALLBACK=1` 时，才会使用固定且锚定到本仓库的 Compose 数据库回退。恢复会验证完整、可识别的 SQL 与安全本地媒体输入，将确认值绑定到准确的主机或 Compose 身份，并在同一个事务中以快速失败方式执行 Schema 重置和导入。
