@@ -8,6 +8,7 @@ import { getPrimarySiteWithSettings } from "@/db/site";
 import { localizeErrorMessage } from "@/i18n/errors";
 import { getRequestI18n } from "@/i18n/server";
 import { AppError, ForbiddenError } from "@/lib/errors";
+import type { ActionState } from "@/lib/action-state";
 import {
   emailVerificationRequestSchema,
   emailVerificationSchema,
@@ -760,11 +761,6 @@ export async function updateRoleAction(
     return actionError(error);
   }
 }
-
-export type ActionState = {
-  ok: boolean;
-  message?: string;
-};
 
 async function requireSession() {
   const session = await getCurrentSession();

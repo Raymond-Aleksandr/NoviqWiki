@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, History, Link2, Quote } from "lucide-react";
+import { Link2, Quote } from "lucide-react";
 import { requirePageReadAccess } from "@/app/access";
-import { getPrimarySiteWithSettings } from "@/db/site";
+import { PageHeader } from "@/components/ui/page-header";
+import { getRequestSite } from "@/lib/request-context";
+import { ArticleBreadcrumbs, ArticleReturnActions } from "@/features/article/article-navigation";
+import { CitationList } from "@/features/article/citation-list";
+import { RevisionTime } from "@/features/article/revision-meta";
 import { getRequestI18n } from "@/i18n/server";
 import { canonicalApplicationBaseUrl } from "@/lib/env";
 import { decodeRouteParam } from "@/lib/route-params";
@@ -15,7 +19,7 @@ type Props = {
 };
 
 export default async function CitePage({ params }: Props) {
-  const site = await getPrimarySiteWithSettings();
+  const site = await getRequestSite();
   if (!site) {
     redirect("/setup");
   }
@@ -52,33 +56,23 @@ export default async function CitePage({ params }: Props) {
     { label: messages.citationMla, value: citations.mla },
     { label: messages.citationChicago, value: citations.chicago },
     { label: messages.citationBibtex, value: citations.bibtex, preformatted: true }
-  ];
+  ].map((item) => ({
+    ...item,
+    copyLabel: messages.copyMarkdown.replace("Markdown", item.label)
+  }));
 
   return (
     <section className="page-frame cite-page">
-      <nav className="breadcrumbs" aria-label={messages.breadcrumb}>
-        <Link href={`/page/${resolved.page.slug}`}>{resolved.page.title}</Link>
-        <span aria-hidden="true">/</span>
-        <span>{messages.citeThisPage}</span>
-      </nav>
-      <header className="page-header">
-        <div>
-          <h1 className="page-title">{messages.citeThisPage}</h1>
-          <p className="page-description">
+      <ArticleBreadcrumbs page={resolved.page} currentLabel={messages.citeThisPage} messages={messages} />
+      <PageHeader
+        title={messages.citeThisPage}
+        description={
+          <p>
             {messages.citeThisPageDescriptionPrefix} <strong>{resolved.page.title}</strong>.
           </p>
-        </div>
-        <div className="page-header-actions">
-          <Link className="button" href={`/page/${resolved.page.slug}`}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            {messages.article}
-          </Link>
-          <Link className="button" href={`/history/${resolved.page.slug}`}>
-            <History size={16} aria-hidden="true" />
-            {messages.history}
-          </Link>
-        </div>
-      </header>
+        }
+        actions={<ArticleReturnActions slug={resolved.page.slug} messages={messages} />}
+      />
       <section className="data-panel citation-overview">
         <div className="admin-panel-heading">
           <Quote size={16} aria-hidden="true" />
@@ -97,24 +91,17 @@ export default async function CitePage({ params }: Props) {
           <div>
             <dt>{messages.citationLastRevision}</dt>
             <dd>
-              r{revision.revisionNumber} · {revision.createdAt.toLocaleString(locale)}
+              r{revision.revisionNumber} · <RevisionTime date={revision.createdAt} locale={locale} />
             </dd>
           </div>
         </dl>
         <p className="muted citation-note">{messages.citationUsePermanentRevision}</p>
       </section>
-      <section className="citation-list" aria-label={messages.citationFormats}>
-        {citationItems.map((item) => (
-          <article className="data-panel citation-card" key={item.label}>
-            <div className="admin-panel-heading">{item.label}</div>
-            {item.preformatted ? (
-              <pre className="citation-block">{item.value}</pre>
-            ) : (
-              <p className="citation-block">{item.value}</p>
-            )}
-          </article>
-        ))}
-      </section>
+      <CitationList
+        items={citationItems}
+        title={messages.citationFormats}
+        messages={{ copiedSuffix: messages.copiedSuffix, clipboardFailed: messages.clipboardFailed }}
+      />
     </section>
   );
 }

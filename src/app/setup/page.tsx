@@ -1,12 +1,14 @@
 import { redirect } from "next/navigation";
-import { getSetupState } from "@/modules/setup/service";
+import { getRequestSetupState } from "@/lib/request-context";
 import { setupAction } from "@/app/actions";
 import { getEnv } from "@/lib/env";
-import { SetupWizard } from "@/components/setup/setup-wizard";
+import { SetupWizard } from "@/features/setup/setup-wizard";
+import { createSetupValues } from "@/features/setup/model";
+import { getSetupMessages } from "@/features/setup/messages";
 import { getRequestI18n } from "@/i18n/server";
 
 export default async function SetupPage() {
-  const setup = await getSetupState().catch(() => ({ mode: "initial" as const, site: null }));
+  const setup = await getRequestSetupState().catch(() => ({ mode: "initial" as const, site: null }));
   if (setup.mode === "complete") {
     redirect("/");
   }
@@ -15,13 +17,16 @@ export default async function SetupPage() {
   return (
     <SetupWizard
       action={setupAction}
-      defaultBaseUrl={env.NOVIQWIKI_BASE_URL}
-      defaultMediaDriver={env.NOVIQWIKI_MEDIA_DRIVER}
-      defaultSiteName={setup.site?.name ?? "NoviqWiki"}
-      initialLocale={locale}
+      initialValues={createSetupValues({
+        baseUrl: env.NOVIQWIKI_BASE_URL,
+        mediaDriver: env.NOVIQWIKI_MEDIA_DRIVER,
+        siteName: setup.site?.name ?? "NoviqWiki",
+        tagline: messages.modernSelfHostedWiki,
+        defaultLocale: locale
+      })}
       setupTokenRequired={env.NODE_ENV === "production" || Boolean(env.NOVIQWIKI_SETUP_TOKEN)}
-      messages={messages}
-      ownerOnly={setup.mode === "owner"}
+      messages={getSetupMessages(messages)}
+      mode={setup.mode}
     />
   );
 }

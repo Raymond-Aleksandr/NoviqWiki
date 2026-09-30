@@ -2,12 +2,14 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { Check, Save, X } from "lucide-react";
 import { editPageAction } from "@/app/actions";
-import { MarkdownEditor, type EditorMediaItem } from "@/components/editor/markdown-editor";
+import { MarkdownEditor } from "@/features/editor/markdown-editor";
+import { getEditorMessages } from "@/features/editor/messages";
+import type { EditorMediaItem } from "@/features/editor/types";
 import { ActionForm } from "@/components/ui/action-form";
-import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestSite } from "@/lib/request-context";
 import { getRequestI18n } from "@/i18n/server";
 import { decodeRouteParam } from "@/lib/route-params";
-import { getCurrentSession } from "@/modules/auth/session";
+import { getRequestSession } from "@/lib/request-context";
 import { hasPermission, requirePermission } from "@/modules/authorization/permissions";
 import { listMedia, rewriteLegacyMediaUrls } from "@/modules/media/service";
 import { getDraftForEditor, getRevisionById } from "@/modules/pages/service";
@@ -19,11 +21,11 @@ type Props = {
 };
 
 export default async function EditPage({ params }: Props) {
-  const site = await getPrimarySiteWithSettings();
+  const site = await getRequestSite();
   if (!site) {
     redirect("/setup");
   }
-  const session = await getCurrentSession();
+  const session = await getRequestSession();
   if (!session) {
     redirect("/login");
   }
@@ -92,7 +94,7 @@ export default async function EditPage({ params }: Props) {
           initialValue={editorMarkdown}
           initialPreviewHtml={initialPreview.html}
           previewMode="edit"
-          messages={messages}
+          messages={getEditorMessages(messages)}
           mediaItems={serializeEditorMedia(mediaItems)}
           footer={
             <>

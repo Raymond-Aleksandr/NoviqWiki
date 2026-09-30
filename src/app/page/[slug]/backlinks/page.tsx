@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, History, Link2 } from "lucide-react";
+import { Link2 } from "lucide-react";
 import { requirePageReadAccess } from "@/app/access";
-import { getPrimarySiteWithSettings } from "@/db/site";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { getRequestSite } from "@/lib/request-context";
+import { ArticleBreadcrumbs, ArticleReturnActions } from "@/features/article/article-navigation";
+import { RevisionTime } from "@/features/article/revision-meta";
 import { getRequestI18n } from "@/i18n/server";
 import { decodeRouteParam } from "@/lib/route-params";
 import { listPageBacklinks } from "@/modules/pages/service";
@@ -13,7 +17,7 @@ type Props = {
 };
 
 export default async function PageBacklinks({ params }: Props) {
-  const site = await getPrimarySiteWithSettings();
+  const site = await getRequestSite();
   if (!site) {
     redirect("/setup");
   }
@@ -40,36 +44,20 @@ export default async function PageBacklinks({ params }: Props) {
 
   return (
     <section className="page-frame">
-      <nav className="breadcrumbs" aria-label={messages.breadcrumb}>
-        <Link href={`/page/${resolved.page.slug}`}>{resolved.page.title}</Link>
-        <span aria-hidden="true">/</span>
-        <span>{messages.whatLinksHere}</span>
-      </nav>
-      <header className="page-header">
-        <div>
-          <h1 className="page-title">{messages.whatLinksHere}</h1>
-          <p className="page-description">
+      <ArticleBreadcrumbs page={resolved.page} currentLabel={messages.whatLinksHere} messages={messages} />
+      <PageHeader
+        title={messages.whatLinksHere}
+        description={
+          <p>
             {messages.backlinksDescriptionPrefix} <strong>{resolved.page.title}</strong>.
           </p>
-        </div>
-        <div className="page-header-actions">
-          <Link className="button" href={`/page/${resolved.page.slug}`}>
-            <ArrowLeft size={16} aria-hidden="true" />
-            {messages.article}
-          </Link>
-          <Link className="button" href={`/history/${resolved.page.slug}`}>
-            <History size={16} aria-hidden="true" />
-            {messages.history}
-          </Link>
-        </div>
-      </header>
+        }
+        actions={<ArticleReturnActions slug={resolved.page.slug} messages={messages} />}
+      />
       <section className="data-panel">
         <div className="admin-panel-heading">{messages.backlinks}</div>
         {backlinks.length === 0 ? (
-          <div className="empty-state backlinks-empty">
-            <strong>{messages.noBacklinksYet}</strong>
-            <p className="muted">{messages.noBacklinksBody}</p>
-          </div>
+          <EmptyState title={messages.noBacklinksYet} description={messages.noBacklinksBody} />
         ) : (
           <div className="backlink-list">
             {backlinks.map((backlink) => (
@@ -78,7 +66,7 @@ export default async function PageBacklinks({ params }: Props) {
                 <span>
                   <strong>{backlink.title}</strong>
                   <small>
-                    {messages.updated} {backlink.updatedAt.toLocaleString(locale)}
+                    {messages.updated} <RevisionTime date={backlink.updatedAt} locale={locale} />
                   </small>
                 </span>
               </Link>

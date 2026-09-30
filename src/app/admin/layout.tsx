@@ -1,16 +1,17 @@
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 import { AdminNav } from "@/components/layout/admin-nav";
-import { getPrimarySiteWithSettings } from "@/db/site";
+import { getAdminNavigation } from "@/features/admin/navigation";
 import { getRequestI18n } from "@/i18n/server";
-import { getCurrentSession } from "@/modules/auth/session";
+import { getRequestSession, getRequestSite } from "@/lib/request-context";
 import { requirePermission } from "@/modules/authorization/permissions";
 
-export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const site = await getPrimarySiteWithSettings();
+export default async function AdminLayout({ children }: { children: ReactNode }) {
+  const site = await getRequestSite();
   if (!site) {
     redirect("/setup");
   }
-  const session = await getCurrentSession();
+  const session = await getRequestSession();
   if (!session) {
     redirect("/login");
   }
@@ -18,7 +19,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { messages } = await getRequestI18n(site.settings?.defaultLocale);
   return (
     <section>
-      <AdminNav messages={messages} />
+      <AdminNav items={getAdminNavigation(messages)} label={messages.adminNavigation} />
       {children}
     </section>
   );

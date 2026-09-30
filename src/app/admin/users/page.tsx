@@ -1,266 +1,56 @@
-import Link from "next/link";
-import { Pause, Play, Plus, Save, Search, UsersRound, X } from "lucide-react";
-import {
-  createUserAction,
-  resetUserSessionsAction,
-  updateUserGroupsAction,
-  updateUserStatusAction
-} from "@/app/actions";
 import { requireAuthenticatedPermission } from "@/app/access";
-import { ActionForm } from "@/components/ui/action-form";
-import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
-import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestSite } from "@/lib/request-context";
+import { AdminUsersView } from "@/features/admin/users-view";
 import { groupDisplayName, roleDisplayName } from "@/i18n/authorization";
 import { getRequestI18n } from "@/i18n/server";
 import { getGroupSummaries, getUserGroupMemberships } from "@/modules/authorization/permissions";
 import { listUsers } from "@/modules/users/service";
 
-type Props = {
-  searchParams: Promise<{ q?: string }>;
-};
+type Props = { searchParams: Promise<{ q?: string }> };
 
 export default async function AdminUsersPage({ searchParams }: Props) {
-  const site = await getPrimarySiteWithSettings();
+  const site = await getRequestSite();
   await requireAuthenticatedPermission(site!.site.id, "user.read");
   await requireAuthenticatedPermission(site!.site.id, "group.read");
   await requireAuthenticatedPermission(site!.site.id, "role.read");
   const params = await searchParams;
   const query = params.q?.trim() ?? "";
-  const rows = await listUsers({ query: query || undefined, limit: 200 });
-  const groupRows = await getGroupSummaries(site!.site.id);
-  const memberships = await getUserGroupMemberships(
-    site!.site.id,
-    rows.map((user) => user.id)
-  );
-  const roleMap = new Map<string, Map<string, { name: string; normalizedName: string | null }>>();
-  const groupMap = new Map<string, { id: string; name: string; normalizedName: string | null }[]>();
-  const groupSeenMap = new Map<string, Set<string>>();
-  for (const row of memberships) {
-    const seenGroups = groupSeenMap.get(row.userId) ?? new Set<string>();
-    if (!seenGroups.has(row.groupId)) {
-      groupMap.set(row.userId, [
-        ...(groupMap.get(row.userId) ?? []),
-        { id: row.groupId, name: row.groupName, normalizedName: row.groupNormalizedName }
-      ]);
-      seenGroups.add(row.groupId);
-      groupSeenMap.set(row.userId, seenGroups);
-    }
-    if (row.roleName) {
-      const roles =
-        roleMap.get(row.userId) ??
-        new Map<string, { name: string; normalizedName: string | null }>();
-      roles.set(row.roleNormalizedName ?? row.roleName, {
-        name: row.roleName,
-        normalizedName: row.roleNormalizedName
-      });
-      roleMap.set(row.userId, roles);
+  const [rows, groupRows, { locale, messages }] = await Promise.all([
+    listUsers({ query: query || undefined, limit: 200 }),
+    getGroupSummaries(site!.site.id),
+    getRequestI18n(site!.settings?.defaultLocale)
+  ]);
+  const memberships = await getUserGroupMemberships(site!.site.id, rows.map((user) => user.id));
+  const groupsByUser = new Map<string, Map<string, { value: string; label: string }>>();
+  const rolesByUser = new Map<string, Map<string, string>>();
+  for (const membership of memberships) {
+    const groups = groupsByUser.get(membership.userId) ?? new Map();
+    groups.set(membership.groupId, {
+      value: membership.groupId,
+      label: groupDisplayName({ name: membership.groupName, normalizedName: membership.groupNormalizedName }, messages)
+    });
+    groupsByUser.set(membership.userId, groups);
+    if (membership.roleName) {
+      const roles = rolesByUser.get(membership.userId) ?? new Map();
+      roles.set(membership.roleNormalizedName ?? membership.roleName, roleDisplayName({ name: membership.roleName, normalizedName: membership.roleNormalizedName }, messages));
+      rolesByUser.set(membership.userId, roles);
     }
   }
-  const { locale, messages } = await getRequestI18n(site!.settings?.defaultLocale);
   return (
-    <section className="admin-page">
-      <h1>{messages.users}</h1>
-      <section className="panel admin-create-panel">
-        <h2>{messages.createAccount}</h2>
-        <ActionForm
-          action={createUserAction}
-          className="admin-form-grid"
-          pendingLabel={messages.working}
-        >
-          <label>
-            {messages.username}
-            <input className="field" name="username" required />
-          </label>
-          <label>
-            {messages.email}
-            <input className="field" name="email" type="email" required />
-          </label>
-          <label>
-            {messages.displayName}
-            <input className="field" name="displayName" />
-          </label>
-          <label>
-            {messages.password}
-            <input className="field" name="password" type="password" required />
-          </label>
-          <label>
-            {messages.initialGroup}
-            <select name="groupId" defaultValue="">
-              <option value="">{messages.noGroup}</option>
-              {groupRows.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {groupDisplayName(group, messages)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button className="primary">
-            <Plus size={15} aria-hidden="true" />
-            {messages.createUser}
-          </button>
-        </ActionForm>
-      </section>
-      <div className="data-panel admin-table admin-grid-users">
-        <form className="admin-filter-bar" action="/admin/users">
-          <label className="admin-filter-control admin-filter-search">
-            <Search size={15} aria-hidden="true" />
-            <input name="q" defaultValue={query} placeholder={messages.filterUsers} />
-          </label>
-          <button className="button compact">
-            <Search size={14} aria-hidden="true" />
-            {messages.search}
-          </button>
-          {query ? (
-            <Link className="button compact" href="/admin/users">
-              <X size={14} aria-hidden="true" />
-              {messages.clearFilters}
-            </Link>
-          ) : null}
-          <div className="admin-filter-spacer" />
-        </form>
-        <div className="admin-grid-header admin-users-grid admin-grid-users">
-          <div>{messages.user}</div>
-          <div>{messages.email}</div>
-          <div>{messages.groups}</div>
-          <div>{messages.role}</div>
-          <div>{messages.status}</div>
-          <div>{messages.lastLogin}</div>
-          <div className="admin-grid-header-actions">{messages.actions}</div>
-        </div>
-        {rows.length === 0 ? <div className="admin-empty-state">{messages.noResults}</div> : null}
-        {rows.map((user) => (
-          <article className="admin-grid-row admin-users-grid admin-grid-users" key={user.id}>
-            <div className="user-cell" data-label={messages.user}>
-              <span className="avatar" aria-hidden="true">
-                {user.displayName.slice(0, 2).toUpperCase()}
-              </span>
-              <strong>{user.username}</strong>
-            </div>
-            <div className="mono muted" data-label={messages.email}>
-              {user.email}
-            </div>
-            <div className="user-group-badges" data-label={messages.groups}>
-              {(groupMap.get(user.id) ?? []).length > 0 ? (
-                groupMap.get(user.id)?.map((group) => (
-                  <span className="badge info" key={group.id}>
-                    {groupDisplayName(group, messages)}
-                  </span>
-                ))
-              ) : (
-                <span className="muted">{messages.noGroup}</span>
-              )}
-            </div>
-            <div data-label={messages.role}>
-              <span className="role-badge">
-                {[...(roleMap.get(user.id)?.values() ?? [])]
-                  .map((role) => roleDisplayName(role, messages))
-                  .join(", ") || "-"}
-              </span>
-            </div>
-            <div data-label={messages.status}>
-              <span className={`status-badge ${user.status}`}>
-                {userStatusLabel(user.status, messages)}
-              </span>
-            </div>
-            <div className="mono muted" data-label={messages.lastLogin}>
-              {user.lastLoginAt?.toLocaleString(locale) ?? messages.never}
-            </div>
-            <div className="admin-action-list" data-label={messages.actions}>
-              <details className="user-group-editor">
-                <summary className="button compact">
-                  <UsersRound size={14} aria-hidden="true" />
-                  {messages.groups}
-                </summary>
-                <ActionForm
-                  action={updateUserGroupsAction}
-                  className="user-group-form"
-                  pendingLabel={messages.working}
-                  statusMode="compact"
-                >
-                  <input type="hidden" name="userId" value={user.id} />
-                  <fieldset>
-                    <legend>{messages.groups}</legend>
-                    <div className="user-group-checkboxes">
-                      {groupRows.map((group) => {
-                        const userGroupIds = new Set(
-                          (groupMap.get(user.id) ?? []).map((membership) => membership.id)
-                        );
-                        return (
-                          <label className="checkbox-row" key={`${user.id}-${group.id}`}>
-                            <input
-                              type="checkbox"
-                              name="groupId"
-                              value={group.id}
-                              defaultChecked={userGroupIds.has(group.id)}
-                            />
-                            <span>{groupDisplayName(group, messages)}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </fieldset>
-                  <button className="button compact primary">
-                    <Save size={14} aria-hidden="true" />
-                    {messages.saveChanges}
-                  </button>
-                </ActionForm>
-              </details>
-              <ActionForm
-                action={updateUserStatusAction}
-                className="inline-form"
-                pendingLabel={messages.working}
-                statusMode="compact"
-              >
-                <input type="hidden" name="userId" value={user.id} />
-                <input
-                  type="hidden"
-                  name="status"
-                  value={user.status === "active" ? "suspended" : "active"}
-                />
-                <button
-                  className="icon-button"
-                  title={user.status === "active" ? messages.suspend : messages.activate}
-                >
-                  {user.status === "active" ? (
-                    <Pause size={15} aria-hidden="true" />
-                  ) : (
-                    <Play size={15} aria-hidden="true" />
-                  )}
-                  <span className="sr-only">
-                    {user.status === "active" ? messages.suspend : messages.activate} ·{" "}
-                    {user.username}
-                  </span>
-                </button>
-              </ActionForm>
-              <ConfirmActionForm
-                action={resetUserSessionsAction}
-                hiddenFields={[{ name: "userId", value: user.id }]}
-                triggerLabel={`${messages.resetSessions} · ${user.username}`}
-                triggerTitle={messages.resetSessions}
-                triggerIconOnly
-                triggerClassName="icon-button"
-                icon="reset"
-                title={`${messages.resetSessions} · ${user.username}`}
-                body={messages.resetSessionsConfirmBody}
-                warning={messages.resetSessionsConfirmWarning}
-                confirmLabel={messages.resetSessions}
-                cancelLabel={messages.cancel}
-                pendingLabel={messages.working}
-              />
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
+    <AdminUsersView
+      query={query}
+      messages={messages}
+      groups={groupRows.map((group) => ({ value: group.id, label: groupDisplayName(group, messages) }))}
+      rows={rows.map((user) => ({
+        id: user.id,
+        username: user.username,
+        displayName: user.displayName,
+        email: user.email,
+        status: user.status,
+        groups: [...(groupsByUser.get(user.id)?.values() ?? [])],
+        roles: [...(rolesByUser.get(user.id)?.values() ?? [])],
+        lastLogin: user.lastLoginAt ? { dateTime: user.lastLoginAt.toISOString(), label: user.lastLoginAt.toLocaleString(locale) } : null
+      }))}
+    />
   );
-}
-
-function userStatusLabel(
-  status: string,
-  messages: Awaited<ReturnType<typeof getRequestI18n>>["messages"]
-) {
-  if (status === "active") return messages.userStatusActive;
-  if (status === "suspended") return messages.userStatusSuspended;
-  if (status === "pending") return messages.userStatusPending;
-  return status;
 }

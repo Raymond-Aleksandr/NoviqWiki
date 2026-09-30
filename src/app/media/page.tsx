@@ -1,15 +1,17 @@
 import { redirect } from "next/navigation";
 import { requireMediaReadAccess } from "@/app/access";
 import { deleteMediaAction, uploadMediaAction } from "@/app/actions";
-import { MediaLibrary } from "@/components/media-library";
-import { getPrimarySiteWithSettings } from "@/db/site";
+import { PageHeader } from "@/components/ui/page-header";
+import { getRequestSite } from "@/lib/request-context";
+import { MediaLibraryView } from "@/features/media/media-library-view";
+import { getMediaLibraryMessages } from "@/features/media/messages";
 import { getRequestI18n } from "@/i18n/server";
 import { hasPermission } from "@/modules/authorization/permissions";
 import { serializeMedia } from "@/modules/media/dto";
 import { listMedia } from "@/modules/media/service";
 
 export default async function MediaPage() {
-  const site = await getPrimarySiteWithSettings();
+  const site = await getRequestSite();
   if (!site) {
     redirect("/setup");
   }
@@ -23,19 +25,12 @@ export default async function MediaPage() {
   const { messages } = i18n;
   return (
     <section className="page-frame wide">
-      <header className="page-header">
-        <div>
-          <h1 className="page-title">{messages.mediaLibrary}</h1>
-          <p className="page-description">{messages.mediaLibraryDescription}</p>
-        </div>
-      </header>
-      <MediaLibrary
+      <PageHeader title={messages.mediaLibrary} description={messages.mediaLibraryDescription} />
+      <MediaLibraryView
         assets={assets.map(serializeMedia)}
-        canUpload={canUpload}
-        canDelete={canDelete}
-        uploadAction={uploadMediaAction}
-        deleteAction={deleteMediaAction}
-        messages={messages}
+        uploadAction={canUpload ? uploadMediaAction : undefined}
+        deleteAction={canDelete ? deleteMediaAction : undefined}
+        messages={getMediaLibraryMessages(messages)}
       />
     </section>
   );
