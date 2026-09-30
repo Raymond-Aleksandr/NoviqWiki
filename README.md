@@ -92,6 +92,8 @@ listed in [.env.example](.env.example).
 | --- | --- |
 | `pnpm dev` | Start the development server. |
 | `pnpm build` | Create the production standalone output. |
+| `pnpm typecheck` | Check TypeScript across the application. |
+| `pnpm test:frontend` | Run frontend behavior regression tests. |
 | `pnpm start` | Serve an existing production build. |
 | `pnpm db:generate` | Generate a forward Drizzle migration. |
 | `pnpm db:migrate` | Apply migrations. |
@@ -101,7 +103,16 @@ listed in [.env.example](.env.example).
 | `pnpm restore` | Restore a database and optional local-media backup. |
 | `pnpm openapi` | Regenerate the [OpenAPI specification](docs/openapi.json). |
 
+## Frontend development
+
+Frontend route files handle authorization and data loading on the server. Views,
+client interactions, and their message contracts live in `src/features`; shared
+presentation and dialog primitives live in `src/components/ui`. The application
+shell uses a request-scoped context for site, session, language, and appearance.
+Styles are organized by shared tokens, base rules, components, shell, and feature.
+
 ## API and license
+
 
 The JSON API is available under `/api/v1`. The
 [OpenAPI specification](docs/openapi.json) describes its endpoints.

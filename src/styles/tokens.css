@@ -1,0 +1,129 @@
+/* One semantic palette; theme changes only replace values, never add aliases. */
+:root {
+  --font-sans: "Hanken Grotesk", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-serif: "Source Serif 4", "Noto Serif SC", "Iowan Old Style", "Palatino Linotype", Georgia, "Songti SC", STSong, SimSun, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --control-height: 36px;
+  --control-radius: var(--radius-md);
+  --control-font-size: 13.5px;
+  --control-pad-x: 12px;
+  --header-height: 76px;
+}
+
+:root,
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-muted: #eaedf0;
+  --surface-sunken: #e5e8ec;
+  --sidebar: #f4f5f7;
+  --sidebar-active: #ffffff;
+  --text: #1e2328;
+  --text-muted: #59616a;
+  --text-faint: #626c76;
+  --border: #d4d9df;
+  --border-strong: #7c8793;
+  --primary: #2c5f8f;
+  --primary-hover: #234c73;
+  --on-primary: #ffffff;
+  --primary-soft: #e6eef5;
+  --link: #2457a6;
+  --link-visited: #5d3f8d;
+  --danger: #a83232;
+  --danger-bg: #f7e6e4;
+  --warning: #946011;
+  --warning-bg: #f6ecd8;
+  --success: #24734d;
+  --success-bg: #e2f0e8;
+  --on-success: #ffffff;
+  --info: #2a6a93;
+  --info-bg: #e4eef4;
+  --focus: #a5620b;
+  --code-bg: #f0f2f2;
+  --code-text: #374044;
+  --diff-add-bg: #e3f1e8;
+  --diff-add-line: #a9d4bb;
+  --diff-add-text: #155c3a;
+  --diff-del-bg: #f7e6e4;
+  --diff-del-line: #e2b6b1;
+  --diff-del-text: #8f2723;
+  --shadow-sm: 0 1px 2px rgb(20 22 20 / 0.06);
+  --shadow-md: 0 4px 14px rgb(20 22 20 / 0.08);
+  --shadow-lg: 0 16px 44px rgb(20 22 20 / 0.16);
+  --button-active-shadow: inset 0 1px 2px rgb(30 35 40 / 0.12);
+  --dialog-backdrop: rgb(15 18 20 / 0.55);
+  --stripe: #e3e7ec;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #16181a;
+  --surface: #212528;
+  --surface-muted: #2b3033;
+  --surface-sunken: #121416;
+  --sidebar: #1c1f21;
+  --sidebar-active: #2b3033;
+  --text: #e9edef;
+  --text-muted: #a3acb1;
+  --text-faint: #969fa7;
+  --border: #333a3e;
+  --border-strong: #6b7680;
+  --primary: #6fa2d0;
+  --primary-hover: #8bb6de;
+  --on-primary: #0f151b;
+  --primary-soft: #1b2b39;
+  --link: #8cb8ff;
+  --link-visited: #c5a9ff;
+  --danger: #f28e8e;
+  --danger-bg: #3a2020;
+  --warning: #f0ba5f;
+  --warning-bg: #3a2e14;
+  --success: #7fd7a6;
+  --success-bg: #173021;
+  --on-success: #0f151b;
+  --info: #7fb8dd;
+  --info-bg: #14262f;
+  --focus: #f0ba5f;
+  --code-bg: #14171a;
+  --code-text: #c7ccce;
+  --diff-add-bg: #173021;
+  --diff-add-line: #2f5c3f;
+  --diff-add-text: #8fdcac;
+  --diff-del-bg: #3a2020;
+  --diff-del-line: #5f3532;
+  --diff-del-text: #f0a49b;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 16px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 18px 48px rgb(0 0 0 / 0.55);
+  --button-active-shadow: inset 0 1px 2px rgb(0 0 0 / 0.42);
+  --dialog-backdrop: rgb(0 0 0 / 0.62);
+  --stripe: #282d30;
+}
+
+/* Print remains legible even when the screen theme is dark. */
+@media print {
+  :root,
+  html[data-theme] {
+    color-scheme: light;
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --surface-muted: #f3f3f3;
+    --surface-sunken: #ffffff;
+    --text: #111111;
+    --text-muted: #444444;
+    --text-faint: #555555;
+    --border: #cccccc;
+    --border-strong: #888888;
+    --link: #111111;
+    --link-visited: #111111;
+    --code-bg: #f3f3f3;
+    --code-text: #111111;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+  }
+}

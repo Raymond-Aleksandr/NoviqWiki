@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { BookOpen, LogIn } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { ActionForm } from "@/components/ui/action-form";
-import { getCurrentSession } from "@/modules/auth/session";
+import { AuthPage } from "@/features/auth/auth-page";
+import { AuthField } from "@/features/auth/auth-field";
+import { AuthSubmitButton } from "@/features/auth/auth-submit-button";
+import { getRequestSession } from "@/lib/request-context";
 import { loginAction } from "@/app/actions";
-import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestSite } from "@/lib/request-context";
 import { getRequestI18n } from "@/i18n/server";
 import { isSetupRequired } from "@/modules/setup/service";
 
@@ -13,77 +15,68 @@ type Props = {
 };
 
 export default async function LoginPage({ searchParams }: Props) {
-  if (await getCurrentSession()) {
+  if (await getRequestSession()) {
     redirect("/");
   }
   if (await isSetupRequired()) {
     redirect("/setup");
   }
-  const site = await getPrimarySiteWithSettings();
+  const site = await getRequestSite();
   if (!site) {
     redirect("/setup");
   }
   const { messages } = await getRequestI18n(site.settings?.defaultLocale);
   const params = await searchParams;
+  const registrationEnabled =
+    site.settings?.registrationMode === "open" ||
+    site.settings?.registrationMode === "email_verification";
   return (
-    <section className="auth-page auth-shell">
-      <div className="auth-card">
-        <div className="auth-form-panel">
-          <div className="auth-brand">
-            <span>
-              <BookOpen size={19} aria-hidden="true" />
-            </span>
-            <strong>{site.site.name}</strong>
-          </div>
-          <h1>{messages.loginTitle}</h1>
-          {params.registered ? (
-            <p role="status" className="notice">
-              {messages.accountCreatedNotice}
-            </p>
-          ) : null}
-          {params.reset ? (
-            <p role="status" className="notice">
-              {messages.passwordResetComplete}
-            </p>
-          ) : null}
-          {params.verified ? (
-            <p role="status" className="notice">
-              {messages.emailVerifiedNotice}
-            </p>
-          ) : null}
-          <ActionForm action={loginAction} pendingLabel={messages.working}>
-            <label>
-              {messages.usernameOrEmail}
-              <input className="field input" name="identifier" autoComplete="username" required />
-            </label>
-            <label>
-              {messages.password}
-              <input
-                className="field input"
-                name="password"
-                type="password"
-                autoComplete="current-password"
-                required
-              />
-            </label>
-            <button className="primary button-primary">
-              <LogIn size={16} aria-hidden="true" />
-              {messages.login}
-            </button>
-          </ActionForm>
-          <div className="auth-links">
-            <Link href="/forgot-password">{messages.forgotPassword}</Link>
-            <Link href="/resend-verification">{messages.resendVerificationEmail}</Link>
-            {site.settings?.registrationMode === "open" ||
-            site.settings?.registrationMode === "email_verification" ? (
-              <Link href="/register">{messages.createAccount}</Link>
-            ) : null}
-          </div>
-        </div>
-        <div className="auth-art" aria-hidden="true">
-          <span>{messages.authBrandImage}</span>
-        </div>
-      </div>
-    </section>
+    <AuthPage
+      title={messages.loginTitle}
+      siteName={site.site.name}
+      illustration={messages.authBrandImage}
+      links={[
+        { href: "/forgot-password", label: messages.forgotPassword },
+        { href: "/resend-verification", label: messages.resendVerificationEmail },
+        ...(registrationEnabled ? [{ href: "/register", label: messages.createAccount }] : [])
+      ]}
+    >
+      {params.registered ? (
+        <p role="status" className="notice">
+          {messages.accountCreatedNotice}
+        </p>
+      ) : null}
+      {params.reset ? (
+        <p role="status" className="notice">
+          {messages.passwordResetComplete}
+        </p>
+      ) : null}
+      {params.verified ? (
+        <p role="status" className="notice">
+          {messages.emailVerifiedNotice}
+        </p>
+      ) : null}
+      <ActionForm action={loginAction} pendingLabel={messages.working}>
+        <AuthField
+          name="identifier"
+          label={messages.usernameOrEmail}
+          autoComplete="username"
+          maxLength={320}
+          required
+        />
+        <AuthField
+          name="password"
+          label={messages.password}
+          type="password"
+          autoComplete="current-password"
+          maxLength={200}
+          required
+        />
+        <AuthSubmitButton pendingLabel={messages.working}>
+          <LogIn size={16} aria-hidden="true" />
+          {messages.login}
+        </AuthSubmitButton>
+      </ActionForm>
+    </AuthPage>
   );
 }

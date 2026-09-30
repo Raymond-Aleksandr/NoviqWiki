@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { BookOpen, UserPlus } from "lucide-react";
+import { UserPlus } from "lucide-react";
 import { ActionForm } from "@/components/ui/action-form";
+import { AuthPage } from "@/features/auth/auth-page";
+import { AuthField } from "@/features/auth/auth-field";
+import { AuthSubmitButton } from "@/features/auth/auth-submit-button";
 import { registerAction } from "@/app/actions";
-import { getPrimarySiteWithSettings } from "@/db/site";
+import { getRequestSite } from "@/lib/request-context";
 import { getRequestI18n } from "@/i18n/server";
 import { isSetupRequired } from "@/modules/setup/service";
 
@@ -11,7 +13,7 @@ export default async function RegisterPage() {
   if (await isSetupRequired()) {
     redirect("/setup");
   }
-  const site = await getPrimarySiteWithSettings();
+  const site = await getRequestSite();
   if (!site) {
     redirect("/setup");
   }
@@ -23,54 +25,53 @@ export default async function RegisterPage() {
   }
   const { messages } = await getRequestI18n(site.settings?.defaultLocale);
   return (
-    <section className="auth-compact auth-shell">
-      <div className="auth-compact-card">
-        <div className="auth-brand">
-          <span>
-            <BookOpen size={18} aria-hidden="true" />
-          </span>
-          <strong>{site.site.name}</strong>
-        </div>
-        <h1>{messages.createAccount}</h1>
-        <p>{messages.registerDescription}</p>
-        <ActionForm action={registerAction} pendingLabel={messages.working}>
-          <label>
-            {messages.username}
-            <input className="field input" name="username" autoComplete="username" required />
-          </label>
-          <label>
-            {messages.email}
-            <input
-              className="field input"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-            />
-          </label>
-          <label>
-            {messages.displayName}
-            <input className="field input" name="displayName" />
-          </label>
-          <label>
-            {messages.password}
-            <input
-              className="field input"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-            />
-          </label>
-          <button className="primary button-primary">
-            <UserPlus size={16} aria-hidden="true" />
-            {messages.createAccount}
-          </button>
-        </ActionForm>
-        <p className="muted auth-secondary-link">
-          {messages.alreadyHaveAccount} <Link href="/login">{messages.login}</Link>
-        </p>
-      </div>
-    </section>
+    <AuthPage
+      title={messages.createAccount}
+      description={messages.registerDescription}
+      siteName={site.site.name}
+      linksIntro={messages.alreadyHaveAccount}
+      links={[{ href: "/login", label: messages.login }]}
+    >
+      <ActionForm action={registerAction} pendingLabel={messages.working}>
+        <AuthField
+          name="username"
+          label={messages.username}
+          autoComplete="username"
+          minLength={2}
+          maxLength={80}
+          pattern={"[A-Za-z0-9_.\\-]+"}
+          hint={messages.usernameCharacters}
+          required
+        />
+        <AuthField
+          name="email"
+          label={messages.email}
+          type="email"
+          autoComplete="email"
+          maxLength={320}
+          required
+        />
+        <AuthField
+          name="displayName"
+          label={messages.displayName}
+          autoComplete="nickname"
+          maxLength={160}
+        />
+        <AuthField
+          name="password"
+          label={messages.password}
+          type="password"
+          autoComplete="new-password"
+          minLength={12}
+          maxLength={200}
+          hint={`${messages.passwordLength} ${messages.passwordComplexity}`}
+          required
+        />
+        <AuthSubmitButton pendingLabel={messages.working}>
+          <UserPlus size={16} aria-hidden="true" />
+          {messages.createAccount}
+        </AuthSubmitButton>
+      </ActionForm>
+    </AuthPage>
   );
 }

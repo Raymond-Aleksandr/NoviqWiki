@@ -1,6 +1,11 @@
 import type { Messages } from "@/i18n";
 
-export function formatRevisionSummary(summary: string, messages: Messages) {
+export type RevisionSummaryMessages = Pick<
+  Messages,
+  "rollbackRevisionSummary" | "initialPublicationSummary" | "updateBodySummary"
+>;
+
+export function formatRevisionSummary(summary: string, messages: RevisionSummaryMessages) {
   const trimmed = summary.trim();
   if (!trimmed) {
     return "";
@@ -25,6 +30,6 @@ export function formatRevisionSummary(summary: string, messages: Messages) {
   return trimmed;
 }
 
-export function formatRollbackRevisionSummary(messages: Messages, revisionNumber: number) {
+export function formatRollbackRevisionSummary(messages: Pick<Messages, "rollbackRevisionSummary">, revisionNumber: number) {
   return messages.rollbackRevisionSummary.replace("{revision}", String(revisionNumber));
 }

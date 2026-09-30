@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requirePageReadAccess } from "@/app/access";
-import { ArticleView } from "@/components/article/article-view";
-import { getPrimarySiteWithSettings } from "@/db/site";
+import { ArticleView } from "@/features/article/article-view";
+import { getRequestSite } from "@/lib/request-context";
 import { getRequestI18n } from "@/i18n/server";
 import { slugifyTitle } from "@/lib/normalize";
 import { decodeRouteParam } from "@/lib/route-params";
@@ -17,6 +17,7 @@ import {
 } from "@/modules/pages/service";
 import { resolvePageBySlug } from "@/modules/redirects/service";
 import { invalidRevisionNumber, parseRevisionNumberParam } from "@/modules/revisions/params";
+import { decorateWikiLinkHtml } from "@/modules/rendering/wiki-link-html";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -24,7 +25,7 @@ type Props = {
 };
 
 export default async function ArticlePage({ params, searchParams }: Props) {
-  const site = await getPrimarySiteWithSettings();
+  const site = await getRequestSite();
   if (!site) {
     redirect("/setup");
   }
@@ -79,21 +80,32 @@ export default async function ArticlePage({ params, searchParams }: Props) {
   ]);
   return (
     <ArticleView
-      page={resolved.page}
-      revision={currentRevision}
-      renderedHtml={renderedHtml}
-      canEdit={canEdit}
-      canCreatePage={canCreatePage}
+      page={{
+        id: resolved.page.id,
+        title: resolved.page.title,
+        slug: resolved.page.slug,
+        status: resolved.page.status,
+        protected: resolved.page.protectionLevel === "protected"
+      }}
+      revision={{
+        revisionNumber: currentRevision.revisionNumber,
+        editorDisplayName: currentRevision.editorDisplayName,
+        createdAt: currentRevision.createdAt,
+        html: decorateWikiLinkHtml(renderedHtml ?? currentRevision.html, outboundLinks, canCreatePage),
+        headings: currentRevision.headings,
+        characterCount: currentRevision.plainText.length
+      }}
       redirectedFrom={resolved.redirectedFrom}
       categories={currentRevision.categories.map((name) => ({ name, slug: slugifyTitle(name) }))}
-      outboundLinks={outboundLinks}
-      backlinkCount={backlinks.length}
-      revisionCount={revisions.length}
-      canWatch={Boolean(session)}
-      watched={watched}
+      statistics={{
+        outboundCount: outboundLinks.length,
+        backlinkCount: backlinks.length,
+        revisionCount: revisions.length
+      }}
+      permissions={{ canEdit, canWatch: Boolean(session), watched }}
       currentRevisionNumber={
         revisions.find((revision) => revision.id === resolved.page.currentRevisionId)
-          ?.revisionNumber
+          ?.revisionNumber ?? currentRevision.revisionNumber
       }
       locale={i18n.locale}
       messages={i18n.messages}

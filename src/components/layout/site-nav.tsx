@@ -2,97 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Clock3, FileText, ImageIcon, ListChecks, ShieldCheck, Tags } from "lucide-react";
+import { getSiteNavigation, type SiteNavigationMessages } from "./navigation";
 
-type Messages = {
-  read: string;
-  recentChanges: string;
-  pages: string;
-  categories: string;
-  media: string;
-  specialPages: string;
-  admin: string;
-};
-
-export function SiteNav({ messages, showAdmin }: { messages: Messages; showAdmin: boolean }) {
+export function SiteNav({
+  messages,
+  canAdmin,
+  onNavigate
+}: {
+  messages: SiteNavigationMessages;
+  canAdmin: boolean;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
-  const links = [
-    {
-      href: "/",
-      label: messages.read,
-      icon: BookOpen,
-      active: pathname === "/" || pathname.startsWith("/page/")
-    },
-    {
-      href: "/recent",
-      label: messages.recentChanges,
-      icon: Clock3,
-      active: pathname.startsWith("/recent")
-    },
-    {
-      href: "/pages",
-      label: messages.pages,
-      icon: FileText,
-      active: pathname.startsWith("/pages")
-    },
-    {
-      href: "/categories",
-      label: messages.categories,
-      icon: Tags,
-      active: pathname.startsWith("/categories")
-    },
-    {
-      href: "/media",
-      label: messages.media,
-      icon: ImageIcon,
-      active: pathname.startsWith("/media")
-    },
-    {
-      href: "/special",
-      label: messages.specialPages,
-      icon: ListChecks,
-      active:
-        pathname.startsWith("/special") ||
-        pathname.startsWith("/wanted") ||
-        pathname.startsWith("/orphaned") ||
-        pathname.startsWith("/dead-end") ||
-        pathname.startsWith("/short-pages") ||
-        pathname.startsWith("/protected-pages") ||
-        pathname.startsWith("/uncategorized") ||
-        pathname.startsWith("/redirects") ||
-        pathname.startsWith("/watchlist")
-    },
-    {
-      href: "/admin",
-      label: messages.admin,
-      icon: ShieldCheck,
-      active:
-        pathname.startsWith("/admin") ||
-        pathname.startsWith("/edit") ||
-        pathname.startsWith("/history") ||
-        pathname.startsWith("/diff"),
-      hidden: !showAdmin
-    }
-  ];
 
   return (
-    <nav className="nav-list">
-      {links
-        .filter((link) => !link.hidden)
-        .map((link) => {
-          const Icon = link.icon;
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={link.active ? "active" : ""}
-              aria-current={link.active ? "page" : undefined}
-            >
-              <Icon size={18} aria-hidden="true" />
-              {link.label}
-            </Link>
-          );
-        })}
+    <nav className="nav-list" aria-label={messages.siteNavigation}>
+      {getSiteNavigation(pathname, messages, canAdmin).map(({ href, label, icon: Icon, active }) => (
+        <Link
+          key={href}
+          href={href}
+          className={active ? "active" : undefined}
+          aria-current={active ? "page" : undefined}
+          onClick={onNavigate}
+        >
+          <Icon size={18} aria-hidden="true" />
+          <span>{label}</span>
+        </Link>
+      ))}
     </nav>
   );
 }

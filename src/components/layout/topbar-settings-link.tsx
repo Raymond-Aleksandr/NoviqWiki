@@ -10,7 +10,7 @@ export function TopbarSettingsLink({ label }: { label: string }) {
     return null;
   }
   return (
-    <Link className="button" href="/admin/settings" aria-label={label}>
+    <Link className="button icon-button" href="/admin/settings" aria-label={label} title={label}>
       <Settings size={18} aria-hidden="true" />
     </Link>
   );

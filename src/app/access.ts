@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { getCurrentSession } from "@/modules/auth/session";
+import { getRequestSession } from "@/lib/request-context";
 import {
   hasPermission,
   requirePermission,
@@ -7,7 +7,7 @@ import {
 } from "@/modules/authorization/permissions";
 
 export async function requirePageReadAccess(siteId: string) {
-  const session = await getCurrentSession();
+  const session = await getRequestSession();
   if (!(await hasPermission(session?.user.id, siteId, "page.read"))) {
     redirect("/login");
   }
@@ -15,7 +15,7 @@ export async function requirePageReadAccess(siteId: string) {
 }
 
 export async function requireMediaReadAccess(siteId: string) {
-  const session = await getCurrentSession();
+  const session = await getRequestSession();
   if (!(await hasPermission(session?.user.id, siteId, "media.read"))) {
     redirect("/login");
   }
@@ -23,7 +23,7 @@ export async function requireMediaReadAccess(siteId: string) {
 }
 
 export async function requireAuthenticatedPermission(siteId: string, permission: PermissionKey) {
-  const session = await getCurrentSession();
+  const session = await getRequestSession();
   if (!session) {
     redirect("/login");
   }

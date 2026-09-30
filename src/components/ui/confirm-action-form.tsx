@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useId, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   AlertTriangle,
@@ -12,7 +12,8 @@ import {
   Trash2,
   X
 } from "lucide-react";
-import type { ActionState } from "@/app/actions";
+import type { ActionState } from "@/lib/action-state";
+import { Dialog } from "@/components/ui/dialog";
 
 type HiddenField = {
   name: string;
@@ -59,7 +60,6 @@ export function ConfirmActionForm({
   icon,
   children
 }: Props) {
-  const titleId = useId();
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState(action, initialState);
   const iconTone = danger
@@ -72,7 +72,7 @@ export function ConfirmActionForm({
     if (state.ok && state.message) {
       setOpen(false);
     }
-  }, [state.message, state.ok]);
+  }, [state]);
 
   return (
     <>
@@ -82,6 +82,7 @@ export function ConfirmActionForm({
         data-confirm-action={icon ?? "confirm"}
         aria-label={triggerIconOnly ? triggerLabel : undefined}
         title={triggerTitle ?? (triggerIconOnly ? triggerLabel : undefined)}
+        disabled={pending}
         onClick={() => setOpen(true)}
       >
         <ActionIcon icon={icon} size={14} />
@@ -96,53 +97,60 @@ export function ConfirmActionForm({
           <span className="sr-only">{state.message}</span>
         </span>
       ) : null}
-      {open ? (
-        <div className="modal-backdrop" role="presentation">
-          <div className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
-            <div className="confirm-dialog-heading">
-              <span className={`confirm-dialog-icon ${iconTone}`}>
-                {icon === "rename" ? (
-                  <Pencil size={19} aria-hidden="true" />
-                ) : icon === "archive" ? (
-                  <Archive size={19} aria-hidden="true" />
-                ) : icon === "protect" ? (
-                  <ShieldCheck size={19} aria-hidden="true" />
-                ) : icon === "unprotect" ? (
-                  <ShieldOff size={19} aria-hidden="true" />
-                ) : (
-                  <AlertTriangle size={19} aria-hidden="true" />
-                )}
-              </span>
-              <div>
-                <h2 id={titleId}>{title}</h2>
-                <p>{body}</p>
-              </div>
-            </div>
-            {warning ? <div className="confirm-warning">{warning}</div> : null}
-            <form action={formAction} className="confirm-action-form">
-              {hiddenFields.map((field) => (
-                <input key={field.name} type="hidden" name={field.name} value={field.value} />
-              ))}
-              {children}
-              {state.message && !state.ok ? (
-                <p role="status" className="error">
-                  {state.message}
-                </p>
-              ) : null}
-              <div className="confirm-actions">
-                <button type="button" onClick={() => setOpen(false)}>
-                  <X size={15} aria-hidden="true" />
-                  {cancelLabel}
-                </button>
-                <button className={danger ? "danger" : "primary"} disabled={pending}>
-                  <ActionIcon icon={icon} size={14} />
-                  {pending ? pendingLabel : confirmLabel}
-                </button>
-              </div>
-            </form>
+      <Dialog
+        open={open}
+        onClose={() => setOpen(false)}
+        closeLabel={cancelLabel}
+        closeDisabled={pending}
+        className="confirm-dialog"
+        title={
+          <span className="confirm-dialog-heading">
+            <span className={`confirm-dialog-icon ${iconTone}`}>
+              {icon === "rename" ? (
+                <Pencil size={19} aria-hidden="true" />
+              ) : icon === "archive" ? (
+                <Archive size={19} aria-hidden="true" />
+              ) : icon === "protect" ? (
+                <ShieldCheck size={19} aria-hidden="true" />
+              ) : icon === "unprotect" ? (
+                <ShieldOff size={19} aria-hidden="true" />
+              ) : (
+                <AlertTriangle size={19} aria-hidden="true" />
+              )}
+            </span>
+            <span>{title}</span>
+          </span>
+        }
+        description={body}
+      >
+        {warning ? <div className="confirm-warning">{warning}</div> : null}
+        <form action={formAction} className="confirm-action-form" aria-busy={pending}>
+          {hiddenFields.map((field) => (
+            <input key={field.name} type="hidden" name={field.name} value={field.value} />
+          ))}
+          {children}
+          {state.message && !state.ok ? (
+            <p role="status" aria-live="polite" className="error">
+              {state.message}
+            </p>
+          ) : null}
+          <div className="confirm-actions">
+            <button
+              type="button"
+              data-dialog-autofocus
+              disabled={pending}
+              onClick={() => setOpen(false)}
+            >
+              <X size={15} aria-hidden="true" />
+              {cancelLabel}
+            </button>
+            <button className={danger ? "danger" : "primary"} disabled={pending}>
+              <ActionIcon icon={icon} size={14} />
+              {pending ? pendingLabel : confirmLabel}
+            </button>
           </div>
-        </div>
-      ) : null}
+        </form>
+      </Dialog>
     </>
   );
 }

@@ -1,12 +1,10 @@
-import Link from "next/link";
-import { Eye, GitCompare } from "lucide-react";
 import { notFound, redirect } from "next/navigation";
 import { requirePageReadAccess } from "@/app/access";
-import { rollbackAction } from "@/app/actions";
-import { RevisionCompareForm } from "@/components/article/revision-compare-form";
-import { ConfirmActionForm } from "@/components/ui/confirm-action-form";
-import { getPrimarySiteWithSettings } from "@/db/site";
-import { formatRevisionSummary, formatRollbackRevisionSummary } from "@/i18n/revisions";
+import { PageHeader } from "@/components/ui/page-header";
+import { getRequestSite } from "@/lib/request-context";
+import { ArticleBreadcrumbs, ArticleReturnActions } from "@/features/article/article-navigation";
+import { RevisionCompare } from "@/features/article/revision-compare";
+import { RevisionHistory } from "@/features/article/revision-history";
 import { getRequestI18n } from "@/i18n/server";
 import { decodeRouteParam } from "@/lib/route-params";
 import { hasPermission } from "@/modules/authorization/permissions";
@@ -18,7 +16,7 @@ type Props = {
 };
 
 export default async function HistoryPage({ params }: Props) {
-  const site = await getPrimarySiteWithSettings();
+  const site = await getRequestSite();
   if (!site) {
     redirect("/setup");
   }
@@ -41,89 +39,28 @@ export default async function HistoryPage({ params }: Props) {
   const { locale, messages } = i18n;
   return (
     <section className="page-frame">
-      <h1 className="page-title history-title">
-        {messages.history} · {resolved.page.title}
-      </h1>
-      <RevisionCompareForm
+      <ArticleBreadcrumbs page={resolved.page} currentLabel={messages.history} messages={messages} />
+      <PageHeader
+        title={`${messages.history} · ${resolved.page.title}`}
+        actions={<ArticleReturnActions slug={resolved.page.slug} includeHistory={false} messages={messages} />}
+      />
+      <RevisionCompare
         pageSlug={resolved.page.slug}
         revisions={revisions}
         locale={locale}
         messages={messages}
       />
-      <div className="history-panel">
-        <div className="history-row header">
-          <div>{messages.revisionShort}</div>
-          <div>{messages.summary}</div>
-          <div>{messages.editor}</div>
-          <div>{messages.actions}</div>
-        </div>
-        {revisions.map((revision, index) => (
-          <article className="history-row" key={revision.id}>
-            <div className="history-revision-cell mono" data-label={messages.revisionShort}>
-              <span className="history-revision-value">
-                <span className="history-revision-number">r{revision.revisionNumber}</span>
-                {resolved.page.currentRevisionId === revision.id ? (
-                  <span className="badge success history-current-badge">{messages.current}</span>
-                ) : null}
-              </span>
-            </div>
-            <div className="history-summary-cell" data-label={messages.summary}>
-              <div className="history-summary-text">
-                {formatRevisionSummary(revision.editSummary, messages) || messages.noEditSummary}
-              </div>
-              <div className="history-summary-date mono muted">
-                {revision.createdAt.toLocaleString(locale)}
-              </div>
-            </div>
-            <div className="muted" data-label={messages.editor}>
-              {revision.editorDisplayName}
-            </div>
-            <div className="history-actions" data-label={messages.actions}>
-              <div className="history-action-buttons">
-                <Link
-                  className="button compact"
-                  href={`/page/${resolved.page.slug}?revision=${revision.revisionNumber}&redirect=no`}
-                >
-                  <Eye size={14} aria-hidden="true" />
-                  {messages.view}
-                </Link>
-                {revisions[index + 1] ? (
-                  <Link
-                    className="button compact"
-                    href={`/diff/${revisions[index + 1].id}/${revision.id}`}
-                  >
-                    <GitCompare size={14} aria-hidden="true" />
-                    {messages.compare}
-                  </Link>
-                ) : null}
-                {canRollback && resolved.page.currentRevisionId !== revision.id ? (
-                  <ConfirmActionForm
-                    action={rollbackAction}
-                    hiddenFields={[
-                      { name: "pageId", value: resolved.page.id },
-                      { name: "slug", value: resolved.page.slug },
-                      { name: "targetRevisionId", value: revision.id },
-                      {
-                        name: "reason",
-                        value: formatRollbackRevisionSummary(messages, revision.revisionNumber)
-                      }
-                    ]}
-                    triggerLabel={messages.rollback}
-                    triggerClassName="button compact"
-                    icon="rollback"
-                    title={`${messages.rollback} · r${revision.revisionNumber}`}
-                    body={messages.rollbackConfirmBody}
-                    warning={messages.destructiveActionWarning}
-                    confirmLabel={messages.rollback}
-                    cancelLabel={messages.cancel}
-                    pendingLabel={messages.working}
-                  />
-                ) : null}
-              </div>
-            </div>
-          </article>
-        ))}
-      </div>
+      <RevisionHistory
+        page={{
+          id: resolved.page.id,
+          slug: resolved.page.slug,
+          currentRevisionId: resolved.page.currentRevisionId
+        }}
+        revisions={revisions}
+        canRollback={canRollback}
+        locale={locale}
+        messages={messages}
+      />
     </section>
   );
 }

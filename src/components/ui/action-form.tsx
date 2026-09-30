@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import type { ActionState } from "@/app/actions";
+import { useActionState, useEffect, useRef } from "react";
+import type { ActionState } from "@/lib/action-state";
 
 type Props = {
   action: (state: ActionState, formData: FormData) => Promise<ActionState>;
@@ -21,32 +21,67 @@ export function ActionForm({
   statusMode = "inline"
 }: Props) {
   const [state, formAction, pending] = useActionState(action, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+  const submissionInFlight = useRef(false);
+  const status = pending ? pendingLabel : state.message;
+
+  useEffect(() => {
+    submissionInFlight.current = pending;
+    if (!pending || !formRef.current) return;
+
+    // React has already captured FormData, including the submitter's name and value.
+    const submitters = Array.from(formRef.current.elements).filter(
+      (element): element is HTMLButtonElement | HTMLInputElement =>
+        (element instanceof HTMLButtonElement || element instanceof HTMLInputElement) &&
+        (element.type === "submit" || element.type === "image") &&
+        !element.disabled
+    );
+    submitters.forEach((element) => {
+      element.disabled = true;
+    });
+    return () => {
+      submitters.forEach((element) => {
+        element.disabled = false;
+      });
+    };
+  }, [pending]);
+
   return (
-    <form action={formAction} className={className}>
+    <form
+      ref={formRef}
+      action={formAction}
+      className={className}
+      aria-busy={pending}
+      onSubmitCapture={(event) => {
+        if (submissionInFlight.current) {
+          event.preventDefault();
+          return;
+        }
+        submissionInFlight.current = true;
+      }}
+    >
       {children}
-      {pending ? (
-        statusMode === "compact" ? (
-          <span className="form-status-dot pending" role="status" title={pendingLabel}>
-            <span className="sr-only">{pendingLabel}</span>
-          </span>
-        ) : (
-          <p className="muted">{pendingLabel}</p>
-        )
-      ) : null}
-      {state.message && statusMode === "compact" ? (
-        <span
-          role="status"
-          className={`form-status-dot ${state.ok ? "ok" : "error"}`}
-          title={state.message}
-        >
-          <span className="sr-only">{state.message}</span>
-        </span>
-      ) : null}
-      {state.message && statusMode === "inline" ? (
-        <p role="status" className={state.ok ? "meta" : "error"}>
-          {state.message}
-        </p>
-      ) : null}
+      <span
+        className={`action-form-feedback ${statusMode}`}
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {status ? (
+          statusMode === "compact" ? (
+            <span
+              className={`form-status-dot ${pending ? "pending" : state.ok ? "ok" : "error"}`}
+              title={status}
+            >
+              <span className="sr-only">{status}</span>
+            </span>
+          ) : (
+            <span className={`action-form-status ${pending ? "muted" : state.ok ? "meta" : "error"}`}>
+              {status}
+            </span>
+          )
+        ) : null}
+      </span>
     </form>
   );
 }
