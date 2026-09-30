@@ -1,0 +1,1 @@
+DROP INDEX "site_settings_site_idx";

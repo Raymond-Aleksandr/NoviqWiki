@@ -1,0 +1,15 @@
+.git
+.DS_Store
+.env
+.env*.local
+.next
+node_modules
+coverage
+playwright-report
+test-results
+dist
+media
+backups
+*.log
+*.tsbuildinfo
+*.[mM][dD]
